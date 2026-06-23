@@ -1,0 +1,46 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: devmind-backend
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: ${DEVMIND_DB_URL:jdbc:mysql://localhost:3306/devmind?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    username: ${DEVMIND_DB_USERNAME:root}
+    password: ${DEVMIND_DB_PASSWORD:root}
+  flyway:
+    enabled: ${DEVMIND_FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 1
+    baseline-description: existing schema baseline
+  data:
+    redis:
+      host: ${DEVMIND_REDIS_HOST:localhost}
+      port: ${DEVMIND_REDIS_PORT:6379}
+      database: ${DEVMIND_REDIS_DATABASE:1}
+      password: ${DEVMIND_REDIS_PASSWORD:}
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+devmind:
+  security:
+    jwt-secret: ${DEVMIND_JWT_SECRET:devmind-local-secret-change-me-devmind-local-secret}
+    token-expire-seconds: ${DEVMIND_TOKEN_EXPIRE_SECONDS:7200}
+  ai:
+    provider: ${DEVMIND_AI_PROVIDER:mock}
+    deepseek-api-key: ${DEVMIND_DEEPSEEK_API_KEY:}
+    deepseek-base-url: ${DEVMIND_DEEPSEEK_BASE_URL:https://api.deepseek.com}
+    deepseek-model: ${DEVMIND_DEEPSEEK_MODEL:deepseek-v4-flash}
+    deepseek-temperature: ${DEVMIND_DEEPSEEK_TEMPERATURE:0.2}

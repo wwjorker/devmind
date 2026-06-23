@@ -1,0 +1,30 @@
+services:
+  devmind-mysql:
+    image: mysql:8.0
+    container_name: devmind-mysql
+    restart: unless-stopped
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: devmind
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - devmind_mysql_data:/var/lib/mysql
+      - ./src/main/resources/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+
+  devmind-redis:
+    image: redis:7.2
+    container_name: devmind-redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - devmind_redis_data:/data
+
+volumes:
+  devmind_mysql_data:
+  devmind_redis_data:
