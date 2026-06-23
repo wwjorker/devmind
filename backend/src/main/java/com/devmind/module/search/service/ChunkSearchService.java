@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,15 +40,33 @@ public class ChunkSearchService {
             throw new BizException(ResultCode.BAD_REQUEST, "keyword is required");
         }
 
+        return searchChunks(userId, List.of(keyword), limit);
+    }
+
+    public List<ChunkSearchResponse> searchChunks(Long userId, List<String> keywords, Integer limit) {
+        List<String> normalizedKeywords = normalizeKeywords(keywords);
+        if (normalizedKeywords.isEmpty()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "keyword is required");
+        }
+
         int safeLimit = resolveLimit(limit);
-        String normalizedKeyword = keyword.trim();
+        int queryLimit = Math.min(safeLimit * normalizedKeywords.size(), MAX_LIMIT);
 
         LambdaQueryWrapper<DocumentChunk> chunkQuery = new LambdaQueryWrapper<>();
         chunkQuery.eq(DocumentChunk::getUserId, userId)
                 .eq(DocumentChunk::getStatus, STATUS_ACTIVE)
-                .like(DocumentChunk::getContent, normalizedKeyword)
+                .and(wrapper -> {
+                    for (int i = 0; i < normalizedKeywords.size(); i++) {
+                        String keyword = normalizedKeywords.get(i);
+                        if (i == 0) {
+                            wrapper.like(DocumentChunk::getContent, keyword);
+                        } else {
+                            wrapper.or().like(DocumentChunk::getContent, keyword);
+                        }
+                    }
+                })
                 .orderByDesc(DocumentChunk::getUpdatedAt)
-                .last("LIMIT " + safeLimit);
+                .last("LIMIT " + queryLimit);
 
         List<DocumentChunk> chunks = chunkMapper.selectList(chunkQuery);
         if (chunks.isEmpty()) {
@@ -61,7 +80,7 @@ public class ChunkSearchService {
 
         return chunks.stream()
                 .filter(chunk -> documentMap.containsKey(chunk.getDocumentId()))
-                .map(chunk -> toResponse(chunk, documentMap.get(chunk.getDocumentId()), normalizedKeyword))
+                .map(chunk -> toResponse(chunk, documentMap.get(chunk.getDocumentId()), normalizedKeywords))
                 .sorted(Comparator.comparing(ChunkSearchResponse::getScore).reversed()
                         .thenComparing(ChunkSearchResponse::getChunkId))
                 .limit(safeLimit)
@@ -87,7 +106,7 @@ public class ChunkSearchService {
 
     private ChunkSearchResponse toResponse(DocumentChunk chunk,
                                            KnowledgeDocument document,
-                                           String keyword) {
+                                           List<String> keywords) {
         return new ChunkSearchResponse(
                 chunk.getId(),
                 chunk.getDocumentId(),
@@ -97,16 +116,33 @@ public class ChunkSearchService {
                 chunk.getChunkIndex(),
                 chunk.getContent(),
                 chunk.getTokenCount(),
-                calculateScore(chunk, document, keyword)
+                calculateScore(chunk, document, keywords)
         );
     }
 
-    private int calculateScore(DocumentChunk chunk, KnowledgeDocument document, String keyword) {
-        String lowerKeyword = keyword.toLowerCase();
-        int score = countOccurrences(chunk.getContent(), lowerKeyword) * 10;
-        score += countOccurrences(document.getTitle(), lowerKeyword) * 5;
-        score += countOccurrences(document.getTags(), lowerKeyword) * 3;
-        score += countOccurrences(document.getSourceType(), lowerKeyword);
+    private List<String> normalizeKeywords(List<String> keywords) {
+        if (keywords == null) {
+            return List.of();
+        }
+
+        return keywords.stream()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toCollection(LinkedHashSet::new),
+                        List::copyOf
+                ));
+    }
+
+    private int calculateScore(DocumentChunk chunk, KnowledgeDocument document, List<String> keywords) {
+        int score = 0;
+        for (String keyword : keywords) {
+            String lowerKeyword = keyword.toLowerCase();
+            score += countOccurrences(chunk.getContent(), lowerKeyword) * 10;
+            score += countOccurrences(document.getTitle(), lowerKeyword) * 5;
+            score += countOccurrences(document.getTags(), lowerKeyword) * 3;
+            score += countOccurrences(document.getSourceType(), lowerKeyword);
+        }
         return Math.max(score, 1);
     }
 

@@ -11,40 +11,40 @@ import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Locale;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 public class AiAskService {
 
     private static final int DEFAULT_RETRIEVAL_LIMIT = 3;
-    private static final Pattern ENGLISH_TOKEN_PATTERN = Pattern.compile("[A-Za-z][A-Za-z0-9_+#.-]*");
 
     private final ChunkSearchService chunkSearchService;
     private final AiAskLogService askLogService;
     private final PromptBuilderService promptBuilderService;
+    private final RetrievalKeywordService retrievalKeywordService;
     private final LlmClientRouter llmClientRouter;
 
     public AiAskService(ChunkSearchService chunkSearchService,
                         AiAskLogService askLogService,
                         PromptBuilderService promptBuilderService,
+                        RetrievalKeywordService retrievalKeywordService,
                         LlmClientRouter llmClientRouter) {
         this.chunkSearchService = chunkSearchService;
         this.askLogService = askLogService;
         this.promptBuilderService = promptBuilderService;
+        this.retrievalKeywordService = retrievalKeywordService;
         this.llmClientRouter = llmClientRouter;
     }
 
     public AskResponse ask(Long userId, AskRequest request) {
         long startTime = System.currentTimeMillis();
         String question = request.getQuestion().trim();
-        String retrievalKeyword = resolveRetrievalKeyword(question);
+        List<String> retrievalKeywords = retrievalKeywordService.resolveKeywords(question);
+        String retrievalKeyword = retrievalKeywordService.toLogKeyword(retrievalKeywords);
         Integer retrievalLimit = request.getRetrievalLimit() == null
                 ? DEFAULT_RETRIEVAL_LIMIT
                 : request.getRetrievalLimit();
 
-        List<ChunkSearchResponse> chunks = chunkSearchService.searchChunks(userId, retrievalKeyword, retrievalLimit);
+        List<ChunkSearchResponse> chunks = chunkSearchService.searchChunks(userId, retrievalKeywords, retrievalLimit);
         String promptPreview = promptBuilderService.buildPrompt(question, chunks);
         List<CitationResponse> citations = buildCitations(chunks);
         LlmResponse llmResponse = llmClientRouter.generate(new LlmRequest(question, promptPreview, chunks, citations));
@@ -81,33 +81,6 @@ public class AiAskService {
                 chunks,
                 citations
         );
-    }
-
-    private String resolveRetrievalKeyword(String question) {
-        String lowerQuestion = question.toLowerCase(Locale.ROOT);
-        if (lowerQuestion.contains("redis")) {
-            return "Redis";
-        }
-        if (lowerQuestion.contains("mysql")) {
-            return "MySQL";
-        }
-        if (lowerQuestion.contains("jwt")) {
-            return "JWT";
-        }
-
-        Matcher matcher = ENGLISH_TOKEN_PATTERN.matcher(question);
-        String bestToken = null;
-        while (matcher.find()) {
-            String token = matcher.group();
-            if (bestToken == null || token.length() > bestToken.length()) {
-                bestToken = token;
-            }
-        }
-
-        if (bestToken != null) {
-            return bestToken;
-        }
-        return question;
     }
 
     private List<CitationResponse> buildCitations(List<ChunkSearchResponse> chunks) {

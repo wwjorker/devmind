@@ -9,7 +9,7 @@ It demonstrates a complete RAG-style workflow instead of a thin AI API wrapper:
 ```text
 knowledge documents
 -> document chunks
--> keyword retrieval
+-> multilingual keyword retrieval
 -> prompt building
 -> LLM provider routing
 -> answers with citations
@@ -22,9 +22,9 @@ knowledge documents
 
 ```text
 devmind
-├── backend    Spring Boot backend
-├── frontend   Vue 3 + Vite frontend
-└── .github    CI workflow
++-- backend    Spring Boot backend
++-- frontend   Vue 3 + Vite frontend
++-- .github    CI workflow
 ```
 
 ## Backend
@@ -96,6 +96,7 @@ This verifies the backend unit tests and frontend production build on every push
 - JWT authentication and user-scoped data isolation
 - Flyway-managed schema migration
 - RAG ask flow with prompt preview and citations
+- Multilingual keyword extraction for Chinese and English technical questions
 - Pluggable LLM provider layer with Mock and DeepSeek implementations
 - AI ask logs with latency, retrieved chunk ids, and token usage
 - Bad-case feedback and lightweight RAG evaluation summary

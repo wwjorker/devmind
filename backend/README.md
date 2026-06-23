@@ -28,7 +28,7 @@ This makes the project easier to explain in Java backend interviews because the 
 - User-scoped knowledge documents
 - Soft archive instead of physical deletion
 - Automatic document chunk generation and rebuild on update
-- Keyword-based retrieval v0 for explainable debugging
+- Multilingual keyword retrieval for Chinese and English technical questions
 - RAG ask flow with prompt preview and citations
 - Pluggable LLM layer with `MockLlmClient` and `DeepSeekLlmClient`
 - DeepSeek real-model integration through environment variables
@@ -112,7 +112,7 @@ sequenceDiagram
     participant Feedback as AiAskFeedbackService
 
     Client->>AI: POST /api/v1/ai/ask
-    AI->>Search: searchChunks(userId, keyword)
+    AI->>Search: searchChunks(userId, keywords)
     Search-->>AI: retrieved chunks
     AI->>Prompt: buildPrompt(question, chunks)
     Prompt-->>AI: prompt preview
@@ -167,7 +167,7 @@ Each AI ask log records:
 
 ```text
 question
-retrieval keyword
+retrieval keywords
 prompt preview
 model provider
 mock or real-provider flag
