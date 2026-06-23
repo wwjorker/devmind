@@ -1183,3 +1183,106 @@ RetrievalKeywordServiceTest
 ```text
 项目早期的 RAG 检索只使用单个英文关键词，中文问题和多概念问题的召回效果较弱。后面我抽象了 RetrievalKeywordService，把检索词提取从单关键词升级成中英文多关键词，并让 ChunkSearchService 支持 OR 条件召回和多关键词加权打分。这样在不引入向量库的前提下，提高了中文技术笔记场景下的上下文命中率，同时保持了检索结果可解释、易调试。
 ```
+
+## 38 为什么要给 JWT logout 接 Redis 黑名单
+
+JWT 的特点是无状态：服务端签发 token 后，后续请求只要 token 没过期、签名正确，就可以通过认证。
+
+这带来一个问题：
+
+```text
+用户点击 logout 后，服务端默认并不知道要让哪个 token 立刻失效。
+```
+
+所以这次把 Redis 真正用到了认证链路里：
+
+```text
+用户登录 -> 得到 JWT
+用户 logout -> 把当前 JWT 的 SHA-256 哈希写入 Redis
+Redis key 设置 TTL = token 剩余有效期
+后续请求 -> JwtAuthenticationFilter 先查 Redis 黑名单
+命中黑名单 -> 不建立登录态
+```
+
+这里有两个设计点：
+
+- 不把原始 token 明文存进 Redis，而是存 SHA-256 哈希，避免 Redis 数据暴露时 token 直接可用。
+- TTL 使用 token 剩余有效期，过期后 Redis 自动删除，不需要额外清理任务。
+
+面试时可以这样讲：
+
+```text
+JWT 本身是无状态的，服务端默认无法主动吊销 token。为了解决 logout 后 token 仍可用的问题，我用 Redis 做 token blacklist。登出时把 token 的 SHA-256 哈希写入 Redis，并设置与 token 剩余有效期一致的 TTL；认证过滤器解析 token 前先检查黑名单，命中则拒绝建立认证上下文。这样既保留了 JWT 的无状态优势，又支持了服务端主动登出失效。
+```
+
+## 39 为什么 AI 调用失败也要落库
+
+AI 项目不能只记录成功路径。真实接入 DeepSeek 这类模型时，可能出现：
+
+- API key 没配置。
+- provider 名称配置错。
+- 网络超时。
+- 模型服务返回异常。
+
+如果失败时只给前端返回错误，不写日志，后面就很难排查：
+
+```text
+到底是检索没召回？
+还是 prompt 有问题？
+还是 provider 调用失败？
+```
+
+所以现在失败时也会写入 `ai_ask_log`：
+
+```text
+status = 0
+question
+retrieval_keyword
+prompt_preview
+model_provider
+retrieved_chunk_ids
+elapsed_ms
+answer = LLM request failed: 具体失败原因
+```
+
+面试时可以这样讲：
+
+```text
+我没有只处理 AI 调用成功的 happy path。模型 provider 调用失败时，我仍然会记录问题、检索词、prompt preview、召回 chunk、provider、耗时和失败原因，并把 status 标记为 0。这样后续可以区分是 RAG 召回问题、Prompt 问题，还是模型服务/配置问题，属于 AI 应用的可观测性设计。
+```
+
+## 40 为什么要做无召回兜底
+
+RAG 的核心原则是：回答应该基于检索到的知识库上下文。
+
+如果检索结果为空，还继续把问题交给大模型，就会有两个风险：
+
+- 模型可能凭自己的通用知识回答，造成“看起来合理但没有知识库依据”的幻觉。
+- 白白消耗 token 和 API 成本。
+
+所以现在 `AiAskService` 在检索后做了一层判断：
+
+```text
+如果 retrieved chunks 为空：
+    不调用 LLM provider
+    直接返回固定兜底回答
+    写入 ask log
+如果 retrieved chunks 不为空：
+    构造 prompt
+    调用 Mock/DeepSeek
+    写入成功或失败日志
+```
+
+兜底回答的含义是：
+
+```text
+知识库目前没有足够信息回答这个问题，请补充相关笔记或换一种问法。
+```
+
+这一步的价值不是让项目显得复杂，而是让 AI 行为更可控。
+
+面试时可以这样讲：
+
+```text
+为了减少幻觉和无效 token 消耗，我在 RAG 编排层加了无召回兜底。如果关键词检索没有召回任何 chunk，系统不会继续调用大模型，而是直接返回“知识库暂无足够信息”的确定性回答，并记录日志。这样可以保证回答边界清晰，也方便后续通过 bad case 或补充文档来优化知识库覆盖率。
+```

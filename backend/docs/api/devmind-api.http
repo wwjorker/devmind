@@ -75,6 +75,32 @@ Content-Type: application/json
 
 > {% client.global.set("askLogId", response.body.data.logId); %}
 
+### Ask AI With No Retrieved Context
+# Expected: the backend returns a deterministic fallback answer and does not call the LLM provider.
+POST {{baseUrl}}/api/v1/ai/ask
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "question": "What is Kubernetes pod eviction policy?",
+  "retrievalLimit": 3
+}
+
+### Ask AI Failure Log Demo
+# To test failure logging:
+# 1. Set DEVMIND_AI_PROVIDER=unknown in the backend run configuration.
+# 2. Restart the backend.
+# 3. Run this request after creating the Redis cache penetration document.
+# Expected: the API returns an error response, and ai_ask_log gets status = 0.
+POST {{baseUrl}}/api/v1/ai/ask
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "question": "How should Redis cache penetration be handled?",
+  "retrievalLimit": 3
+}
+
 ### List AI Ask Logs
 GET {{baseUrl}}/api/v1/ai/ask-logs?pageNo=1&pageSize=10
 Authorization: Bearer {{authToken}}

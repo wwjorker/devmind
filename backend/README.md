@@ -12,6 +12,7 @@ Many AI demos stop at "send a prompt to a model and return an answer". DevMind t
 knowledge document
 -> document chunks
 -> retrieval
+-> no-context fallback when retrieval is empty
 -> prompt building
 -> LLM provider
 -> answer with citations
@@ -30,6 +31,7 @@ This makes the project easier to explain in Java backend interviews because the 
 - Soft archive instead of physical deletion
 - Automatic document chunk generation and rebuild on update
 - Multilingual keyword retrieval for Chinese and English technical questions
+- No-context fallback to avoid unsupported model answers
 - RAG ask flow with prompt preview and citations
 - Pluggable LLM layer with `MockLlmClient` and `DeepSeekLlmClient`
 - DeepSeek real-model integration through environment variables
@@ -116,6 +118,10 @@ sequenceDiagram
     Client->>AI: POST /api/v1/ai/ask
     AI->>Search: searchChunks(userId, keywords)
     Search-->>AI: retrieved chunks
+    alt no chunks found
+        AI->>Log: save fallback log without calling LLM
+        AI-->>Client: knowledge base has insufficient information
+    else chunks found
     AI->>Prompt: buildPrompt(question, chunks)
     Prompt-->>AI: prompt preview
     AI->>LLM: generate(prompt)
@@ -124,6 +130,7 @@ sequenceDiagram
     AI-->>Client: answer + citations + logId
     LLM--xAI: provider error
     AI->>Log: save failure log with provider, chunks, latency, reason
+    end
     Client->>Feedback: POST feedback for logId
 ```
 
@@ -184,6 +191,8 @@ status: success or failed
 ```
 
 Logout writes the current JWT into a Redis blacklist with a TTL equal to the token's remaining lifetime. The authentication filter checks the blacklist before accepting a bearer token.
+
+When retrieval returns no chunks, the backend returns a deterministic fallback answer instead of calling the LLM provider. This avoids unsupported answers and saves model tokens.
 
 Feedback records store:
 

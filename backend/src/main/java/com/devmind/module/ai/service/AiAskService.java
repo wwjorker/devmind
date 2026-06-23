@@ -16,6 +16,11 @@ import java.util.List;
 public class AiAskService {
 
     private static final int DEFAULT_RETRIEVAL_LIMIT = 3;
+    private static final String NO_CONTEXT_PROVIDER = "knowledge-base-fallback";
+    private static final String NO_CONTEXT_ANSWER = """
+            The knowledge base does not contain enough information to answer this question.
+            Please add relevant notes or refine the question, then ask again.
+            """;
 
     private final ChunkSearchService chunkSearchService;
     private final AiAskLogService askLogService;
@@ -47,6 +52,18 @@ public class AiAskService {
         List<ChunkSearchResponse> chunks = chunkSearchService.searchChunks(userId, retrievalKeywords, retrievalLimit);
         String promptPreview = promptBuilderService.buildPrompt(question, chunks);
         List<CitationResponse> citations = buildCitations(chunks);
+        if (chunks.isEmpty()) {
+            return buildNoContextResponse(
+                    userId,
+                    question,
+                    retrievalKeyword,
+                    promptPreview,
+                    chunks,
+                    citations,
+                    System.currentTimeMillis() - startTime
+            );
+        }
+
         LlmResponse llmResponse;
         try {
             llmResponse = llmClientRouter.generate(new LlmRequest(question, promptPreview, chunks, citations));
@@ -96,6 +113,44 @@ public class AiAskService {
                 llmResponse.getPromptTokens(),
                 llmResponse.getCompletionTokens(),
                 llmResponse.getTotalTokens(),
+                chunks,
+                citations
+        );
+    }
+
+    private AskResponse buildNoContextResponse(Long userId,
+                                               String question,
+                                               String retrievalKeyword,
+                                               String promptPreview,
+                                               List<ChunkSearchResponse> chunks,
+                                               List<CitationResponse> citations,
+                                               long elapsedMs) {
+        Long logId = askLogService.saveSuccessLog(
+                userId,
+                question,
+                retrievalKeyword,
+                promptPreview,
+                NO_CONTEXT_ANSWER,
+                NO_CONTEXT_PROVIDER,
+                true,
+                null,
+                null,
+                null,
+                chunks,
+                elapsedMs
+        );
+
+        return new AskResponse(
+                logId,
+                question,
+                retrievalKeyword,
+                promptPreview,
+                NO_CONTEXT_ANSWER,
+                NO_CONTEXT_PROVIDER,
+                true,
+                null,
+                null,
+                null,
                 chunks,
                 citations
         );
