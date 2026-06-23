@@ -20,16 +20,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private final JwtTokenProvider jwtTokenProvider;
+    private final TokenBlacklistService tokenBlacklistService;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider) {
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider,
+                                   TokenBlacklistService tokenBlacklistService) {
         this.jwtTokenProvider = jwtTokenProvider;
+        this.tokenBlacklistService = tokenBlacklistService;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         String token = resolveToken(request);
-        if (StringUtils.hasText(token) && SecurityContextHolder.getContext().getAuthentication() == null) {
+        if (StringUtils.hasText(token)
+                && !tokenBlacklistService.isBlacklisted(token)
+                && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
                 AuthenticatedUser user = jwtTokenProvider.parseToken(token);
                 UsernamePasswordAuthenticationToken authentication =

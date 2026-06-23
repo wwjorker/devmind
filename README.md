@@ -37,6 +37,7 @@ Spring Boot 3.3.x
 Spring Security
 MyBatis-Plus
 MySQL
+Redis
 Flyway
 JJWT
 Springdoc OpenAPI
@@ -94,6 +95,7 @@ This verifies the backend unit tests and frontend production build on every push
 ## Interview Highlights
 
 - JWT authentication and user-scoped data isolation
+- Redis-backed JWT logout blacklist
 - Flyway-managed schema migration
 - RAG ask flow with prompt preview and citations
 - Multilingual keyword extraction for Chinese and English technical questions

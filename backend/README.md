@@ -25,6 +25,7 @@ This makes the project easier to explain in Java backend interviews because the 
 ## Core Features
 
 - JWT authentication with BCrypt password hashing
+- Redis-backed JWT logout blacklist
 - User-scoped knowledge documents
 - Soft archive instead of physical deletion
 - Automatic document chunk generation and rebuild on update
@@ -45,7 +46,7 @@ Spring Boot 3.3.x
 Spring Security
 MyBatis-Plus
 MySQL
-Redis configuration ready
+Redis
 Maven
 Flyway
 Springdoc OpenAPI
@@ -68,6 +69,7 @@ Prompt building
 Mock LLM responses
 LLM provider routing
 JWT creation and parsing
+Redis-backed token blacklist
 ```
 
 GitHub Actions runs the same Maven test command on every push and pull request to `main`.
@@ -181,6 +183,8 @@ total tokens
 status: success or failed
 ```
 
+Logout writes the current JWT into a Redis blacklist with a TTL equal to the token's remaining lifetime. The authentication filter checks the blacklist before accepting a bearer token.
+
 Feedback records store:
 
 ```text
@@ -247,6 +251,9 @@ DEVMIND_DB_USERNAME=your_mysql_username
 DEVMIND_DB_PASSWORD=your_mysql_password
 DEVMIND_JWT_SECRET=replace_with_a_long_random_secret_for_non_local_use
 DEVMIND_AI_PROVIDER=mock
+DEVMIND_REDIS_HOST=localhost
+DEVMIND_REDIS_PORT=6379
+DEVMIND_REDIS_DATABASE=1
 ```
 
 DeepSeek provider:

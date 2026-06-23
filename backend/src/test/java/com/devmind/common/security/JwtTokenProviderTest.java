@@ -20,5 +20,6 @@ class JwtTokenProviderTest {
         assertThat(authenticatedUser.userId()).isEqualTo(12L);
         assertThat(authenticatedUser.username()).isEqualTo("testuser");
         assertThat(jwtTokenProvider.getExpireSeconds()).isEqualTo(3600);
+        assertThat(jwtTokenProvider.getRemainingTtlSeconds(token)).isBetween(3590L, 3600L);
     }
 }

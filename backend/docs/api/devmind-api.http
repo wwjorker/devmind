@@ -100,7 +100,7 @@ Authorization: Bearer {{authToken}}
 
 ### Inspect Latest Ask Logs in Database
 # Run this SQL in DBeaver after Ask AI:
-# SELECT id, question, retrieval_keyword, prompt_tokens, completion_tokens, total_tokens, retrieved_chunk_ids, elapsed_ms, created_at
+# SELECT id, question, retrieval_keyword, prompt_tokens, completion_tokens, total_tokens, retrieved_chunk_ids, elapsed_ms, status, created_at
 # FROM devmind.ai_ask_log
 # ORDER BY id DESC;
 
@@ -125,4 +125,9 @@ Content-Type: application/json
 
 ### Archive Document
 DELETE {{baseUrl}}/api/v1/documents/{{documentId}}
+Authorization: Bearer {{authToken}}
+
+### Logout
+# Run this one at the end. After logout, this token is written to the Redis blacklist.
+POST {{baseUrl}}/api/v1/auth/logout
 Authorization: Bearer {{authToken}}

@@ -35,16 +35,27 @@ public class JwtTokenProvider {
     }
 
     public AuthenticatedUser parseToken(String token) {
+        Claims claims = parseClaims(token);
+        Long userId = claims.get(CLAIM_USER_ID, Long.class);
+        return new AuthenticatedUser(userId, claims.getSubject());
+    }
+
+    public long getRemainingTtlSeconds(String token) {
+        Date expiration = parseClaims(token).getExpiration();
+        long remainingSeconds = expiration.toInstant().getEpochSecond() - Instant.now().getEpochSecond();
+        return Math.max(remainingSeconds, 0);
+    }
+
+    public long getExpireSeconds() {
+        return jwtProperties.getTokenExpireSeconds();
+    }
+
+    private Claims parseClaims(String token) {
         Claims claims = Jwts.parser()
                 .verifyWith(secretKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-        Long userId = claims.get(CLAIM_USER_ID, Long.class);
-        return new AuthenticatedUser(userId, claims.getSubject());
-    }
-
-    public long getExpireSeconds() {
-        return jwtProperties.getTokenExpireSeconds();
+        return claims;
     }
 }

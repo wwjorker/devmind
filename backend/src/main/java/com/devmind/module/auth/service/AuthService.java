@@ -3,6 +3,7 @@ package com.devmind.module.auth.service;
 import com.devmind.common.api.ResultCode;
 import com.devmind.common.exception.BizException;
 import com.devmind.common.security.JwtTokenProvider;
+import com.devmind.common.security.TokenBlacklistService;
 import com.devmind.module.auth.dto.LoginRequest;
 import com.devmind.module.auth.dto.RegisterRequest;
 import com.devmind.module.auth.vo.LoginResponse;
@@ -21,13 +22,16 @@ public class AuthService {
     private final UserAccountService userAccountService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final TokenBlacklistService tokenBlacklistService;
 
     public AuthService(UserAccountService userAccountService,
                        PasswordEncoder passwordEncoder,
-                       JwtTokenProvider jwtTokenProvider) {
+                       JwtTokenProvider jwtTokenProvider,
+                       TokenBlacklistService tokenBlacklistService) {
         this.userAccountService = userAccountService;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.tokenBlacklistService = tokenBlacklistService;
     }
 
     @Transactional
@@ -60,6 +64,14 @@ public class AuthService {
 
         String token = jwtTokenProvider.createToken(userAccount.getId(), userAccount.getUsername());
         return new LoginResponse(token, "Bearer", jwtTokenProvider.getExpireSeconds());
+    }
+
+    public void logout(String token) {
+        if (!StringUtils.hasText(token)) {
+            return;
+        }
+        long ttlSeconds = jwtTokenProvider.getRemainingTtlSeconds(token);
+        tokenBlacklistService.blacklist(token, ttlSeconds);
     }
 
     public UserProfileResponse getCurrentUser(Long userId) {

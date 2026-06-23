@@ -7,6 +7,7 @@ import com.devmind.module.auth.dto.RegisterRequest;
 import com.devmind.module.auth.service.AuthService;
 import com.devmind.module.auth.vo.LoginResponse;
 import com.devmind.module.auth.vo.UserProfileResponse;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,6 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
+
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
 
     private final AuthService authService;
 
@@ -41,7 +45,16 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public Result<Void> logout() {
+    public Result<Void> logout(HttpServletRequest request) {
+        authService.logout(resolveToken(request));
         return Result.success();
+    }
+
+    private String resolveToken(HttpServletRequest request) {
+        String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
+        if (bearerToken != null && bearerToken.startsWith(BEARER_PREFIX)) {
+            return bearerToken.substring(BEARER_PREFIX.length());
+        }
+        return null;
     }
 }
