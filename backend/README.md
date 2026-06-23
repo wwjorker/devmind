@@ -15,7 +15,7 @@ knowledge document
 -> prompt building
 -> LLM provider
 -> answer with citations
--> ask log with token usage
+-> success/failure ask log with token usage
 -> bad-case feedback
 -> evaluation summary
 ```
@@ -32,7 +32,7 @@ This makes the project easier to explain in Java backend interviews because the 
 - RAG ask flow with prompt preview and citations
 - Pluggable LLM layer with `MockLlmClient` and `DeepSeekLlmClient`
 - DeepSeek real-model integration through environment variables
-- AI ask logs with provider, latency, retrieved chunk ids, and token usage
+- AI ask logs with success/failure status, provider, latency, retrieved chunk ids, and token usage
 - AI feedback records for helpful labels and bad-case collection
 - Evaluation summary API for total feedback, bad-case count, bad-case rate, and recent bad cases
 - OpenAPI / Swagger UI and IDEA HTTP Client examples
@@ -118,8 +118,10 @@ sequenceDiagram
     Prompt-->>AI: prompt preview
     AI->>LLM: generate(prompt)
     LLM-->>AI: answer + token usage
-    AI->>Log: save provider, chunks, latency, tokens
+    AI->>Log: save success log with provider, chunks, latency, tokens
     AI-->>Client: answer + citations + logId
+    LLM--xAI: provider error
+    AI->>Log: save failure log with provider, chunks, latency, reason
     Client->>Feedback: POST feedback for logId
 ```
 
@@ -176,6 +178,7 @@ elapsed milliseconds
 prompt tokens
 completion tokens
 total tokens
+status: success or failed
 ```
 
 Feedback records store:

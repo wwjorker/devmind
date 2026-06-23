@@ -17,6 +17,7 @@ import java.util.stream.Collectors;
 public class AiAskLogService {
 
     private static final int STATUS_SUCCESS = 1;
+    private static final int STATUS_FAILED = 0;
     private static final long MAX_PAGE_SIZE = 50;
 
     private final AiAskLogMapper askLogMapper;
@@ -57,6 +58,32 @@ public class AiAskLogService {
         return log.getId();
     }
 
+    @Transactional
+    public Long saveFailureLog(Long userId,
+                               String question,
+                               String retrievalKeyword,
+                               String promptPreview,
+                               String failureMessage,
+                               String modelProvider,
+                               boolean mock,
+                               List<ChunkSearchResponse> retrievedChunks,
+                               long elapsedMs) {
+        AiAskLog log = new AiAskLog();
+        log.setUserId(userId);
+        log.setQuestion(question);
+        log.setRetrievalKeyword(retrievalKeyword);
+        log.setPromptPreview(promptPreview);
+        log.setAnswer(toFailureAnswer(failureMessage));
+        log.setModelProvider(modelProvider);
+        log.setMock(mock);
+        log.setRetrievedChunkCount(retrievedChunks.size());
+        log.setRetrievedChunkIds(toChunkIds(retrievedChunks));
+        log.setElapsedMs(elapsedMs);
+        log.setStatus(STATUS_FAILED);
+        askLogMapper.insert(log);
+        return log.getId();
+    }
+
     public PageResult<AskLogResponse> page(Long userId, long pageNo, long pageSize) {
         long safePageNo = Math.max(pageNo, 1);
         long safePageSize = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
@@ -78,6 +105,13 @@ public class AiAskLogService {
         return chunks.stream()
                 .map(chunk -> String.valueOf(chunk.getChunkId()))
                 .collect(Collectors.joining(","));
+    }
+
+    private String toFailureAnswer(String failureMessage) {
+        if (failureMessage == null || failureMessage.isBlank()) {
+            return "LLM request failed";
+        }
+        return "LLM request failed: " + failureMessage;
     }
 
     private AskLogResponse toResponse(AiAskLog log) {

@@ -26,4 +26,8 @@ public class LlmClientRouter {
                 .orElseThrow(() -> new BizException(ResultCode.INTERNAL_ERROR, "unsupported llm provider: " + provider))
                 .generate(request);
     }
+
+    public String getConfiguredProvider() {
+        return aiProperties.getProvider();
+    }
 }

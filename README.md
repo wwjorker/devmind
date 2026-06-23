@@ -13,7 +13,7 @@ knowledge documents
 -> prompt building
 -> LLM provider routing
 -> answers with citations
--> ask logs with token usage
+-> success/failure ask logs with token usage
 -> bad-case feedback
 -> evaluation summary
 ```
@@ -98,6 +98,6 @@ This verifies the backend unit tests and frontend production build on every push
 - RAG ask flow with prompt preview and citations
 - Multilingual keyword extraction for Chinese and English technical questions
 - Pluggable LLM provider layer with Mock and DeepSeek implementations
-- AI ask logs with latency, retrieved chunk ids, and token usage
+- AI ask logs with success/failure status, latency, retrieved chunk ids, and token usage
 - Bad-case feedback and lightweight RAG evaluation summary
 - Unit tests and GitHub Actions CI

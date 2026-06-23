@@ -47,7 +47,25 @@ public class AiAskService {
         List<ChunkSearchResponse> chunks = chunkSearchService.searchChunks(userId, retrievalKeywords, retrievalLimit);
         String promptPreview = promptBuilderService.buildPrompt(question, chunks);
         List<CitationResponse> citations = buildCitations(chunks);
-        LlmResponse llmResponse = llmClientRouter.generate(new LlmRequest(question, promptPreview, chunks, citations));
+        LlmResponse llmResponse;
+        try {
+            llmResponse = llmClientRouter.generate(new LlmRequest(question, promptPreview, chunks, citations));
+        } catch (RuntimeException ex) {
+            long elapsedMs = System.currentTimeMillis() - startTime;
+            String modelProvider = llmClientRouter.getConfiguredProvider();
+            askLogService.saveFailureLog(
+                    userId,
+                    question,
+                    retrievalKeyword,
+                    promptPreview,
+                    ex.getMessage(),
+                    modelProvider,
+                    isMockProvider(modelProvider),
+                    chunks,
+                    elapsedMs
+            );
+            throw ex;
+        }
         String answer = llmResponse.getAnswer();
         String modelProvider = llmResponse.getModelProvider();
         boolean mock = llmResponse.isMock();
@@ -93,5 +111,9 @@ public class AiAskService {
                         chunk.getScore()
                 ))
                 .toList();
+    }
+
+    private boolean isMockProvider(String modelProvider) {
+        return "mock".equalsIgnoreCase(modelProvider);
     }
 }
