@@ -101,6 +101,7 @@ This verifies the backend unit tests and frontend production build on every push
 - RAG ask flow with prompt preview and citations
 - No-context fallback to reduce hallucination and token cost
 - Multilingual keyword extraction for Chinese and English technical questions
+- Restoring full retrieved chunk details from saved ask-log chunk ids
 - Pluggable LLM provider layer with Mock and DeepSeek implementations
 - AI ask logs with success/failure status, latency, retrieved chunk ids, and token usage
 - Bad-case feedback and lightweight RAG evaluation summary

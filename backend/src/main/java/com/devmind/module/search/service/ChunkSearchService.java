@@ -87,6 +87,37 @@ public class ChunkSearchService {
                 .toList();
     }
 
+    public List<ChunkSearchResponse> findChunksByIds(Long userId, List<Long> chunkIds) {
+        List<Long> normalizedChunkIds = normalizeChunkIds(chunkIds);
+        if (normalizedChunkIds.isEmpty()) {
+            throw new BizException(ResultCode.BAD_REQUEST, "chunk ids are required");
+        }
+
+        LambdaQueryWrapper<DocumentChunk> chunkQuery = new LambdaQueryWrapper<>();
+        chunkQuery.eq(DocumentChunk::getUserId, userId)
+                .eq(DocumentChunk::getStatus, STATUS_ACTIVE)
+                .in(DocumentChunk::getId, normalizedChunkIds);
+
+        List<DocumentChunk> chunks = chunkMapper.selectList(chunkQuery);
+        if (chunks.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> documentIds = chunks.stream()
+                .map(DocumentChunk::getDocumentId)
+                .collect(Collectors.toSet());
+        Map<Long, KnowledgeDocument> documentMap = findActiveDocuments(userId, documentIds);
+        Map<Long, DocumentChunk> chunkMap = chunks.stream()
+                .filter(chunk -> documentMap.containsKey(chunk.getDocumentId()))
+                .collect(Collectors.toMap(DocumentChunk::getId, Function.identity()));
+
+        return normalizedChunkIds.stream()
+                .map(chunkMap::get)
+                .filter(chunk -> chunk != null)
+                .map(chunk -> toResponse(chunk, documentMap.get(chunk.getDocumentId()), List.of()))
+                .toList();
+    }
+
     private Map<Long, KnowledgeDocument> findActiveDocuments(Long userId, Set<Long> documentIds) {
         LambdaQueryWrapper<KnowledgeDocument> documentQuery = new LambdaQueryWrapper<>();
         documentQuery.eq(KnowledgeDocument::getUserId, userId)
@@ -128,6 +159,20 @@ public class ChunkSearchService {
         return keywords.stream()
                 .filter(StringUtils::hasText)
                 .map(String::trim)
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toCollection(LinkedHashSet::new),
+                        List::copyOf
+                ));
+    }
+
+    private List<Long> normalizeChunkIds(List<Long> chunkIds) {
+        if (chunkIds == null) {
+            return List.of();
+        }
+
+        return chunkIds.stream()
+                .filter(chunkId -> chunkId != null && chunkId > 0)
+                .limit(MAX_LIMIT)
                 .collect(Collectors.collectingAndThen(
                         Collectors.toCollection(LinkedHashSet::new),
                         List::copyOf

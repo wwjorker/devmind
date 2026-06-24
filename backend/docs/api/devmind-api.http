@@ -63,6 +63,11 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/v1/search/chunks?keyword=Redis&limit=5
 Authorization: Bearer {{authToken}}
 
+### Restore Chunks By Ask Log Chunk IDs
+# Use retrieved_chunk_ids from ai_ask_log, for example: ids=1,2,3
+GET {{baseUrl}}/api/v1/search/chunks/by-ids?ids=1,2,3
+Authorization: Bearer {{authToken}}
+
 ### Ask AI
 POST {{baseUrl}}/api/v1/ai/ask
 Authorization: Bearer {{authToken}}

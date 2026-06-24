@@ -272,8 +272,44 @@ function parseChunkIds(value: string | null) {
     .filter((chunkId) => Number.isFinite(chunkId));
 }
 
-function restoreAskFromLog(log: AskLogItem, notify = true) {
+function toCitations(chunks: AskResponse['retrievedChunks'], chunkIds: number[]) {
+  if (chunks.length > 0) {
+    return chunks.map((chunk) => ({
+      chunkId: chunk.chunkId,
+      documentId: chunk.documentId,
+      documentTitle: chunk.documentTitle,
+      chunkIndex: chunk.chunkIndex,
+      score: chunk.score
+    }));
+  }
+
+  return chunkIds.map((chunkId) => ({
+    chunkId,
+    documentId: 0,
+    documentTitle: 'Restored chunk id from ask log',
+    chunkIndex: 0,
+    score: 0
+  }));
+}
+
+async function loadChunksByIds(chunkIds: number[]) {
+  if (chunkIds.length === 0) {
+    return [];
+  }
+
+  const ids = encodeURIComponent(chunkIds.join(','));
+  return apiRequest<AskResponse['retrievedChunks']>(`/api/v1/search/chunks/by-ids?ids=${ids}`);
+}
+
+async function restoreAskFromLog(log: AskLogItem, notify = true) {
   const chunkIds = parseChunkIds(log.retrievedChunkIds);
+  let restoredChunks: AskResponse['retrievedChunks'] = [];
+
+  try {
+    restoredChunks = await loadChunksByIds(chunkIds);
+  } catch {
+    restoredChunks = [];
+  }
 
   askResponse.value = {
     logId: log.id,
@@ -286,14 +322,8 @@ function restoreAskFromLog(log: AskLogItem, notify = true) {
     promptTokens: log.promptTokens,
     completionTokens: log.completionTokens,
     totalTokens: log.totalTokens,
-    retrievedChunks: [],
-    citations: chunkIds.map((chunkId) => ({
-      chunkId,
-      documentId: 0,
-      documentTitle: 'Restored chunk id from ask log',
-      chunkIndex: 0,
-      score: 0
-    }))
+    retrievedChunks: restoredChunks,
+    citations: toCitations(restoredChunks, chunkIds)
   };
   askForm.question = log.question;
   activeView.value = 'ask';
@@ -314,7 +344,7 @@ async function loadAskLogs(restoreLatest = false) {
     const page = await apiRequest<PageResult<AskLogItem>>('/api/v1/ai/ask-logs?pageNo=1&pageSize=6');
     askLogs.value = page.records;
     if (restoreLatest && !askResponse.value && page.records.length > 0) {
-      restoreAskFromLog(page.records[0], false);
+      await restoreAskFromLog(page.records[0], false);
     }
   } catch {
     askLogs.value = [];
@@ -566,7 +596,7 @@ onMounted(async () => {
                   <div v-if="askResponse.retrievedChunks.length === 0" class="empty-state compact">
                     {{
                       restoredFromLog
-                        ? 'This answer was restored from an ask log. The log keeps the answer, prompt, tokens, and chunk ids, but not full chunk text.'
+                        ? 'This answer was restored from an ask log. Chunk text is loaded again when the saved chunk ids still point to active chunks.'
                         : 'Retrieval returned 0 chunks, so the backend skipped the LLM provider.'
                     }}
                   </div>

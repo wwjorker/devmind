@@ -164,6 +164,7 @@ DELETE /api/v1/documents/{documentId}
 GET    /api/v1/documents/{documentId}/chunks
 
 GET    /api/v1/search/chunks
+GET    /api/v1/search/chunks/by-ids
 
 POST   /api/v1/ai/ask
 GET    /api/v1/ai/ask-logs
