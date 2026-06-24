@@ -61,9 +61,10 @@ public class AiAskController {
     @GetMapping("/ask-feedback")
     public Result<PageResult<AskFeedbackResponse>> pageFeedback(@AuthenticationPrincipal AuthenticatedUser user,
                                                                @RequestParam(required = false) Boolean helpful,
+                                                               @RequestParam(required = false) Long askLogId,
                                                                @RequestParam(defaultValue = "1") long pageNo,
                                                                @RequestParam(defaultValue = "10") long pageSize) {
-        return Result.success(feedbackService.page(user.userId(), helpful, pageNo, pageSize));
+        return Result.success(feedbackService.page(user.userId(), helpful, askLogId, pageNo, pageSize));
     }
 
     @GetMapping("/evaluation/summary")

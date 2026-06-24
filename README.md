@@ -104,5 +104,6 @@ This verifies the backend unit tests and frontend production build on every push
 - Restoring full retrieved chunk details from saved ask-log chunk ids
 - Pluggable LLM provider layer with Mock and DeepSeek implementations
 - AI ask logs with success/failure status, latency, retrieved chunk ids, and token usage
+- Ask-log detail UI for answer, prompt, token, chunk, and feedback inspection
 - Bad-case feedback and lightweight RAG evaluation summary
 - Unit tests and GitHub Actions CI

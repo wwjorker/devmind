@@ -60,13 +60,16 @@ public class AiAskFeedbackService {
         return toResponse(feedback);
     }
 
-    public PageResult<AskFeedbackResponse> page(Long userId, Boolean helpful, long pageNo, long pageSize) {
+    public PageResult<AskFeedbackResponse> page(Long userId, Boolean helpful, Long askLogId, long pageNo, long pageSize) {
         long safePageNo = Math.max(pageNo, 1);
         long safePageSize = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
 
         LambdaQueryWrapper<AiAskFeedback> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(AiAskFeedback::getUserId, userId)
                 .eq(AiAskFeedback::getStatus, STATUS_ACTIVE);
+        if (askLogId != null) {
+            queryWrapper.eq(AiAskFeedback::getAskLogId, askLogId);
+        }
         if (helpful != null) {
             queryWrapper.eq(AiAskFeedback::getHelpful, helpful);
         }

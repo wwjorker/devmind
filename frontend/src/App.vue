@@ -5,6 +5,7 @@ import {
   clearToken,
   getToken,
   setToken,
+  type AskFeedbackItem,
   type AskLogItem,
   type AskResponse,
   type DocumentItem,
@@ -24,6 +25,11 @@ const askResponse = ref<AskResponse | null>(null);
 const restoredFromLog = ref(false);
 const restoredAskLogStatus = ref<number | null>(null);
 const askLogs = ref<AskLogItem[]>([]);
+const selectedLogDetail = ref<{
+  log: AskLogItem;
+  chunks: AskResponse['retrievedChunks'];
+  feedback: AskFeedbackItem[];
+} | null>(null);
 const evaluation = ref<EvaluationSummary | null>(null);
 const loading = reactive({
   auth: false,
@@ -32,7 +38,8 @@ const loading = reactive({
   ask: false,
   askLogs: false,
   feedback: false,
-  evaluation: false
+  evaluation: false,
+  logDetail: false
 });
 const toast = ref('');
 const error = ref('');
@@ -155,6 +162,7 @@ function clearLocalSession() {
   restoredFromLog.value = false;
   restoredAskLogStatus.value = null;
   askLogs.value = [];
+  selectedLogDetail.value = null;
   evaluation.value = null;
 }
 
@@ -299,6 +307,34 @@ async function loadChunksByIds(chunkIds: number[]) {
 
   const ids = encodeURIComponent(chunkIds.join(','));
   return apiRequest<AskResponse['retrievedChunks']>(`/api/v1/search/chunks/by-ids?ids=${ids}`);
+}
+
+async function loadFeedbackForLog(logId: number) {
+  const page = await apiRequest<PageResult<AskFeedbackItem>>(`/api/v1/ai/ask-feedback?askLogId=${logId}&pageNo=1&pageSize=20`);
+  return page.records;
+}
+
+async function openLogDetail(log: AskLogItem) {
+  loading.logDetail = true;
+  setError('');
+  const chunkIds = parseChunkIds(log.retrievedChunkIds);
+
+  try {
+    const [chunks, feedback] = await Promise.all([
+      loadChunksByIds(chunkIds).catch(() => []),
+      loadFeedbackForLog(log.id).catch(() => [])
+    ]);
+
+    selectedLogDetail.value = {
+      log,
+      chunks,
+      feedback
+    };
+  } catch (err) {
+    setError(err instanceof Error ? err.message : 'Failed to load ask log detail');
+  } finally {
+    loading.logDetail = false;
+  }
 }
 
 async function restoreAskFromLog(log: AskLogItem, notify = true) {
@@ -659,10 +695,74 @@ onMounted(async () => {
                 <span>{{ log.retrievedChunkCount }} chunks</span>
                 <span>{{ log.elapsedMs }}ms</span>
                 <span>{{ formatDate(log.createdAt) }}</span>
+                <button class="mini-button" type="button" :disabled="loading.logDetail" @click="openLogDetail(log)">Details</button>
                 <button class="mini-button" type="button" @click="restoreAskFromLog(log)">Restore</button>
               </div>
             </div>
             <div v-if="!askLogs.length" class="empty-state">No ask logs yet.</div>
+          </div>
+
+          <div v-if="selectedLogDetail" class="log-detail-panel">
+            <div class="log-detail-header">
+              <div>
+                <span>Ask log #{{ selectedLogDetail.log.id }}</span>
+                <strong>{{ selectedLogDetail.log.question }}</strong>
+              </div>
+              <button class="mini-button" type="button" @click="selectedLogDetail = null">Close</button>
+            </div>
+
+            <div class="answer-meta">
+              <span :class="['state-pill', selectedLogDetail.log.status === 1 ? 'success' : 'failed']">
+                {{ selectedLogDetail.log.status === 1 ? 'Success' : 'Failed' }}
+              </span>
+              <span>{{ selectedLogDetail.log.mock ? 'Mock/local' : 'Real model' }}</span>
+              <span>{{ selectedLogDetail.log.modelProvider }}</span>
+              <span>keyword: {{ selectedLogDetail.log.retrievalKeyword }}</span>
+              <span>chunks {{ selectedLogDetail.log.retrievedChunkCount }}</span>
+              <span>{{ selectedLogDetail.log.elapsedMs }}ms</span>
+            </div>
+
+            <div class="log-detail-grid">
+              <section>
+                <h3>Answer</h3>
+                <pre>{{ selectedLogDetail.log.answer }}</pre>
+              </section>
+              <section>
+                <h3>Prompt Preview</h3>
+                <pre>{{ selectedLogDetail.log.promptPreview || 'No prompt preview stored.' }}</pre>
+              </section>
+            </div>
+
+            <div class="token-strip">
+              <span>Prompt {{ selectedLogDetail.log.promptTokens ?? '-' }}</span>
+              <span>Completion {{ selectedLogDetail.log.completionTokens ?? '-' }}</span>
+              <span>Total {{ selectedLogDetail.log.totalTokens ?? '-' }}</span>
+              <span>Chunk ids {{ selectedLogDetail.log.retrievedChunkIds || '-' }}</span>
+            </div>
+
+            <div class="chunk-list">
+              <h3>Retrieved Chunks</h3>
+              <div v-for="chunk in selectedLogDetail.chunks" :key="chunk.chunkId" class="chunk-row">
+                <strong>#{{ chunk.chunkId }} - {{ chunk.documentTitle }}</strong>
+                <span>{{ chunk.content }}</span>
+                <small>score {{ chunk.score }} - tokens {{ chunk.tokenCount }}</small>
+              </div>
+              <div v-if="selectedLogDetail.chunks.length === 0" class="empty-state compact">
+                No active chunk text found for the saved chunk ids.
+              </div>
+            </div>
+
+            <div class="feedback-list">
+              <h3>Feedback</h3>
+              <div v-for="feedback in selectedLogDetail.feedback" :key="feedback.id" class="feedback-row">
+                <strong>{{ feedback.helpful ? 'Helpful' : 'Bad case' }}</strong>
+                <span>{{ feedback.reason || 'No reason provided' }}</span>
+                <small>{{ formatDate(feedback.createdAt) }}</small>
+              </div>
+              <div v-if="selectedLogDetail.feedback.length === 0" class="empty-state compact">
+                No feedback recorded for this ask log.
+              </div>
+            </div>
           </div>
         </section>
       </template>

@@ -169,7 +169,7 @@ GET    /api/v1/search/chunks/by-ids
 POST   /api/v1/ai/ask
 GET    /api/v1/ai/ask-logs
 POST   /api/v1/ai/ask-logs/{logId}/feedback
-GET    /api/v1/ai/ask-feedback
+GET    /api/v1/ai/ask-feedback?helpful=&askLogId=
 GET    /api/v1/ai/evaluation/summary
 ```
 

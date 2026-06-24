@@ -11,6 +11,7 @@ Vue 3 + Vite frontend for the DevMind AI knowledge base backend.
 - Fallback state display when retrieval returns no chunks
 - Recent ask logs with success/failure status, provider, chunk count, and latency
 - Latest ask result restoration after page refresh using backend ask logs
+- Ask log detail panel with answer, prompt preview, token usage, retrieved chunks, and feedback
 - Helpful / bad-case feedback submission
 - RAG evaluation summary
 
@@ -49,6 +50,7 @@ token usage
 retrieved chunks
 prompt preview
 recent ask logs
+ask log detail panel
 ```
 
 After refreshing the page, the frontend restores the latest answer from `/api/v1/ai/ask-logs`.

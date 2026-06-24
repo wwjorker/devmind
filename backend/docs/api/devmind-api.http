@@ -125,6 +125,10 @@ Content-Type: application/json
 GET {{baseUrl}}/api/v1/ai/ask-feedback?helpful=false&pageNo=1&pageSize=10
 Authorization: Bearer {{authToken}}
 
+### List Feedback For One Ask Log
+GET {{baseUrl}}/api/v1/ai/ask-feedback?askLogId={{askLogId}}&pageNo=1&pageSize=10
+Authorization: Bearer {{authToken}}
+
 ### Evaluation Summary
 GET {{baseUrl}}/api/v1/ai/evaluation/summary?recentLimit=5
 Authorization: Bearer {{authToken}}

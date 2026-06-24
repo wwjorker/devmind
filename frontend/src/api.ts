@@ -89,6 +89,16 @@ export interface AskLogItem {
   createdAt: string;
 }
 
+export interface AskFeedbackItem {
+  id: number;
+  askLogId: number;
+  helpful: boolean;
+  reason: string | null;
+  expectedAnswer: string | null;
+  status: number;
+  createdAt: string;
+}
+
 export interface EvaluationSummary {
   totalFeedbackCount: number;
   helpfulCount: number;
