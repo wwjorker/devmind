@@ -5,6 +5,7 @@ import {
   clearToken,
   getToken,
   setToken,
+  type AskLogItem,
   type AskResponse,
   type DocumentItem,
   type EvaluationSummary,
@@ -20,12 +21,14 @@ const activeView = ref<'documents' | 'ask' | 'evaluation'>('ask');
 const documents = ref<DocumentItem[]>([]);
 const selectedDocumentId = ref<number | null>(null);
 const askResponse = ref<AskResponse | null>(null);
+const askLogs = ref<AskLogItem[]>([]);
 const evaluation = ref<EvaluationSummary | null>(null);
 const loading = reactive({
   auth: false,
   documents: false,
   createDocument: false,
   ask: false,
+  askLogs: false,
   feedback: false,
   evaluation: false
 });
@@ -45,8 +48,17 @@ const documentForm = reactive({
   sourceType: 'bug_review',
   tags: 'redis,cache,backend',
   summary: 'A short review note about cache penetration.',
-  content:
-    'Problem:\\nThe API may hit the database repeatedly when a missing key is requested many times.\\n\\nRoot cause:\\nThe system only caches existing data, so non-existing data bypasses Redis every time.\\n\\nSolution:\\nCache empty values for a short TTL, validate illegal parameters early, and add rate limiting for abnormal traffic.\\n\\nInterview talking point:\\nCache penetration is different from cache breakdown and cache avalanche.'
+  content: `Problem:
+The API may hit the database repeatedly when a missing key is requested many times.
+
+Root cause:
+The system only caches existing data, so non-existing data bypasses Redis every time.
+
+Solution:
+Cache empty values for a short TTL, validate illegal parameters early, and add rate limiting for abnormal traffic.
+
+Interview talking point:
+Cache penetration is different from cache breakdown and cache avalanche.`
 });
 
 const askForm = reactive({
@@ -64,6 +76,17 @@ const selectedDocument = computed(() =>
 );
 
 const isAuthed = computed(() => Boolean(token.value));
+const currentAskState = computed(() => {
+  if (!askResponse.value) {
+    return 'Ready';
+  }
+  if (askResponse.value.modelProvider === 'knowledge-base-fallback') {
+    return 'Fallback';
+  }
+  return 'Success';
+});
+
+const currentAskStateClass = computed(() => currentAskState.value.toLowerCase());
 
 function showToast(message: string) {
   toast.value = message;
@@ -105,7 +128,7 @@ async function login() {
     token.value = loginData.token;
     setToken(loginData.token);
     await loadCurrentUser();
-    await Promise.all([loadDocuments(), loadEvaluation()]);
+    await Promise.all([loadDocuments(), loadEvaluation(), loadAskLogs()]);
     showToast('Signed in');
   } catch (err) {
     setError(err instanceof Error ? err.message : 'Authentication failed');
@@ -118,14 +141,27 @@ async function loadCurrentUser() {
   user.value = await apiRequest<UserProfile>('/api/v1/auth/me');
 }
 
-function logout() {
+function clearLocalSession() {
   clearToken();
   token.value = '';
   user.value = null;
   documents.value = [];
   askResponse.value = null;
+  askLogs.value = [];
   evaluation.value = null;
-  showToast('Signed out');
+}
+
+async function logout() {
+  try {
+    if (token.value) {
+      await apiRequest('/api/v1/auth/logout', { method: 'POST' });
+    }
+  } catch {
+    // Local cleanup should still happen even if Redis or the backend is temporarily unavailable.
+  } finally {
+    clearLocalSession();
+    showToast('Signed out');
+  }
 }
 
 async function loadDocuments() {
@@ -169,7 +205,7 @@ async function ask() {
       body: JSON.stringify({ question: askForm.question })
     });
     activeView.value = 'ask';
-    await loadEvaluation();
+    await Promise.all([loadEvaluation(), loadAskLogs()]);
     showToast('AI answer generated');
   } catch (err) {
     setError(err instanceof Error ? err.message : 'Failed to ask AI');
@@ -217,8 +253,23 @@ async function loadEvaluation() {
   }
 }
 
+async function loadAskLogs() {
+  if (!isAuthed.value) {
+    return;
+  }
+  loading.askLogs = true;
+  try {
+    const page = await apiRequest<PageResult<AskLogItem>>('/api/v1/ai/ask-logs?pageNo=1&pageSize=6');
+    askLogs.value = page.records;
+  } catch {
+    askLogs.value = [];
+  } finally {
+    loading.askLogs = false;
+  }
+}
+
 async function refreshAll() {
-  await Promise.all([loadDocuments(), loadEvaluation()]);
+  await Promise.all([loadDocuments(), loadEvaluation(), loadAskLogs()]);
 }
 
 function formatDate(value: string | null) {
@@ -234,9 +285,9 @@ onMounted(async () => {
   }
   try {
     await loadCurrentUser();
-    await Promise.all([loadDocuments(), loadEvaluation()]);
+    await Promise.all([loadDocuments(), loadEvaluation(), loadAskLogs()]);
   } catch {
-    logout();
+    clearLocalSession();
   }
 });
 </script>
@@ -337,16 +388,16 @@ onMounted(async () => {
             <strong>{{ documents.length }}</strong>
           </div>
           <div class="metric">
-            <span>Bad cases</span>
-            <strong>{{ evaluation?.badCaseCount ?? 0 }}</strong>
+            <span>Ask state</span>
+            <strong>{{ currentAskState }}</strong>
           </div>
           <div class="metric">
-            <span>Bad-case rate</span>
-            <strong>{{ Math.round((evaluation?.badCaseRate ?? 0) * 100) }}%</strong>
+            <span>Retrieved chunks</span>
+            <strong>{{ askResponse?.retrievedChunks?.length ?? 0 }}</strong>
           </div>
           <div class="metric">
-            <span>Provider</span>
-            <strong>{{ askResponse?.modelProvider || 'mock/deepseek' }}</strong>
+            <span>Ask logs</span>
+            <strong>{{ askLogs.length }}</strong>
           </div>
         </section>
 
@@ -370,7 +421,7 @@ onMounted(async () => {
                 @click="selectedDocumentId = document.id"
               >
                 <strong>{{ document.title }}</strong>
-                <span>{{ document.sourceType }} · {{ document.tags }}</span>
+                <span>{{ document.sourceType }} - {{ document.tags }}</span>
                 <small>{{ formatDate(document.updatedAt || document.createdAt) }}</small>
               </button>
               <div v-if="!loading.documents && documents.length === 0" class="empty-state">No documents yet. Create one to test retrieval.</div>
@@ -420,9 +471,11 @@ onMounted(async () => {
 
             <div v-if="askResponse" class="answer-card">
               <div class="answer-meta">
-                <span>{{ askResponse.mock ? 'Mock' : 'Real model' }}</span>
+                <span :class="['state-pill', currentAskStateClass]">{{ currentAskState }}</span>
+                <span>{{ askResponse.mock ? 'Mock/local' : 'Real model' }}</span>
                 <span>{{ askResponse.modelProvider }}</span>
                 <span>keyword: {{ askResponse.retrievalKeyword }}</span>
+                <span>logId: {{ askResponse.logId }}</span>
               </div>
               <pre>{{ askResponse.answer }}</pre>
 
@@ -433,13 +486,32 @@ onMounted(async () => {
                   <span>{{ citation.documentTitle }}</span>
                   <small>score {{ citation.score }}</small>
                 </div>
+                <div v-if="askResponse.citations.length === 0" class="empty-state compact">
+                  No citations. This is expected for no-context fallback.
+                </div>
               </div>
 
               <div class="token-strip">
                 <span>Prompt {{ askResponse.promptTokens ?? '-' }}</span>
                 <span>Completion {{ askResponse.completionTokens ?? '-' }}</span>
                 <span>Total {{ askResponse.totalTokens ?? '-' }}</span>
+                <span>Chunks {{ askResponse.retrievedChunks?.length ?? 0 }}</span>
               </div>
+
+              <details class="debug-details">
+                <summary>Prompt preview and retrieved chunks</summary>
+                <pre>{{ askResponse.promptPreview }}</pre>
+                <div class="chunk-list">
+                  <div v-for="chunk in askResponse.retrievedChunks" :key="chunk.chunkId" class="chunk-row">
+                    <strong>#{{ chunk.chunkId }} - {{ chunk.documentTitle }}</strong>
+                    <span>{{ chunk.content }}</span>
+                    <small>score {{ chunk.score }} - tokens {{ chunk.tokenCount }}</small>
+                  </div>
+                  <div v-if="askResponse.retrievedChunks.length === 0" class="empty-state compact">
+                    Retrieval returned 0 chunks, so the backend skipped the LLM provider.
+                  </div>
+                </div>
+              </details>
 
               <div class="feedback-box">
                 <textarea v-model="feedbackForm.reason" rows="2"></textarea>
@@ -470,6 +542,36 @@ onMounted(async () => {
               <small>{{ formatDate(badCase.createdAt) }}</small>
             </div>
             <div v-if="!evaluation?.recentBadCases?.length" class="empty-state">No bad cases yet.</div>
+          </div>
+        </section>
+
+        <section class="panel logs-panel">
+          <div class="panel-header">
+            <div>
+              <h2>Ask logs</h2>
+              <p>Success, fallback, and failure records from the backend.</p>
+            </div>
+            <button class="icon-button" title="Reload ask logs" @click="loadAskLogs">
+              <span v-html="icons.refresh"></span>
+            </button>
+          </div>
+          <div class="log-list">
+            <div v-for="log in askLogs" :key="log.id" class="log-row">
+              <div>
+                <strong>{{ log.question }}</strong>
+                <span>{{ log.retrievalKeyword }}</span>
+              </div>
+              <div class="log-meta">
+                <span :class="['status-badge', log.status === 1 ? 'success' : 'failed']">
+                  {{ log.status === 1 ? 'success' : 'failed' }}
+                </span>
+                <span>{{ log.modelProvider }}</span>
+                <span>{{ log.retrievedChunkCount }} chunks</span>
+                <span>{{ log.elapsedMs }}ms</span>
+                <span>{{ formatDate(log.createdAt) }}</span>
+              </div>
+            </div>
+            <div v-if="!askLogs.length" class="empty-state">No ask logs yet.</div>
           </div>
         </section>
       </template>

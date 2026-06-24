@@ -8,6 +8,8 @@ Vue 3 + Vite frontend for the DevMind AI knowledge base backend.
 - Knowledge document list and creation
 - AI Ask workflow
 - Citations and token usage display
+- Fallback state display when retrieval returns no chunks
+- Recent ask logs with success/failure status, provider, chunk count, and latency
 - Helpful / bad-case feedback submission
 - RAG evaluation summary
 
@@ -33,6 +35,28 @@ http://127.0.0.1:5173
 ```
 
 The Vite dev server proxies `/api` requests to the backend.
+
+After signing in, create the sample Redis document and ask a question. The AI Ask panel shows:
+
+```text
+answer
+provider
+logId
+retrieval keywords
+citations
+token usage
+retrieved chunks
+prompt preview
+recent ask logs
+```
+
+To verify the no-context fallback, ask:
+
+```text
+What is Kubernetes pod eviction policy?
+```
+
+If the knowledge base has no related chunks, the backend returns a fallback answer and skips the LLM provider.
 
 ## Build
 

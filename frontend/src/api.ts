@@ -44,6 +44,18 @@ export interface Citation {
   score: number;
 }
 
+export interface RetrievedChunk {
+  chunkId: number;
+  documentId: number;
+  documentTitle: string;
+  sourceType: string;
+  tags: string;
+  chunkIndex: number;
+  content: string;
+  tokenCount: number;
+  score: number;
+}
+
 export interface AskResponse {
   logId: number;
   question: string;
@@ -55,7 +67,26 @@ export interface AskResponse {
   promptTokens: number | null;
   completionTokens: number | null;
   totalTokens: number | null;
+  retrievedChunks: RetrievedChunk[];
   citations: Citation[];
+}
+
+export interface AskLogItem {
+  id: number;
+  question: string;
+  retrievalKeyword: string;
+  promptPreview: string | null;
+  answer: string;
+  modelProvider: string;
+  mock: boolean;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  retrievedChunkCount: number;
+  retrievedChunkIds: string | null;
+  elapsedMs: number;
+  status: number;
+  createdAt: string;
 }
 
 export interface EvaluationSummary {

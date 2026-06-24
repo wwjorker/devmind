@@ -538,6 +538,16 @@ textarea:focus {
   font-weight: 700;
 }
 
+.answer-meta .state-pill.success {
+  background: #e8f6ef;
+  color: #1f7045;
+}
+
+.answer-meta .state-pill.fallback {
+  background: #fff4df;
+  color: #8a5a10;
+}
+
 .answer-card pre {
   max-height: 260px;
   overflow: auto;
@@ -551,6 +561,62 @@ textarea:focus {
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+.debug-details {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: #fbfcfc;
+}
+
+.debug-details summary {
+  cursor: pointer;
+  padding: 10px 12px;
+  color: #31414d;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.debug-details pre {
+  max-height: 190px;
+  margin: 0 12px 12px;
+  background: #f5f7f8;
+  color: #26343f;
+}
+
+.chunk-list {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.chunk-row {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.chunk-row strong,
+.chunk-row span,
+.chunk-row small {
+  min-width: 0;
+}
+
+.chunk-row span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.chunk-row small {
+  color: var(--amber);
 }
 
 .citation-list {
@@ -602,7 +668,13 @@ textarea:focus {
   text-align: center;
 }
 
-.evaluation-panel {
+.empty-state.compact {
+  padding: 10px;
+  font-size: 12px;
+}
+
+.evaluation-panel,
+.logs-panel {
   margin-top: 14px;
 }
 
@@ -625,6 +697,70 @@ textarea:focus {
 .badcase-row small {
   color: var(--muted);
   font-size: 13px;
+}
+
+.log-list {
+  display: grid;
+  gap: 8px;
+}
+
+.log-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(320px, 1.3fr);
+  gap: 12px;
+  align-items: center;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.log-row strong,
+.log-row span {
+  min-width: 0;
+}
+
+.log-row strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-row div > span {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.log-meta span {
+  margin-top: 0;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: #f1f5f5;
+  color: #52616d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.log-meta .status-badge.success {
+  background: #e8f6ef;
+  color: #1f7045;
+}
+
+.log-meta .status-badge.failed {
+  background: #fff4f1;
+  color: var(--danger);
 }
 
 .toast,
@@ -726,11 +862,14 @@ textarea:focus {
 
   .form-row,
   .badcase-row,
-  .citation {
+  .citation,
+  .log-row {
     grid-template-columns: 1fr;
   }
 
-  .citation small {
+  .citation small,
+  .log-meta {
     text-align: left;
+    justify-content: flex-start;
   }
 }
