@@ -38,6 +38,7 @@ This makes the project easier to explain in Java backend interviews because the 
 - AI ask logs with success/failure status, provider, latency, retrieved chunk ids, and token usage
 - AI feedback records for helpful labels and bad-case collection
 - Evaluation summary API for total feedback, bad-case count, bad-case rate, and recent bad cases
+- RAG evaluation dataset API for standard questions, expected answers, expected keywords, and ask-log coverage
 - OpenAPI / Swagger UI and IDEA HTTP Client examples
 
 ## Tech Stack
@@ -171,6 +172,7 @@ GET    /api/v1/ai/ask-logs
 POST   /api/v1/ai/ask-logs/{logId}/feedback
 GET    /api/v1/ai/ask-feedback?helpful=&askLogId=
 GET    /api/v1/ai/evaluation/summary
+GET    /api/v1/ai/evaluation/dataset
 ```
 
 ## Observability And Evaluation
@@ -212,6 +214,20 @@ helpful count
 bad-case count
 bad-case rate
 recent bad cases
+```
+
+The evaluation dataset API returns standard RAG test cases and marks whether the current user has already asked each question:
+
+```text
+case id
+category
+question
+expected keywords
+expected answer
+expected evidence
+risk type
+covered status
+latest ask log id and retrieved chunk count
 ```
 
 ## Local Setup

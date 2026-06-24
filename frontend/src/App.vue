@@ -12,6 +12,7 @@ import {
   type EvaluationSummary,
   type LoginResponse,
   type PageResult,
+  type RagEvaluationDataset,
   type UserProfile
 } from './api';
 import { icons } from './icons';
@@ -34,6 +35,7 @@ const selectedLogDetail = ref<{
   feedback: AskFeedbackItem[];
 } | null>(null);
 const evaluation = ref<EvaluationSummary | null>(null);
+const evaluationDataset = ref<RagEvaluationDataset | null>(null);
 const loading = reactive({
   auth: false,
   documents: false,
@@ -180,6 +182,7 @@ function clearLocalSession() {
   askLogs.value = [];
   selectedLogDetail.value = null;
   evaluation.value = null;
+  evaluationDataset.value = null;
 }
 
 async function logout() {
@@ -278,9 +281,15 @@ async function loadEvaluation() {
   }
   loading.evaluation = true;
   try {
-    evaluation.value = await apiRequest<EvaluationSummary>('/api/v1/ai/evaluation/summary?recentLimit=5');
+    const [summary, dataset] = await Promise.all([
+      apiRequest<EvaluationSummary>('/api/v1/ai/evaluation/summary?recentLimit=5'),
+      apiRequest<RagEvaluationDataset>('/api/v1/ai/evaluation/dataset')
+    ]);
+    evaluation.value = summary;
+    evaluationDataset.value = dataset;
   } catch {
     evaluation.value = null;
+    evaluationDataset.value = null;
   } finally {
     loading.evaluation = false;
   }
@@ -685,6 +694,42 @@ onMounted(async () => {
               <small>{{ formatDate(badCase.createdAt) }}</small>
             </div>
             <div v-if="!evaluation?.recentBadCases?.length" class="empty-state">No bad cases yet.</div>
+          </div>
+
+          <div class="evaluation-dataset">
+            <div class="dataset-header">
+              <div>
+                <h3>RAG evaluation dataset</h3>
+                <p>Standard questions for checking retrieval coverage and no-context fallback.</p>
+              </div>
+              <div class="dataset-score">
+                <strong>{{ evaluationDataset?.coveredCaseCount ?? 0 }}/{{ evaluationDataset?.totalCaseCount ?? 0 }}</strong>
+                <span>{{ Math.round((evaluationDataset?.coverageRate ?? 0) * 100) }}% covered</span>
+              </div>
+            </div>
+
+            <div class="evaluation-case-list">
+              <div v-for="testCase in evaluationDataset?.cases || []" :key="testCase.caseId" class="evaluation-case-row">
+                <div>
+                  <strong>{{ testCase.question }}</strong>
+                  <span>{{ testCase.caseId }} - {{ testCase.category }} - {{ testCase.riskType }}</span>
+                </div>
+                <div class="case-keywords">
+                  <span v-for="keyword in testCase.expectedKeywords" :key="`${testCase.caseId}-${keyword}`">{{ keyword }}</span>
+                </div>
+                <div class="case-status">
+                  <span :class="['status-badge', testCase.covered ? 'success' : 'failed']">
+                    {{ testCase.covered ? 'covered' : 'not run' }}
+                  </span>
+                  <small v-if="testCase.covered">
+                    log #{{ testCase.lastAskLogId }} - {{ testCase.lastRetrievedChunkCount }} chunks
+                  </small>
+                  <small v-else>ask this question to cover the case</small>
+                </div>
+                <p>{{ testCase.expectedAnswer }}</p>
+              </div>
+              <div v-if="!evaluationDataset?.cases?.length" class="empty-state">No evaluation cases loaded.</div>
+            </div>
           </div>
         </section>
 

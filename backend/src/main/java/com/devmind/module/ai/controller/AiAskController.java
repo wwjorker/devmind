@@ -8,10 +8,12 @@ import com.devmind.module.ai.dto.AskRequest;
 import com.devmind.module.ai.service.AiAskFeedbackService;
 import com.devmind.module.ai.service.AiAskLogService;
 import com.devmind.module.ai.service.AiAskService;
+import com.devmind.module.ai.service.RagEvaluationDatasetService;
 import com.devmind.module.ai.vo.AskFeedbackResponse;
 import com.devmind.module.ai.vo.AskLogResponse;
 import com.devmind.module.ai.vo.AskResponse;
 import com.devmind.module.ai.vo.EvaluationSummaryResponse;
+import com.devmind.module.ai.vo.RagEvaluationDatasetResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,13 +31,16 @@ public class AiAskController {
     private final AiAskService aiAskService;
     private final AiAskLogService askLogService;
     private final AiAskFeedbackService feedbackService;
+    private final RagEvaluationDatasetService evaluationDatasetService;
 
     public AiAskController(AiAskService aiAskService,
                            AiAskLogService askLogService,
-                           AiAskFeedbackService feedbackService) {
+                           AiAskFeedbackService feedbackService,
+                           RagEvaluationDatasetService evaluationDatasetService) {
         this.aiAskService = aiAskService;
         this.askLogService = askLogService;
         this.feedbackService = feedbackService;
+        this.evaluationDatasetService = evaluationDatasetService;
     }
 
     @PostMapping("/ask")
@@ -71,5 +76,10 @@ public class AiAskController {
     public Result<EvaluationSummaryResponse> evaluationSummary(@AuthenticationPrincipal AuthenticatedUser user,
                                                                @RequestParam(required = false) Integer recentLimit) {
         return Result.success(feedbackService.summary(user.userId(), recentLimit));
+    }
+
+    @GetMapping("/evaluation/dataset")
+    public Result<RagEvaluationDatasetResponse> evaluationDataset(@AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(evaluationDatasetService.dataset(user.userId()));
     }
 }
