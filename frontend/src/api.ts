@@ -114,6 +114,29 @@ export interface EvaluationSummary {
   }>;
 }
 
+export interface RagEvaluationCase {
+  caseId: string;
+  category: string;
+  question: string;
+  expectedKeywords: string[];
+  expectedAnswer: string;
+  expectedEvidence: string;
+  riskType: string;
+  covered: boolean;
+  lastAskLogId: number | null;
+  lastStatus: number | null;
+  lastRetrievedChunkCount: number | null;
+  lastRetrievedChunkIds: string | null;
+  lastAskedAt: string | null;
+}
+
+export interface RagEvaluationDataset {
+  totalCaseCount: number;
+  coveredCaseCount: number;
+  coverageRate: number;
+  cases: RagEvaluationCase[];
+}
+
 const TOKEN_KEY = 'devmind_token';
 
 export function getToken() {

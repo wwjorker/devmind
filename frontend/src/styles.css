@@ -709,6 +709,116 @@ textarea:focus {
   font-size: 13px;
 }
 
+.evaluation-dataset {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.dataset-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dataset-header h3,
+.dataset-header p {
+  margin: 0;
+}
+
+.dataset-header p {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.dataset-score {
+  min-width: 120px;
+  text-align: right;
+}
+
+.dataset-score strong,
+.dataset-score span {
+  display: block;
+}
+
+.dataset-score strong {
+  color: var(--accent-strong);
+  font-size: 22px;
+}
+
+.dataset-score span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.evaluation-case-list {
+  display: grid;
+  gap: 8px;
+}
+
+.evaluation-case-row {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) minmax(160px, 0.8fr) minmax(130px, 0.6fr);
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.evaluation-case-row strong,
+.evaluation-case-row span {
+  min-width: 0;
+}
+
+.evaluation-case-row div > span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.evaluation-case-row p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.case-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.case-keywords span {
+  margin-top: 0;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: #f1f5f5;
+  color: #36534f;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.case-status {
+  display: grid;
+  justify-items: end;
+  gap: 5px;
+}
+
+.case-status small {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
 .log-list {
   display: grid;
   gap: 8px;
@@ -968,6 +1078,7 @@ textarea:focus {
   .citation,
   .log-row,
   .log-detail-grid,
+  .evaluation-case-row,
   .feedback-row {
     grid-template-columns: 1fr;
   }
@@ -976,5 +1087,21 @@ textarea:focus {
   .log-meta {
     text-align: left;
     justify-content: flex-start;
+  }
+
+  .dataset-header {
+    display: grid;
+  }
+
+  .dataset-score {
+    text-align: left;
+  }
+
+  .case-status {
+    justify-items: start;
+  }
+
+  .case-status small {
+    text-align: left;
   }
 }

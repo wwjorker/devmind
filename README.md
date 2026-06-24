@@ -17,6 +17,7 @@ knowledge documents
 -> success/failure ask logs with token usage
 -> bad-case feedback
 -> evaluation summary
+-> RAG evaluation dataset coverage
 ```
 
 ## Project Structure
@@ -106,4 +107,5 @@ This verifies the backend unit tests and frontend production build on every push
 - AI ask logs with success/failure status, latency, retrieved chunk ids, and token usage
 - Ask-log detail UI for answer, prompt, token, chunk, and feedback inspection
 - Bad-case feedback and lightweight RAG evaluation summary
+- RAG evaluation dataset with coverage status for standard interview-style questions
 - Unit tests and GitHub Actions CI
