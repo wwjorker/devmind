@@ -19,6 +19,9 @@ import { icons } from './icons';
 const token = ref(getToken() || '');
 const user = ref<UserProfile | null>(null);
 const activeView = ref<'documents' | 'ask' | 'evaluation'>('ask');
+const documentsSection = ref<HTMLElement | null>(null);
+const askSection = ref<HTMLElement | null>(null);
+const evaluationSection = ref<HTMLElement | null>(null);
 const documents = ref<DocumentItem[]>([]);
 const selectedDocumentId = ref<number | null>(null);
 const askResponse = ref<AskResponse | null>(null);
@@ -111,6 +114,19 @@ function showToast(message: string) {
 
 function setError(message: string) {
   error.value = message;
+}
+
+function setActiveView(view: 'documents' | 'ask' | 'evaluation') {
+  activeView.value = view;
+  window.requestAnimationFrame(() => {
+    const target = {
+      documents: documentsSection.value,
+      ask: askSection.value,
+      evaluation: evaluationSection.value
+    }[view];
+
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 }
 
 async function login() {
@@ -426,15 +442,15 @@ onMounted(async () => {
       </div>
 
       <nav class="nav-list" aria-label="Primary">
-        <button :class="{ active: activeView === 'documents' }" @click="activeView = 'documents'">
+        <button :class="{ active: activeView === 'documents' }" @click="setActiveView('documents')">
           <span v-html="icons.documents"></span>
           Documents
         </button>
-        <button :class="{ active: activeView === 'ask' }" @click="activeView = 'ask'">
+        <button :class="{ active: activeView === 'ask' }" @click="setActiveView('ask')">
           <span v-html="icons.ask"></span>
           AI Ask
         </button>
-        <button :class="{ active: activeView === 'evaluation' }" @click="activeView = 'evaluation'">
+        <button :class="{ active: activeView === 'evaluation' }" @click="setActiveView('evaluation')">
           <span v-html="icons.chart"></span>
           Evaluation
         </button>
@@ -524,7 +540,7 @@ onMounted(async () => {
         </section>
 
         <section class="main-grid">
-          <div class="panel document-panel">
+          <div ref="documentsSection" class="panel document-panel">
             <div class="panel-header">
               <div>
                 <h2>Knowledge documents</h2>
@@ -575,7 +591,7 @@ onMounted(async () => {
             </form>
           </div>
 
-          <div class="panel ask-panel">
+          <div ref="askSection" class="panel ask-panel">
             <div class="panel-header">
               <div>
                 <h2>AI Ask</h2>
@@ -652,7 +668,7 @@ onMounted(async () => {
           </div>
         </section>
 
-        <section class="panel evaluation-panel">
+        <section ref="evaluationSection" class="panel evaluation-panel">
           <div class="panel-header">
             <div>
               <h2>Evaluation summary</h2>

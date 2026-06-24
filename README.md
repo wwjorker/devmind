@@ -100,6 +100,7 @@ Chinese interview and resume notes:
 - [Interview guide](docs/interview/devmind-interview-guide-cn.md)
 - [Resume bullets](docs/resume/devmind-resume-cn.md)
 - [Demo script](docs/demo/devmind-demo-script-cn.md)
+- [Beginner glossary](docs/learning/devmind-beginner-glossary-cn.md)
 
 ## Interview Highlights
 
