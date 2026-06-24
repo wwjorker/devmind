@@ -56,7 +56,7 @@ ask log detail panel
 After refreshing the page, the frontend restores the latest answer from `/api/v1/ai/ask-logs`.
 This keeps the answer panel useful during demos while still making the data source explicit:
 historical logs preserve the answer, prompt preview, token usage, provider, and retrieved chunk ids.
-The frontend then uses the saved chunk ids to reload active chunk text from `/api/v1/search/chunks/by-ids`.
+The frontend then uses the saved chunk ids and retrieval keywords to reload active chunk text from `/api/v1/search/chunks/by-ids`.
 
 To verify the no-context fallback, ask:
 

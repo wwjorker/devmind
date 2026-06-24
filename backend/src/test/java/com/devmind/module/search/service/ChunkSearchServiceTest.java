@@ -39,6 +39,33 @@ class ChunkSearchServiceTest {
                 .containsExactly("first restored chunk", "second restored chunk");
     }
 
+    @Test
+    void findChunksByIdsShouldRecalculateScoresWithRetrievalKeywords() {
+        DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        ChunkSearchService searchService = new ChunkSearchService(chunkMapper, documentMapper);
+
+        DocumentChunk chunk = chunk(
+                10L,
+                100L,
+                0,
+                "Redis cache penetration happens when cache misses repeatedly hit MySQL."
+        );
+        KnowledgeDocument document = document(100L, "Redis cache penetration review");
+
+        when(chunkMapper.selectList(any())).thenReturn(List.of(chunk));
+        when(documentMapper.selectList(any())).thenReturn(List.of(document));
+
+        List<ChunkSearchResponse> responses = searchService.findChunksByIds(
+                1L,
+                List.of(10L),
+                List.of("Redis", "cache", "penetration")
+        );
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).getScore()).isGreaterThan(1);
+    }
+
     private DocumentChunk chunk(Long id, Long documentId, Integer chunkIndex, String content) {
         DocumentChunk chunk = new DocumentChunk();
         chunk.setId(id);

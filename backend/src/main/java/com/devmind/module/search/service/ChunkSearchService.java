@@ -88,10 +88,15 @@ public class ChunkSearchService {
     }
 
     public List<ChunkSearchResponse> findChunksByIds(Long userId, List<Long> chunkIds) {
+        return findChunksByIds(userId, chunkIds, List.of());
+    }
+
+    public List<ChunkSearchResponse> findChunksByIds(Long userId, List<Long> chunkIds, List<String> keywords) {
         List<Long> normalizedChunkIds = normalizeChunkIds(chunkIds);
         if (normalizedChunkIds.isEmpty()) {
             throw new BizException(ResultCode.BAD_REQUEST, "chunk ids are required");
         }
+        List<String> normalizedKeywords = normalizeKeywords(keywords);
 
         LambdaQueryWrapper<DocumentChunk> chunkQuery = new LambdaQueryWrapper<>();
         chunkQuery.eq(DocumentChunk::getUserId, userId)
@@ -114,7 +119,7 @@ public class ChunkSearchService {
         return normalizedChunkIds.stream()
                 .map(chunkMap::get)
                 .filter(chunk -> chunk != null)
-                .map(chunk -> toResponse(chunk, documentMap.get(chunk.getDocumentId()), List.of()))
+                .map(chunk -> toResponse(chunk, documentMap.get(chunk.getDocumentId()), normalizedKeywords))
                 .toList();
     }
 

@@ -35,8 +35,9 @@ public class ChunkSearchController {
 
     @GetMapping("/chunks/by-ids")
     public Result<List<ChunkSearchResponse>> findChunksByIds(@AuthenticationPrincipal AuthenticatedUser user,
-                                                             @RequestParam String ids) {
-        return Result.success(searchService.findChunksByIds(user.userId(), parseChunkIds(ids)));
+                                                             @RequestParam String ids,
+                                                             @RequestParam(required = false) String keywords) {
+        return Result.success(searchService.findChunksByIds(user.userId(), parseChunkIds(ids), parseKeywords(keywords)));
     }
 
     private List<Long> parseChunkIds(String ids) {
@@ -53,5 +54,16 @@ public class ChunkSearchController {
         } catch (NumberFormatException ex) {
             throw new BizException(ResultCode.BAD_REQUEST, "chunk ids must be numeric");
         }
+    }
+
+    private List<String> parseKeywords(String keywords) {
+        if (!StringUtils.hasText(keywords)) {
+            return List.of();
+        }
+
+        return Arrays.stream(keywords.split(","))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList();
     }
 }

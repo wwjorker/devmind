@@ -64,8 +64,9 @@ GET {{baseUrl}}/api/v1/search/chunks?keyword=Redis&limit=5
 Authorization: Bearer {{authToken}}
 
 ### Restore Chunks By Ask Log Chunk IDs
-# Use retrieved_chunk_ids from ai_ask_log, for example: ids=1,2,3
-GET {{baseUrl}}/api/v1/search/chunks/by-ids?ids=1,2,3
+# Use retrieved_chunk_ids and retrieval_keyword from ai_ask_log.
+# The optional keywords parameter recalculates the same explainable retrieval score.
+GET {{baseUrl}}/api/v1/search/chunks/by-ids?ids=1,2,3&keywords=Redis,cache,penetration
 Authorization: Bearer {{authToken}}
 
 ### Ask AI

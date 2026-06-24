@@ -300,13 +300,14 @@ function toCitations(chunks: AskResponse['retrievedChunks'], chunkIds: number[])
   }));
 }
 
-async function loadChunksByIds(chunkIds: number[]) {
+async function loadChunksByIds(chunkIds: number[], retrievalKeyword = '') {
   if (chunkIds.length === 0) {
     return [];
   }
 
   const ids = encodeURIComponent(chunkIds.join(','));
-  return apiRequest<AskResponse['retrievedChunks']>(`/api/v1/search/chunks/by-ids?ids=${ids}`);
+  const keywords = retrievalKeyword ? `&keywords=${encodeURIComponent(retrievalKeyword)}` : '';
+  return apiRequest<AskResponse['retrievedChunks']>(`/api/v1/search/chunks/by-ids?ids=${ids}${keywords}`);
 }
 
 async function loadFeedbackForLog(logId: number) {
@@ -321,7 +322,7 @@ async function openLogDetail(log: AskLogItem) {
 
   try {
     const [chunks, feedback] = await Promise.all([
-      loadChunksByIds(chunkIds).catch(() => []),
+      loadChunksByIds(chunkIds, log.retrievalKeyword).catch(() => []),
       loadFeedbackForLog(log.id).catch(() => [])
     ]);
 
@@ -342,7 +343,7 @@ async function restoreAskFromLog(log: AskLogItem, notify = true) {
   let restoredChunks: AskResponse['retrievedChunks'] = [];
 
   try {
-    restoredChunks = await loadChunksByIds(chunkIds);
+    restoredChunks = await loadChunksByIds(chunkIds, log.retrievalKeyword);
   } catch {
     restoredChunks = [];
   }
