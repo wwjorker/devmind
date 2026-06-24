@@ -280,12 +280,6 @@ Never commit real API keys.
 
 The default JWT secret in `application.yml` is only for local development. Override `DEVMIND_JWT_SECRET` in any shared, deployed, or production-like environment.
 
-## Interview Notes
+## Learning Notes
 
-Chinese interview-oriented notes:
-
-```text
-../docs/interview/devmind-interview-guide-cn.md
-../docs/resume/devmind-resume-cn.md
-../docs/demo/devmind-demo-script-cn.md
-```
+Personal interview preparation notes are kept outside this public repository.
