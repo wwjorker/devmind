@@ -93,6 +93,14 @@ frontend: npm ci && npm run build
 
 This verifies the backend unit tests and frontend production build on every push and pull request to `main`.
 
+## Job Preparation Docs
+
+Chinese interview and resume notes:
+
+- [Interview guide](docs/interview/devmind-interview-guide-cn.md)
+- [Resume bullets](docs/resume/devmind-resume-cn.md)
+- [Demo script](docs/demo/devmind-demo-script-cn.md)
+
 ## Interview Highlights
 
 - JWT authentication and user-scoped data isolation

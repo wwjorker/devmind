@@ -285,7 +285,7 @@ The default JWT secret in `application.yml` is only for local development. Overr
 Chinese interview-oriented notes:
 
 ```text
-docs/interview-guide-cn.md
-docs/resume-cn.md
-docs/learning/devmind-live-notes-cn.md
+../docs/interview/devmind-interview-guide-cn.md
+../docs/resume/devmind-resume-cn.md
+../docs/demo/devmind-demo-script-cn.md
 ```
