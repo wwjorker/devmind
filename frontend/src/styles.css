@@ -548,6 +548,16 @@ textarea:focus {
   color: #8a5a10;
 }
 
+.answer-meta .state-pill.failed {
+  background: #fff4f1;
+  color: var(--danger);
+}
+
+.answer-meta .restored-pill {
+  background: #eef1f5;
+  color: #495865;
+}
+
 .answer-card pre {
   max-height: 260px;
   overflow: auto;
@@ -761,6 +771,23 @@ textarea:focus {
 .log-meta .status-badge.failed {
   background: #fff4f1;
   color: var(--danger);
+}
+
+.mini-button {
+  min-height: 26px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #fff;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.mini-button:hover {
+  border-color: rgba(15, 139, 127, 0.35);
+  background: #f1f8f7;
 }
 
 .toast,

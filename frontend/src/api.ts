@@ -134,7 +134,21 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
     headers
   });
 
-  const result = (await response.json()) as ApiResult<T>;
+  const responseText = await response.text();
+  let result: ApiResult<T> | null = null;
+
+  if (responseText) {
+    try {
+      result = JSON.parse(responseText) as ApiResult<T>;
+    } catch {
+      throw new Error(`Request failed: ${response.status}`);
+    }
+  }
+
+  if (!result) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+
   if (!response.ok || result.code !== 0) {
     throw new Error(result.message || `Request failed: ${response.status}`);
   }

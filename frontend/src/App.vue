@@ -21,6 +21,8 @@ const activeView = ref<'documents' | 'ask' | 'evaluation'>('ask');
 const documents = ref<DocumentItem[]>([]);
 const selectedDocumentId = ref<number | null>(null);
 const askResponse = ref<AskResponse | null>(null);
+const restoredFromLog = ref(false);
+const restoredAskLogStatus = ref<number | null>(null);
 const askLogs = ref<AskLogItem[]>([]);
 const evaluation = ref<EvaluationSummary | null>(null);
 const loading = reactive({
@@ -79,6 +81,9 @@ const isAuthed = computed(() => Boolean(token.value));
 const currentAskState = computed(() => {
   if (!askResponse.value) {
     return 'Ready';
+  }
+  if (restoredAskLogStatus.value === 0) {
+    return 'Failed';
   }
   if (askResponse.value.modelProvider === 'knowledge-base-fallback') {
     return 'Fallback';
@@ -147,6 +152,8 @@ function clearLocalSession() {
   user.value = null;
   documents.value = [];
   askResponse.value = null;
+  restoredFromLog.value = false;
+  restoredAskLogStatus.value = null;
   askLogs.value = [];
   evaluation.value = null;
 }
@@ -204,6 +211,8 @@ async function ask() {
       method: 'POST',
       body: JSON.stringify({ question: askForm.question })
     });
+    restoredFromLog.value = false;
+    restoredAskLogStatus.value = null;
     activeView.value = 'ask';
     await Promise.all([loadEvaluation(), loadAskLogs()]);
     showToast('AI answer generated');
@@ -253,7 +262,50 @@ async function loadEvaluation() {
   }
 }
 
-async function loadAskLogs() {
+function parseChunkIds(value: string | null) {
+  if (!value) {
+    return [];
+  }
+  return value
+    .split(',')
+    .map((chunkId) => Number(chunkId.trim()))
+    .filter((chunkId) => Number.isFinite(chunkId));
+}
+
+function restoreAskFromLog(log: AskLogItem, notify = true) {
+  const chunkIds = parseChunkIds(log.retrievedChunkIds);
+
+  askResponse.value = {
+    logId: log.id,
+    question: log.question,
+    retrievalKeyword: log.retrievalKeyword,
+    answer: log.answer,
+    modelProvider: log.modelProvider,
+    mock: log.mock,
+    promptPreview: log.promptPreview || '',
+    promptTokens: log.promptTokens,
+    completionTokens: log.completionTokens,
+    totalTokens: log.totalTokens,
+    retrievedChunks: [],
+    citations: chunkIds.map((chunkId) => ({
+      chunkId,
+      documentId: 0,
+      documentTitle: 'Restored chunk id from ask log',
+      chunkIndex: 0,
+      score: 0
+    }))
+  };
+  askForm.question = log.question;
+  activeView.value = 'ask';
+  restoredFromLog.value = true;
+  restoredAskLogStatus.value = log.status;
+
+  if (notify) {
+    showToast('Answer restored from ask log');
+  }
+}
+
+async function loadAskLogs(restoreLatest = false) {
   if (!isAuthed.value) {
     return;
   }
@@ -261,6 +313,9 @@ async function loadAskLogs() {
   try {
     const page = await apiRequest<PageResult<AskLogItem>>('/api/v1/ai/ask-logs?pageNo=1&pageSize=6');
     askLogs.value = page.records;
+    if (restoreLatest && !askResponse.value && page.records.length > 0) {
+      restoreAskFromLog(page.records[0], false);
+    }
   } catch {
     askLogs.value = [];
   } finally {
@@ -269,7 +324,7 @@ async function loadAskLogs() {
 }
 
 async function refreshAll() {
-  await Promise.all([loadDocuments(), loadEvaluation(), loadAskLogs()]);
+  await Promise.all([loadDocuments(), loadEvaluation(), loadAskLogs(!askResponse.value)]);
 }
 
 function formatDate(value: string | null) {
@@ -285,7 +340,7 @@ onMounted(async () => {
   }
   try {
     await loadCurrentUser();
-    await Promise.all([loadDocuments(), loadEvaluation(), loadAskLogs()]);
+    await Promise.all([loadDocuments(), loadEvaluation(), loadAskLogs(true)]);
   } catch {
     clearLocalSession();
   }
@@ -476,6 +531,7 @@ onMounted(async () => {
                 <span>{{ askResponse.modelProvider }}</span>
                 <span>keyword: {{ askResponse.retrievalKeyword }}</span>
                 <span>logId: {{ askResponse.logId }}</span>
+                <span v-if="restoredFromLog" class="restored-pill">Restored from log</span>
               </div>
               <pre>{{ askResponse.answer }}</pre>
 
@@ -487,7 +543,7 @@ onMounted(async () => {
                   <small>score {{ citation.score }}</small>
                 </div>
                 <div v-if="askResponse.citations.length === 0" class="empty-state compact">
-                  No citations. This is expected for no-context fallback.
+                  {{ restoredFromLog ? 'This historical log has no stored citation ids.' : 'No citations. This is expected for no-context fallback.' }}
                 </div>
               </div>
 
@@ -508,7 +564,11 @@ onMounted(async () => {
                     <small>score {{ chunk.score }} - tokens {{ chunk.tokenCount }}</small>
                   </div>
                   <div v-if="askResponse.retrievedChunks.length === 0" class="empty-state compact">
-                    Retrieval returned 0 chunks, so the backend skipped the LLM provider.
+                    {{
+                      restoredFromLog
+                        ? 'This answer was restored from an ask log. The log keeps the answer, prompt, tokens, and chunk ids, but not full chunk text.'
+                        : 'Retrieval returned 0 chunks, so the backend skipped the LLM provider.'
+                    }}
                   </div>
                 </div>
               </details>
@@ -551,7 +611,7 @@ onMounted(async () => {
               <h2>Ask logs</h2>
               <p>Success, fallback, and failure records from the backend.</p>
             </div>
-            <button class="icon-button" title="Reload ask logs" @click="loadAskLogs">
+            <button class="icon-button" title="Reload ask logs" @click="loadAskLogs()">
               <span v-html="icons.refresh"></span>
             </button>
           </div>
@@ -569,6 +629,7 @@ onMounted(async () => {
                 <span>{{ log.retrievedChunkCount }} chunks</span>
                 <span>{{ log.elapsedMs }}ms</span>
                 <span>{{ formatDate(log.createdAt) }}</span>
+                <button class="mini-button" type="button" @click="restoreAskFromLog(log)">Restore</button>
               </div>
             </div>
             <div v-if="!askLogs.length" class="empty-state">No ask logs yet.</div>
