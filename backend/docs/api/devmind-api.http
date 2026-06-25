@@ -43,6 +43,28 @@ Content-Type: application/json
 
 > {% client.global.set("documentId", response.body.data.id); %}
 
+### Import Knowledge Document From Markdown
+POST {{baseUrl}}/api/v1/documents/import
+Authorization: Bearer {{authToken}}
+Content-Type: multipart/form-data; boundary=devmindBoundary
+
+--devmindBoundary
+Content-Disposition: form-data; name="file"; filename="redis-cache-penetration.md"
+Content-Type: text/markdown
+
+< ./../samples/redis-cache-penetration.md
+--devmindBoundary
+Content-Disposition: form-data; name="sourceType"
+
+imported_note
+--devmindBoundary
+Content-Disposition: form-data; name="tags"
+
+redis,cache,imported
+--devmindBoundary--
+
+> {% client.global.set("documentId", response.body.data.id); %}
+
 ### List Documents
 GET {{baseUrl}}/api/v1/documents?pageNo=1&pageSize=10
 Authorization: Bearer {{authToken}}

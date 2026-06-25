@@ -10,6 +10,7 @@ Many AI demos stop at "send a prompt to a model and return an answer". DevMind t
 
 ```text
 knowledge document
+-> text or Markdown file import
 -> document chunks
 -> retrieval
 -> no-context fallback when retrieval is empty
@@ -29,6 +30,7 @@ This makes the project easier to explain in Java backend interviews because the 
 - Redis-backed JWT logout blacklist
 - User-scoped knowledge documents
 - Soft archive instead of physical deletion
+- Text and Markdown note import with automatic document creation
 - Automatic document chunk generation and rebuild on update
 - Multilingual keyword retrieval for Chinese and English technical questions
 - No-context fallback to avoid unsupported model answers
@@ -158,6 +160,7 @@ GET    /api/v1/auth/me
 POST   /api/v1/auth/logout
 
 POST   /api/v1/documents
+POST   /api/v1/documents/import
 GET    /api/v1/documents
 GET    /api/v1/documents/{documentId}
 PUT    /api/v1/documents/{documentId}
@@ -229,6 +232,27 @@ risk type
 covered status
 latest ask log id and retrieved chunk count
 ```
+
+## Document Import
+
+The import API accepts `.txt`, `.md`, and `.markdown` files:
+
+```text
+POST /api/v1/documents/import
+Content-Type: multipart/form-data
+```
+
+Supported form fields:
+
+```text
+file       required
+title      optional, defaults to the file name
+sourceType optional, defaults to imported_note
+tags       optional
+summary    optional
+```
+
+After import, the backend creates a normal knowledge document and rebuilds chunks through the same `DocumentChunkService` path used by manual document creation. This keeps the RAG pipeline consistent and makes uploaded notes immediately searchable.
 
 ## Local Setup
 

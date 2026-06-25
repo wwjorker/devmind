@@ -8,6 +8,7 @@ It demonstrates a complete RAG-style workflow instead of a thin AI API wrapper:
 
 ```text
 knowledge documents
+-> text or Markdown file import
 -> document chunks
 -> multilingual keyword retrieval
 -> no-context grounded fallback
@@ -99,6 +100,7 @@ This verifies the backend unit tests and frontend production build on every push
 - JWT authentication and user-scoped data isolation
 - Redis-backed JWT logout blacklist
 - Flyway-managed schema migration
+- Text and Markdown note import with automatic chunk rebuild
 - RAG ask flow with prompt preview and citations
 - No-context fallback to reduce hallucination and token cost
 - Multilingual keyword extraction for Chinese and English technical questions

@@ -187,3 +187,39 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}): Pr
   }
   return result.data;
 }
+
+export async function uploadDocument(formData: FormData): Promise<DocumentItem> {
+  const headers = new Headers();
+  const token = getToken();
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch('/api/v1/documents/import', {
+    method: 'POST',
+    headers,
+    body: formData
+  });
+
+  const responseText = await response.text();
+  let result: ApiResult<DocumentItem> | null = null;
+
+  if (responseText) {
+    try {
+      result = JSON.parse(responseText) as ApiResult<DocumentItem>;
+    } catch {
+      throw new Error(`Request failed: ${response.status}`);
+    }
+  }
+
+  if (!result) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+
+  if (!response.ok || result.code !== 0) {
+    throw new Error(result.message || `Request failed: ${response.status}`);
+  }
+
+  return result.data;
+}

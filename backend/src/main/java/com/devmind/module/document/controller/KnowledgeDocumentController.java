@@ -9,6 +9,7 @@ import com.devmind.module.document.service.KnowledgeDocumentService;
 import com.devmind.module.document.vo.DocumentChunkResponse;
 import com.devmind.module.document.vo.DocumentResponse;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -36,6 +38,16 @@ public class KnowledgeDocumentController {
     public Result<DocumentResponse> create(@AuthenticationPrincipal AuthenticatedUser user,
                                            @Valid @RequestBody CreateDocumentRequest request) {
         return Result.success(documentService.create(user.userId(), request));
+    }
+
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<DocumentResponse> importFile(@AuthenticationPrincipal AuthenticatedUser user,
+                                               @RequestParam("file") MultipartFile file,
+                                               @RequestParam(required = false) String title,
+                                               @RequestParam(required = false) String sourceType,
+                                               @RequestParam(required = false) String tags,
+                                               @RequestParam(required = false) String summary) {
+        return Result.success(documentService.importFromFile(user.userId(), file, title, sourceType, tags, summary));
     }
 
     @GetMapping("/{documentId}")

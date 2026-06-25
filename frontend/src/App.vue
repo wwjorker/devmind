@@ -5,6 +5,7 @@ import {
   clearToken,
   getToken,
   setToken,
+  uploadDocument,
   type AskFeedbackItem,
   type AskLogItem,
   type AskResponse,
@@ -40,6 +41,7 @@ const loading = reactive({
   auth: false,
   documents: false,
   createDocument: false,
+  importDocument: false,
   ask: false,
   askLogs: false,
   feedback: false,
@@ -74,6 +76,15 @@ Cache empty values for a short TTL, validate illegal parameters early, and add r
 Interview talking point:
 Cache penetration is different from cache breakdown and cache avalanche.`
 });
+
+const importForm = reactive({
+  title: '',
+  sourceType: 'imported_note',
+  tags: 'imported,learning',
+  summary: ''
+});
+const selectedImportFile = ref<File | null>(null);
+const importFileInputKey = ref(0);
 
 const askForm = reactive({
   question: 'How should I explain Redis cache penetration in an interview?'
@@ -227,6 +238,53 @@ async function createDocument() {
     setError(err instanceof Error ? err.message : 'Failed to create document');
   } finally {
     loading.createDocument = false;
+  }
+}
+
+function onImportFileChange(event: Event) {
+  const input = event.target as HTMLInputElement;
+  selectedImportFile.value = input.files?.[0] ?? null;
+
+  if (selectedImportFile.value && !importForm.title) {
+    importForm.title = selectedImportFile.value.name.replace(/\.(txt|md|markdown)$/i, '');
+  }
+}
+
+async function importDocument() {
+  if (!selectedImportFile.value) {
+    setError('Choose a .txt or .md file first.');
+    return;
+  }
+
+  loading.importDocument = true;
+  setError('');
+  try {
+    const formData = new FormData();
+    formData.append('file', selectedImportFile.value);
+    if (importForm.title.trim()) {
+      formData.append('title', importForm.title.trim());
+    }
+    if (importForm.sourceType.trim()) {
+      formData.append('sourceType', importForm.sourceType.trim());
+    }
+    if (importForm.tags.trim()) {
+      formData.append('tags', importForm.tags.trim());
+    }
+    if (importForm.summary.trim()) {
+      formData.append('summary', importForm.summary.trim());
+    }
+
+    const document = await uploadDocument(formData);
+    selectedDocumentId.value = document.id;
+    selectedImportFile.value = null;
+    importFileInputKey.value += 1;
+    importForm.title = '';
+    await loadDocuments();
+    showToast('File imported and chunked');
+  } catch (err) {
+    setError(err instanceof Error ? err.message : 'Failed to import document');
+  } finally {
+    loading.importDocument = false;
   }
 }
 
@@ -573,6 +631,41 @@ onMounted(async () => {
               </button>
               <div v-if="!loading.documents && documents.length === 0" class="empty-state">No documents yet. Create one to test retrieval.</div>
             </div>
+
+            <form class="import-form" @submit.prevent="importDocument">
+              <div class="import-header">
+                <div>
+                  <h3>Import note file</h3>
+                  <p>Upload a Markdown or TXT note. The backend will create a document and rebuild chunks.</p>
+                </div>
+              </div>
+              <label>
+                File
+                <input :key="importFileInputKey" type="file" accept=".md,.markdown,.txt" @change="onImportFileChange" />
+              </label>
+              <div class="form-row">
+                <label>
+                  Title
+                  <input v-model="importForm.title" placeholder="Use file name by default" />
+                </label>
+                <label>
+                  Type
+                  <input v-model="importForm.sourceType" />
+                </label>
+              </div>
+              <label>
+                Tags
+                <input v-model="importForm.tags" />
+              </label>
+              <label>
+                Summary
+                <input v-model="importForm.summary" placeholder="Optional import note summary" />
+              </label>
+              <button class="secondary-button" type="submit" :disabled="loading.importDocument">
+                <span v-html="icons.plus"></span>
+                {{ loading.importDocument ? 'Importing...' : 'Import file' }}
+              </button>
+            </form>
 
             <form class="document-form" @submit.prevent="createDocument">
               <div class="form-row">
