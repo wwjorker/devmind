@@ -16,13 +16,19 @@ public class MockLlmClient implements LlmClient {
     public LlmResponse generate(LlmRequest request) {
         if (request.getRetrievedChunks().isEmpty()) {
             return new LlmResponse(
-                    "I could not find relevant knowledge chunks for this question. Try adding more notes to the knowledge base.",
+                    containsChinese(request.getQuestion())
+                            ? "没有检索到相关知识片段。请先添加更多笔记，或者调整问题后再试。"
+                            : "I could not find relevant knowledge chunks for this question. Try adding more notes to the knowledge base.",
                     "mock-local",
                     true
             );
         }
 
         ChunkSearchResponse topChunk = request.getRetrievedChunks().get(0);
+        if (containsChinese(request.getQuestion())) {
+            return new LlmResponse(buildChineseAnswer(request, topChunk), "mock-local", true);
+        }
+
         StringBuilder answer = new StringBuilder();
         answer.append("Mock answer based on retrieved knowledge chunks.\n\n");
         answer.append("Question: ").append(request.getQuestion()).append("\n\n");
@@ -47,6 +53,29 @@ public class MockLlmClient implements LlmClient {
         return new LlmResponse(answer.toString(), "mock-local", true);
     }
 
+    private String buildChineseAnswer(LlmRequest request, ChunkSearchResponse topChunk) {
+        StringBuilder answer = new StringBuilder();
+        answer.append("这是基于召回知识片段生成的 Mock 回答。\n\n");
+        answer.append("问题：").append(request.getQuestion()).append("\n\n");
+        answer.append("要点：\n");
+        answer.append("- 最相关的文档是 `")
+                .append(topChunk.getDocumentTitle())
+                .append("`。\n");
+        answer.append("- 召回上下文提到：")
+                .append(compact(topChunk.getContent()))
+                .append("\n");
+        answer.append("- 这个回答由 MockLlmClient 生成，真实模型 Provider 可以在不修改 RAG 编排流程的情况下替换。\n\n");
+        answer.append("引用来源：");
+        for (int i = 0; i < request.getCitations().size(); i++) {
+            CitationResponse citation = request.getCitations().get(i);
+            if (i > 0) {
+                answer.append("，");
+            }
+            answer.append("chunkId=").append(citation.getChunkId());
+        }
+        return answer.toString();
+    }
+
     private String compact(String content) {
         String normalized = content.replace("\r\n", "\n")
                 .replace("\r", "\n")
@@ -56,5 +85,18 @@ public class MockLlmClient implements LlmClient {
             return normalized;
         }
         return normalized.substring(0, 260) + "...";
+    }
+
+    private boolean containsChinese(String text) {
+        if (text == null) {
+            return false;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            Character.UnicodeScript script = Character.UnicodeScript.of(text.charAt(i));
+            if (script == Character.UnicodeScript.HAN) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -16,6 +16,7 @@ public class PromptBuilderService {
         prompt.append("You are DevMind, an AI assistant for developer learning notes.\n");
         prompt.append("Answer the user's question only with the provided context.\n");
         prompt.append("If the context is insufficient, say that the knowledge base does not contain enough information.\n");
+        prompt.append("Answer in the same language as the user's question. If the question is in Chinese, answer in Chinese.\n");
         prompt.append("Cite useful chunks by their chunk ids.\n\n");
 
         prompt.append("Question:\n");

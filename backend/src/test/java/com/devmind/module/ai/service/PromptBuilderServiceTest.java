@@ -17,6 +17,7 @@ class PromptBuilderServiceTest {
 
         assertThat(prompt)
                 .contains("You are DevMind")
+                .contains("Answer in the same language as the user's question")
                 .contains("Question:")
                 .contains("What is cache penetration?")
                 .contains("(No relevant chunks were retrieved.)")

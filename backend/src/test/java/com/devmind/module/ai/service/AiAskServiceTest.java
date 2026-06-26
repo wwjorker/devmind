@@ -63,4 +63,41 @@ class AiAskServiceTest {
         assertThat(response.getAnswer()).contains("does not contain enough information");
         verify(llmClientRouter, never()).generate(any(LlmRequest.class));
     }
+
+    @Test
+    void askShouldReturnChineseFallbackWhenChineseQuestionHasNoChunks() {
+        ChunkSearchService chunkSearchService = mock(ChunkSearchService.class);
+        AiAskLogService askLogService = mock(AiAskLogService.class);
+        LlmClientRouter llmClientRouter = mock(LlmClientRouter.class);
+        when(chunkSearchService.searchChunks(eq(1L), anyList(), anyInt())).thenReturn(List.of());
+        when(askLogService.saveSuccessLog(
+                eq(1L),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq("knowledge-base-fallback"),
+                eq(true),
+                isNull(),
+                isNull(),
+                isNull(),
+                anyList(),
+                anyLong()
+        )).thenReturn(89L);
+        AiAskService aiAskService = new AiAskService(
+                chunkSearchService,
+                askLogService,
+                new PromptBuilderService(),
+                new RetrievalKeywordService(),
+                llmClientRouter
+        );
+        AskRequest request = new AskRequest();
+        request.setQuestion("Kubernetes Pod 驱逐策略是什么？");
+
+        AskResponse response = aiAskService.ask(1L, request);
+
+        assertThat(response.getLogId()).isEqualTo(89L);
+        assertThat(response.getAnswer()).contains("当前知识库没有足够信息");
+        verify(llmClientRouter, never()).generate(any(LlmRequest.class));
+    }
 }
