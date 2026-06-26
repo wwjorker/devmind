@@ -17,9 +17,13 @@ public class AiAskService {
 
     private static final int DEFAULT_RETRIEVAL_LIMIT = 3;
     private static final String NO_CONTEXT_PROVIDER = "knowledge-base-fallback";
-    private static final String NO_CONTEXT_ANSWER = """
+    private static final String NO_CONTEXT_ANSWER_EN = """
             The knowledge base does not contain enough information to answer this question.
             Please add relevant notes or refine the question, then ask again.
+            """;
+    private static final String NO_CONTEXT_ANSWER_CN = """
+            当前知识库没有足够信息回答这个问题。
+            请先添加相关笔记，或者调整问题后再提问。
             """;
 
     private final ChunkSearchService chunkSearchService;
@@ -125,12 +129,13 @@ public class AiAskService {
                                                List<ChunkSearchResponse> chunks,
                                                List<CitationResponse> citations,
                                                long elapsedMs) {
+        String answer = noContextAnswer(question);
         Long logId = askLogService.saveSuccessLog(
                 userId,
                 question,
                 retrievalKeyword,
                 promptPreview,
-                NO_CONTEXT_ANSWER,
+                answer,
                 NO_CONTEXT_PROVIDER,
                 true,
                 null,
@@ -145,7 +150,7 @@ public class AiAskService {
                 question,
                 retrievalKeyword,
                 promptPreview,
-                NO_CONTEXT_ANSWER,
+                answer,
                 NO_CONTEXT_PROVIDER,
                 true,
                 null,
@@ -170,5 +175,22 @@ public class AiAskService {
 
     private boolean isMockProvider(String modelProvider) {
         return "mock".equalsIgnoreCase(modelProvider);
+    }
+
+    private String noContextAnswer(String question) {
+        return containsChinese(question) ? NO_CONTEXT_ANSWER_CN : NO_CONTEXT_ANSWER_EN;
+    }
+
+    private boolean containsChinese(String text) {
+        if (text == null) {
+            return false;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            Character.UnicodeScript script = Character.UnicodeScript.of(text.charAt(i));
+            if (script == Character.UnicodeScript.HAN) {
+                return true;
+            }
+        }
+        return false;
     }
 }

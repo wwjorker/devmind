@@ -17,6 +17,12 @@ import java.util.Map;
 @Component
 public class DeepSeekLlmClient implements LlmClient {
 
+    private static final String SYSTEM_PROMPT = """
+            You are DevMind, an assistant that answers strictly from retrieved developer knowledge-base context.
+            Answer in the same language as the user's question. If the question is in Chinese, answer in Chinese.
+            Do not use unsupported external knowledge when the retrieved context is insufficient.
+            """;
+
     private final AiProperties aiProperties;
 
     public DeepSeekLlmClient(AiProperties aiProperties) {
@@ -43,7 +49,7 @@ public class DeepSeekLlmClient implements LlmClient {
         Map<String, Object> body = Map.of(
                 "model", aiProperties.getDeepseekModel(),
                 "messages", List.of(
-                        Map.of("role", "system", "content", "You are DevMind, an assistant that answers strictly from retrieved developer knowledge-base context."),
+                        Map.of("role", "system", "content", SYSTEM_PROMPT),
                         Map.of("role", "user", "content", request.getPrompt())
                 ),
                 "temperature", aiProperties.getDeepseekTemperature(),
