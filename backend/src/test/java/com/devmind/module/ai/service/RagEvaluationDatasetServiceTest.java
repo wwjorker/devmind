@@ -36,7 +36,7 @@ class RagEvaluationDatasetServiceTest {
         AiAskLogMapper askLogMapper = mock(AiAskLogMapper.class);
         AiAskLog log = new AiAskLog();
         log.setId(42L);
-        log.setQuestion("How should I explain Redis cache penetration in an interview?");
+        log.setQuestion("面试中应该如何解释 Redis 缓存穿透？");
         log.setStatus(1);
         log.setRetrievedChunkCount(3);
         log.setRetrievedChunkIds("3,4,7");

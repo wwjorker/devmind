@@ -97,7 +97,7 @@ Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "question": "How should Redis cache penetration be handled?",
+  "question": "面试中应该如何解释 Redis 缓存穿透？",
   "retrievalLimit": 3
 }
 
@@ -110,7 +110,7 @@ Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "question": "What is Kubernetes pod eviction policy?",
+  "question": "Kubernetes Pod 驱逐策略是什么？",
   "retrievalLimit": 3
 }
 
@@ -125,7 +125,7 @@ Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "question": "How should Redis cache penetration be handled?",
+  "question": "面试中应该如何解释 Redis 缓存穿透？",
   "retrievalLimit": 3
 }
 
@@ -140,8 +140,8 @@ Content-Type: application/json
 
 {
   "helpful": false,
-  "reason": "The answer is correct but does not clearly compare cache penetration, cache breakdown, and cache avalanche.",
-  "expectedAnswer": "Mention cache empty values, parameter validation, rate limiting, and explain the difference from breakdown and avalanche."
+  "reason": "回答基本正确，但没有清楚对比缓存穿透、缓存击穿和缓存雪崩。",
+  "expectedAnswer": "说明缓存空值、参数校验、布隆过滤器或限流，并解释它和缓存击穿、缓存雪崩的区别。"
 }
 
 ### List Bad Case Feedback

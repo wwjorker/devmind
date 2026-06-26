@@ -117,6 +117,7 @@ http://127.0.0.1:5173
 
 ## 文档
 
+- 项目方向护栏：[docs/project-direction-cn.md](docs/project-direction-cn.md)
 - 后端说明：[backend/README.md](backend/README.md)
 - 前端说明：[frontend/README.md](frontend/README.md)
 - 架构说明：[backend/docs/architecture.md](backend/docs/architecture.md)
