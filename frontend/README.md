@@ -44,11 +44,13 @@ Vite dev server 会把 `/api` 请求代理到后端。
 ## 演示流程
 
 1. 登录或注册本地账号。
-2. 创建一篇 Redis 缓存穿透笔记，或者导入 Markdown/TXT 文件。
+2. 创建一篇 Redis 缓存穿透笔记，或者导入 `backend/docs/samples/redis-cache-penetration.md`。
 3. 在 AI 问答区提问：`面试中应该如何解释 Redis 缓存穿透？`
 4. 查看回答、引用来源、召回 chunks、Prompt Preview 和 token 用量。
 5. 提交 helpful 或 bad case 反馈。
 6. 打开评估看板，查看 bad case 和 RAG evaluation dataset 覆盖率。
+
+更完整的展示顺序见根目录：[docs/demo/devmind-demo-script-cn.md](../docs/demo/devmind-demo-script-cn.md)。
 
 ## 无上下文兜底验证
 

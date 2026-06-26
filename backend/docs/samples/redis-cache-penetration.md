@@ -1,20 +1,22 @@
-# Redis Cache Penetration
+# Redis 缓存穿透复盘
 
-## Problem
+## 问题
 
-When many requests query a key that does not exist, the request may bypass Redis and hit MySQL repeatedly.
+当大量请求访问一个不存在的 key 时，请求可能反复绕过 Redis，直接打到 MySQL。
 
-## Root Cause
+## 根因
 
-The system only caches existing data. Missing data is not cached, so every request becomes a cache miss.
+系统只缓存真实存在的数据，不存在的数据没有写入缓存，所以每次请求都会成为缓存未命中。
 
-## Solutions
+## 解决方案
 
-- Cache empty values with a short TTL.
-- Validate illegal parameters early.
-- Add rate limiting for abnormal traffic.
-- Monitor cache miss rate and database pressure.
+- 对不存在的数据缓存空值，并设置较短 TTL。
+- 在入口处校验非法参数，减少明显无效请求。
+- 对异常流量增加限流。
+- 对高风险查询场景使用布隆过滤器提前拦截。
+- 监控缓存 miss 率和数据库压力，及时发现异常访问。
 
-## Interview Talking Point
+## 面试表达
 
-Cache penetration is different from cache breakdown and cache avalanche. The key idea is to protect the database from repeated misses for non-existing data.
+缓存穿透和缓存击穿、缓存雪崩不同。缓存穿透的核心是大量请求查询不存在的数据，导致缓存层无法拦截，数据库承受重复 miss 压力。解决目标是保护数据库，而不是单纯提高缓存命中率。
+
