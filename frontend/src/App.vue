@@ -55,26 +55,26 @@ const authForm = reactive({
   mode: 'login' as 'login' | 'register',
   username: 'testuser',
   password: '123456',
-  nickname: 'Test User',
+  nickname: '测试用户',
   email: 'testuser@example.com'
 });
 
 const documentForm = reactive({
-  title: 'Redis cache penetration review',
+  title: 'Redis 缓存穿透复盘',
   sourceType: 'bug_review',
   tags: 'redis,cache,backend',
-  summary: 'A short review note about cache penetration.',
-  content: `Problem:
-The API may hit the database repeatedly when a missing key is requested many times.
+  summary: '一篇关于 Redis 缓存穿透的复盘笔记。',
+  content: `问题：
+当大量请求访问一个不存在的 key 时，请求可能反复绕过 Redis，直接打到 MySQL。
 
-Root cause:
-The system only caches existing data, so non-existing data bypasses Redis every time.
+根因：
+系统只缓存真实存在的数据，不存在的数据没有缓存，所以每次请求都会成为缓存未命中。
 
-Solution:
-Cache empty values for a short TTL, validate illegal parameters early, and add rate limiting for abnormal traffic.
+解决方案：
+对空值设置较短 TTL 的缓存，提前校验非法参数，并对异常流量增加限流。
 
-Interview talking point:
-Cache penetration is different from cache breakdown and cache avalanche.`
+面试表达：
+缓存穿透和缓存击穿、缓存雪崩不同，核心目标是保护数据库，避免不存在的数据被反复查询。`
 });
 
 const importForm = reactive({
@@ -87,13 +87,13 @@ const selectedImportFile = ref<File | null>(null);
 const importFileInputKey = ref(0);
 
 const askForm = reactive({
-  question: 'How should I explain Redis cache penetration in an interview?'
+  question: '面试中应该如何解释 Redis 缓存穿透？'
 });
 
 const feedbackForm = reactive({
   helpful: false,
-  reason: 'The answer is acceptable, but this test marks it as a bad case for evaluation.',
-  expectedAnswer: 'The answer should mention empty-value caching, parameter validation, rate limiting, and monitoring miss rates.'
+  reason: '这个回答基本可用，但这里把它标记为 bad case，用于测试评估闭环。',
+  expectedAnswer: '回答应该提到缓存空值、参数校验、限流，以及监控异常缓存未命中率。'
 });
 
 const selectedDocument = computed(() =>
@@ -103,18 +103,26 @@ const selectedDocument = computed(() =>
 const isAuthed = computed(() => Boolean(token.value));
 const currentAskState = computed(() => {
   if (!askResponse.value) {
-    return 'Ready';
+    return '待提问';
   }
   if (restoredAskLogStatus.value === 0) {
-    return 'Failed';
+    return '失败';
   }
   if (askResponse.value.modelProvider === 'knowledge-base-fallback') {
-    return 'Fallback';
+    return '兜底';
   }
-  return 'Success';
+  return '成功';
 });
 
-const currentAskStateClass = computed(() => currentAskState.value.toLowerCase());
+const currentAskStateClass = computed(() => {
+  if (restoredAskLogStatus.value === 0) {
+    return 'failed';
+  }
+  if (askResponse.value?.modelProvider === 'knowledge-base-fallback') {
+    return 'fallback';
+  }
+  return askResponse.value ? 'success' : 'ready';
+});
 
 function showToast(message: string) {
   toast.value = message;
@@ -156,7 +164,7 @@ async function login() {
           email: authForm.email
         })
       });
-      showToast('Account created. Signing in...');
+      showToast('账号已创建，正在登录...');
     }
 
     const loginData = await apiRequest<LoginResponse>('/api/v1/auth/login', {
@@ -170,9 +178,9 @@ async function login() {
     setToken(loginData.token);
     await loadCurrentUser();
     await Promise.all([loadDocuments(), loadEvaluation(), loadAskLogs()]);
-    showToast('Signed in');
+    showToast('登录成功');
   } catch (err) {
-    setError(err instanceof Error ? err.message : 'Authentication failed');
+    setError(err instanceof Error ? err.message : '认证失败');
   } finally {
     loading.auth = false;
   }
@@ -205,7 +213,7 @@ async function logout() {
     // Local cleanup should still happen even if Redis or the backend is temporarily unavailable.
   } finally {
     clearLocalSession();
-    showToast('Signed out');
+    showToast('已退出登录');
   }
 }
 
@@ -217,7 +225,7 @@ async function loadDocuments() {
     documents.value = page.records;
     selectedDocumentId.value = page.records[0]?.id ?? null;
   } catch (err) {
-    setError(err instanceof Error ? err.message : 'Failed to load documents');
+    setError(err instanceof Error ? err.message : '加载知识文档失败');
   } finally {
     loading.documents = false;
   }
@@ -233,9 +241,9 @@ async function createDocument() {
     });
     selectedDocumentId.value = document.id;
     await loadDocuments();
-    showToast('Document created and chunked');
+    showToast('文档已创建并完成分块');
   } catch (err) {
-    setError(err instanceof Error ? err.message : 'Failed to create document');
+    setError(err instanceof Error ? err.message : '创建文档失败');
   } finally {
     loading.createDocument = false;
   }
@@ -252,7 +260,7 @@ function onImportFileChange(event: Event) {
 
 async function importDocument() {
   if (!selectedImportFile.value) {
-    setError('Choose a .txt or .md file first.');
+    setError('请先选择 .txt 或 .md 文件。');
     return;
   }
 
@@ -280,9 +288,9 @@ async function importDocument() {
     importFileInputKey.value += 1;
     importForm.title = '';
     await loadDocuments();
-    showToast('File imported and chunked');
+    showToast('文件已导入并完成分块');
   } catch (err) {
-    setError(err instanceof Error ? err.message : 'Failed to import document');
+    setError(err instanceof Error ? err.message : '导入文件失败');
   } finally {
     loading.importDocument = false;
   }
@@ -300,9 +308,9 @@ async function ask() {
     restoredAskLogStatus.value = null;
     activeView.value = 'ask';
     await Promise.all([loadEvaluation(), loadAskLogs()]);
-    showToast('AI answer generated');
+    showToast('AI 回答已生成');
   } catch (err) {
-    setError(err instanceof Error ? err.message : 'Failed to ask AI');
+    setError(err instanceof Error ? err.message : 'AI 问答失败');
   } finally {
     loading.ask = false;
   }
@@ -310,7 +318,7 @@ async function ask() {
 
 async function submitFeedback(helpful: boolean) {
   if (!askResponse.value?.logId) {
-    setError('Ask AI first, then submit feedback.');
+    setError('请先完成一次 AI 问答，再提交反馈。');
     return;
   }
   loading.feedback = true;
@@ -325,9 +333,9 @@ async function submitFeedback(helpful: boolean) {
       })
     });
     await loadEvaluation();
-    showToast(helpful ? 'Marked as helpful' : 'Bad case saved');
+    showToast(helpful ? '已标记为有帮助' : 'Bad case 已保存');
   } catch (err) {
-    setError(err instanceof Error ? err.message : 'Failed to submit feedback');
+    setError(err instanceof Error ? err.message : '提交反馈失败');
   } finally {
     loading.feedback = false;
   }
@@ -377,7 +385,7 @@ function toCitations(chunks: AskResponse['retrievedChunks'], chunkIds: number[])
   return chunkIds.map((chunkId) => ({
     chunkId,
     documentId: 0,
-    documentTitle: 'Restored chunk id from ask log',
+    documentTitle: '从问答日志恢复的 chunk id',
     chunkIndex: 0,
     score: 0
   }));
@@ -415,7 +423,7 @@ async function openLogDetail(log: AskLogItem) {
       feedback
     };
   } catch (err) {
-    setError(err instanceof Error ? err.message : 'Failed to load ask log detail');
+    setError(err instanceof Error ? err.message : '加载问答日志详情失败');
   } finally {
     loading.logDetail = false;
   }
@@ -451,7 +459,7 @@ async function restoreAskFromLog(log: AskLogItem, notify = true) {
   restoredAskLogStatus.value = log.status;
 
   if (notify) {
-    showToast('Answer restored from ask log');
+    showToast('已从问答日志恢复回答');
   }
 }
 
@@ -479,7 +487,7 @@ async function refreshAll() {
 
 function formatDate(value: string | null) {
   if (!value) {
-    return 'Just now';
+    return '刚刚';
   }
   return value.replace('T', ' ').slice(0, 16);
 }
@@ -504,27 +512,27 @@ onMounted(async () => {
         <div class="brand-mark">D</div>
         <div>
           <strong>DevMind</strong>
-          <span>AI Knowledge Base</span>
+          <span>AI 知识库</span>
         </div>
       </div>
 
       <nav class="nav-list" aria-label="Primary">
         <button :class="{ active: activeView === 'documents' }" @click="setActiveView('documents')">
           <span v-html="icons.documents"></span>
-          Documents
+          知识文档
         </button>
         <button :class="{ active: activeView === 'ask' }" @click="setActiveView('ask')">
           <span v-html="icons.ask"></span>
-          AI Ask
+          AI 问答
         </button>
         <button :class="{ active: activeView === 'evaluation' }" @click="setActiveView('evaluation')">
           <span v-html="icons.chart"></span>
-          Evaluation
+          评估看板
         </button>
       </nav>
 
       <div class="sidebar-note">
-        <span>Backend</span>
+        <span>后端服务</span>
         <strong>localhost:8081</strong>
       </div>
     </aside>
@@ -532,8 +540,8 @@ onMounted(async () => {
     <main class="workspace">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Developer learning workspace</p>
-          <h1>RAG notes, answers, and feedback in one place</h1>
+          <p class="eyebrow">开发者学习工作台</p>
+          <h1>开发学习知识库、AI 问答与反馈评估</h1>
         </div>
         <div class="topbar-actions">
           <div v-if="user" class="user-chip">
@@ -543,10 +551,10 @@ onMounted(async () => {
               <small>{{ user.email }}</small>
             </div>
           </div>
-          <button v-if="isAuthed" class="icon-button" title="Refresh" @click="refreshAll">
+          <button v-if="isAuthed" class="icon-button" title="刷新全部" @click="refreshAll">
             <span v-html="icons.refresh"></span>
           </button>
-          <button v-if="isAuthed" class="icon-button" title="Sign out" @click="logout">
+          <button v-if="isAuthed" class="icon-button" title="退出登录" @click="logout">
             <span v-html="icons.logout"></span>
           </button>
         </div>
@@ -554,34 +562,34 @@ onMounted(async () => {
 
       <section v-if="!isAuthed" class="auth-panel">
         <div class="auth-copy">
-          <h2>Connect to your DevMind backend</h2>
-          <p>Use a local account to test document management, AI ask logs, and bad-case feedback.</p>
+          <h2>连接 DevMind 后端</h2>
+          <p>使用本地账号体验知识文档管理、AI 问答日志和 bad case 反馈闭环。</p>
         </div>
         <form class="auth-form" @submit.prevent="login">
           <div class="segmented">
-            <button type="button" :class="{ active: authForm.mode === 'login' }" @click="authForm.mode = 'login'">Login</button>
-            <button type="button" :class="{ active: authForm.mode === 'register' }" @click="authForm.mode = 'register'">Register</button>
+            <button type="button" :class="{ active: authForm.mode === 'login' }" @click="authForm.mode = 'login'">登录</button>
+            <button type="button" :class="{ active: authForm.mode === 'register' }" @click="authForm.mode = 'register'">注册</button>
           </div>
           <label>
-            Username
+            用户名
             <input v-model="authForm.username" autocomplete="username" />
           </label>
           <label>
-            Password
+            密码
             <input v-model="authForm.password" type="password" autocomplete="current-password" />
           </label>
           <template v-if="authForm.mode === 'register'">
             <label>
-              Nickname
+              昵称
               <input v-model="authForm.nickname" />
             </label>
             <label>
-              Email
+              邮箱
               <input v-model="authForm.email" type="email" />
             </label>
           </template>
           <button class="primary-button" type="submit" :disabled="loading.auth">
-            {{ loading.auth ? 'Working...' : authForm.mode === 'login' ? 'Sign in' : 'Create account' }}
+            {{ loading.auth ? '处理中...' : authForm.mode === 'login' ? '登录' : '创建账号' }}
           </button>
         </form>
       </section>
@@ -589,19 +597,19 @@ onMounted(async () => {
       <template v-else>
         <section class="status-grid">
           <div class="metric">
-            <span>Documents</span>
+            <span>知识文档</span>
             <strong>{{ documents.length }}</strong>
           </div>
           <div class="metric">
-            <span>Ask state</span>
+            <span>问答状态</span>
             <strong>{{ currentAskState }}</strong>
           </div>
           <div class="metric">
-            <span>Retrieved chunks</span>
+            <span>召回片段</span>
             <strong>{{ askResponse?.retrievedChunks?.length ?? 0 }}</strong>
           </div>
           <div class="metric">
-            <span>Ask logs</span>
+            <span>问答日志</span>
             <strong>{{ askLogs.length }}</strong>
           </div>
         </section>
@@ -610,10 +618,10 @@ onMounted(async () => {
           <div ref="documentsSection" class="panel document-panel">
             <div class="panel-header">
               <div>
-                <h2>Knowledge documents</h2>
-                <p>Source material for retrieval and citations.</p>
+                <h2>知识文档</h2>
+                <p>用于检索召回和答案引用的学习材料。</p>
               </div>
-              <button class="icon-button" title="Reload documents" @click="loadDocuments">
+              <button class="icon-button" title="刷新知识文档" @click="loadDocuments">
                 <span v-html="icons.refresh"></span>
               </button>
             </div>
@@ -629,70 +637,70 @@ onMounted(async () => {
                 <span>{{ document.sourceType }} - {{ document.tags }}</span>
                 <small>{{ formatDate(document.updatedAt || document.createdAt) }}</small>
               </button>
-              <div v-if="!loading.documents && documents.length === 0" class="empty-state">No documents yet. Create one to test retrieval.</div>
+                <div v-if="!loading.documents && documents.length === 0" class="empty-state">还没有知识文档。先创建或导入一篇笔记来测试检索。</div>
             </div>
 
             <form class="import-form" @submit.prevent="importDocument">
               <div class="import-header">
                 <div>
-                  <h3>Import note file</h3>
-                  <p>Upload a Markdown or TXT note. The backend will create a document and rebuild chunks.</p>
+                  <h3>导入笔记文件</h3>
+                  <p>上传 Markdown 或 TXT 笔记，后端会创建知识文档并自动生成 chunks。</p>
                 </div>
               </div>
               <div class="field-group">
-                <span>File</span>
+                <span>文件</span>
                 <label class="import-file-picker">
                   <input :key="importFileInputKey" type="file" accept=".md,.markdown,.txt" @change="onImportFileChange" />
-                  <span class="file-button">Choose file</span>
-                  <span class="file-name">{{ selectedImportFile?.name || 'No file chosen' }}</span>
+                  <span class="file-button">选择文件</span>
+                  <span class="file-name">{{ selectedImportFile?.name || '未选择文件' }}</span>
                 </label>
               </div>
               <div class="form-row">
                 <label>
-                  Title
-                  <input v-model="importForm.title" placeholder="Use file name by default" />
+                  标题
+                  <input v-model="importForm.title" placeholder="默认使用文件名" />
                 </label>
                 <label>
-                  Type
+                  类型
                   <input v-model="importForm.sourceType" />
                 </label>
               </div>
               <label>
-                Tags
+                标签
                 <input v-model="importForm.tags" />
               </label>
               <label>
-                Summary
-                <input v-model="importForm.summary" placeholder="Optional import note summary" />
+                摘要
+                <input v-model="importForm.summary" placeholder="可选：导入笔记摘要" />
               </label>
               <button class="secondary-button" type="submit" :disabled="loading.importDocument">
                 <span v-html="icons.plus"></span>
-                {{ loading.importDocument ? 'Importing...' : 'Import file' }}
+                {{ loading.importDocument ? '导入中...' : '导入文件' }}
               </button>
             </form>
 
             <form class="document-form" @submit.prevent="createDocument">
               <div class="form-row">
                 <label>
-                  Title
+                  标题
                   <input v-model="documentForm.title" />
                 </label>
                 <label>
-                  Type
+                  类型
                   <input v-model="documentForm.sourceType" />
                 </label>
               </div>
               <label>
-                Tags
+                标签
                 <input v-model="documentForm.tags" />
               </label>
               <label>
-                Content
+                内容
                 <textarea v-model="documentForm.content" rows="7"></textarea>
               </label>
               <button class="secondary-button" type="submit" :disabled="loading.createDocument">
                 <span v-html="icons.plus"></span>
-                {{ loading.createDocument ? 'Creating...' : 'Create document' }}
+                {{ loading.createDocument ? '创建中...' : '创建文档' }}
               </button>
             </form>
           </div>
@@ -700,8 +708,8 @@ onMounted(async () => {
           <div ref="askSection" class="panel ask-panel">
             <div class="panel-header">
               <div>
-                <h2>AI Ask</h2>
-                <p>Ask against retrieved knowledge chunks.</p>
+                <h2>AI 问答</h2>
+                <p>基于检索召回的知识片段回答问题。</p>
               </div>
             </div>
 
@@ -709,30 +717,30 @@ onMounted(async () => {
               <textarea v-model="askForm.question" rows="4"></textarea>
               <button class="primary-button" type="submit" :disabled="loading.ask">
                 <span v-html="icons.send"></span>
-                {{ loading.ask ? 'Generating...' : 'Ask DevMind' }}
+                {{ loading.ask ? '生成中...' : '询问 DevMind' }}
               </button>
             </form>
 
             <div v-if="askResponse" class="answer-card">
               <div class="answer-meta">
                 <span :class="['state-pill', currentAskStateClass]">{{ currentAskState }}</span>
-                <span>{{ askResponse.mock ? 'Mock/local' : 'Real model' }}</span>
+                <span>{{ askResponse.mock ? 'Mock/本地' : '真实模型' }}</span>
                 <span>{{ askResponse.modelProvider }}</span>
-                <span>keyword: {{ askResponse.retrievalKeyword }}</span>
+                <span>检索词: {{ askResponse.retrievalKeyword }}</span>
                 <span>logId: {{ askResponse.logId }}</span>
-                <span v-if="restoredFromLog" class="restored-pill">Restored from log</span>
+                <span v-if="restoredFromLog" class="restored-pill">从日志恢复</span>
               </div>
               <pre>{{ askResponse.answer }}</pre>
 
               <div class="citation-list">
-                <h3>Citations</h3>
+                <h3>引用来源 Citations</h3>
                 <div v-for="citation in askResponse.citations" :key="citation.chunkId" class="citation">
                   <strong>#{{ citation.chunkId }}</strong>
                   <span>{{ citation.documentTitle }}</span>
-                  <small>score {{ citation.score }}</small>
+                  <small>分数 {{ citation.score }}</small>
                 </div>
                 <div v-if="askResponse.citations.length === 0" class="empty-state compact">
-                  {{ restoredFromLog ? 'This historical log has no stored citation ids.' : 'No citations. This is expected for no-context fallback.' }}
+                  {{ restoredFromLog ? '这条历史日志没有保存引用 id。' : '没有引用来源。无上下文兜底时这是正常情况。' }}
                 </div>
               </div>
 
@@ -744,19 +752,19 @@ onMounted(async () => {
               </div>
 
               <details class="debug-details">
-                <summary>Prompt preview and retrieved chunks</summary>
+                <summary>提示词预览 Prompt Preview 与召回片段 Chunks</summary>
                 <pre>{{ askResponse.promptPreview }}</pre>
                 <div class="chunk-list">
                   <div v-for="chunk in askResponse.retrievedChunks" :key="chunk.chunkId" class="chunk-row">
                     <strong>#{{ chunk.chunkId }} - {{ chunk.documentTitle }}</strong>
                     <span>{{ chunk.content }}</span>
-                    <small>score {{ chunk.score }} - tokens {{ chunk.tokenCount }}</small>
+                    <small>分数 {{ chunk.score }} - tokens {{ chunk.tokenCount }}</small>
                   </div>
                   <div v-if="askResponse.retrievedChunks.length === 0" class="empty-state compact">
                     {{
                       restoredFromLog
-                        ? 'This answer was restored from an ask log. Chunk text is loaded again when the saved chunk ids still point to active chunks.'
-                        : 'Retrieval returned 0 chunks, so the backend skipped the LLM provider.'
+                        ? '这个回答来自历史问答日志。只有保存的 chunk ids 仍然指向 active chunks 时，前端才能重新加载片段内容。'
+                        : '检索返回 0 个 chunks，所以后端跳过了 LLM provider。'
                     }}
                   </div>
                 </div>
@@ -765,43 +773,43 @@ onMounted(async () => {
               <div class="feedback-box">
                 <textarea v-model="feedbackForm.reason" rows="2"></textarea>
                 <div class="feedback-actions">
-                  <button class="secondary-button" :disabled="loading.feedback" @click="submitFeedback(true)">Helpful</button>
-                  <button class="danger-button" :disabled="loading.feedback" @click="submitFeedback(false)">Save bad case</button>
+                  <button class="secondary-button" :disabled="loading.feedback" @click="submitFeedback(true)">有帮助</button>
+                  <button class="danger-button" :disabled="loading.feedback" @click="submitFeedback(false)">保存 bad case</button>
                 </div>
               </div>
             </div>
-            <div v-else class="empty-answer">Ask a question to see answer, citations, token usage, and feedback controls.</div>
+            <div v-else class="empty-answer">提出一个问题后，这里会展示回答、引用来源、token 用量和反馈控件。</div>
           </div>
         </section>
 
         <section ref="evaluationSection" class="panel evaluation-panel">
           <div class="panel-header">
             <div>
-              <h2>Evaluation summary</h2>
-              <p>Bad-case feedback loop for RAG improvement.</p>
+              <h2>评估看板</h2>
+              <p>用于持续改进 RAG 效果的 bad-case 反馈闭环。</p>
             </div>
-            <button class="icon-button" title="Reload evaluation" @click="loadEvaluation">
+            <button class="icon-button" title="刷新评估数据" @click="loadEvaluation">
               <span v-html="icons.refresh"></span>
             </button>
           </div>
           <div class="badcase-list">
             <div v-for="badCase in evaluation?.recentBadCases || []" :key="badCase.feedbackId" class="badcase-row">
-              <strong>{{ badCase.question || 'Unknown question' }}</strong>
-              <span>{{ badCase.reason || 'No reason provided' }}</span>
+              <strong>{{ badCase.question || '未知问题' }}</strong>
+              <span>{{ badCase.reason || '未填写原因' }}</span>
               <small>{{ formatDate(badCase.createdAt) }}</small>
             </div>
-            <div v-if="!evaluation?.recentBadCases?.length" class="empty-state">No bad cases yet.</div>
+            <div v-if="!evaluation?.recentBadCases?.length" class="empty-state">暂无 bad case。</div>
           </div>
 
           <div class="evaluation-dataset">
             <div class="dataset-header">
               <div>
-                <h3>RAG evaluation dataset</h3>
-                <p>Standard questions for checking retrieval coverage and no-context fallback.</p>
+                <h3>RAG 评估集</h3>
+                <p>用标准问题检查检索覆盖率和无上下文兜底效果。</p>
               </div>
               <div class="dataset-score">
                 <strong>{{ evaluationDataset?.coveredCaseCount ?? 0 }}/{{ evaluationDataset?.totalCaseCount ?? 0 }}</strong>
-                <span>{{ Math.round((evaluationDataset?.coverageRate ?? 0) * 100) }}% covered</span>
+                <span>覆盖率 {{ Math.round((evaluationDataset?.coverageRate ?? 0) * 100) }}%</span>
               </div>
             </div>
 
@@ -816,16 +824,16 @@ onMounted(async () => {
                 </div>
                 <div class="case-status">
                   <span :class="['status-badge', testCase.covered ? 'success' : 'failed']">
-                    {{ testCase.covered ? 'covered' : 'not run' }}
+                    {{ testCase.covered ? '已覆盖' : '未运行' }}
                   </span>
                   <small v-if="testCase.covered">
                     log #{{ testCase.lastAskLogId }} - {{ testCase.lastRetrievedChunkCount }} chunks
                   </small>
-                  <small v-else>ask this question to cover the case</small>
+                  <small v-else>询问这个问题即可覆盖该 case</small>
                 </div>
                 <p>{{ testCase.expectedAnswer }}</p>
               </div>
-              <div v-if="!evaluationDataset?.cases?.length" class="empty-state">No evaluation cases loaded.</div>
+              <div v-if="!evaluationDataset?.cases?.length" class="empty-state">评估 case 暂未加载。</div>
             </div>
           </div>
         </section>
@@ -833,10 +841,10 @@ onMounted(async () => {
         <section class="panel logs-panel">
           <div class="panel-header">
             <div>
-              <h2>Ask logs</h2>
-              <p>Success, fallback, and failure records from the backend.</p>
+              <h2>问答日志</h2>
+              <p>后端记录的成功、兜底和失败问答请求。</p>
             </div>
-            <button class="icon-button" title="Reload ask logs" @click="loadAskLogs()">
+            <button class="icon-button" title="刷新问答日志" @click="loadAskLogs()">
               <span v-html="icons.refresh"></span>
             </button>
           </div>
@@ -848,17 +856,17 @@ onMounted(async () => {
               </div>
               <div class="log-meta">
                 <span :class="['status-badge', log.status === 1 ? 'success' : 'failed']">
-                  {{ log.status === 1 ? 'success' : 'failed' }}
+                  {{ log.status === 1 ? '成功' : '失败' }}
                 </span>
                 <span>{{ log.modelProvider }}</span>
                 <span>{{ log.retrievedChunkCount }} chunks</span>
                 <span>{{ log.elapsedMs }}ms</span>
                 <span>{{ formatDate(log.createdAt) }}</span>
-                <button class="mini-button" type="button" :disabled="loading.logDetail" @click="openLogDetail(log)">Details</button>
-                <button class="mini-button" type="button" @click="restoreAskFromLog(log)">Restore</button>
+                <button class="mini-button" type="button" :disabled="loading.logDetail" @click="openLogDetail(log)">详情</button>
+                <button class="mini-button" type="button" @click="restoreAskFromLog(log)">恢复</button>
               </div>
             </div>
-            <div v-if="!askLogs.length" class="empty-state">No ask logs yet.</div>
+            <div v-if="!askLogs.length" class="empty-state">暂无问答日志。</div>
           </div>
 
           <div v-if="selectedLogDetail" class="log-detail-panel">
@@ -867,28 +875,28 @@ onMounted(async () => {
                 <span>Ask log #{{ selectedLogDetail.log.id }}</span>
                 <strong>{{ selectedLogDetail.log.question }}</strong>
               </div>
-              <button class="mini-button" type="button" @click="selectedLogDetail = null">Close</button>
+              <button class="mini-button" type="button" @click="selectedLogDetail = null">关闭</button>
             </div>
 
             <div class="answer-meta">
               <span :class="['state-pill', selectedLogDetail.log.status === 1 ? 'success' : 'failed']">
-                {{ selectedLogDetail.log.status === 1 ? 'Success' : 'Failed' }}
+                {{ selectedLogDetail.log.status === 1 ? '成功' : '失败' }}
               </span>
-              <span>{{ selectedLogDetail.log.mock ? 'Mock/local' : 'Real model' }}</span>
+              <span>{{ selectedLogDetail.log.mock ? 'Mock/本地' : '真实模型' }}</span>
               <span>{{ selectedLogDetail.log.modelProvider }}</span>
-              <span>keyword: {{ selectedLogDetail.log.retrievalKeyword }}</span>
+              <span>检索词: {{ selectedLogDetail.log.retrievalKeyword }}</span>
               <span>chunks {{ selectedLogDetail.log.retrievedChunkCount }}</span>
               <span>{{ selectedLogDetail.log.elapsedMs }}ms</span>
             </div>
 
             <div class="log-detail-grid">
               <section>
-                <h3>Answer</h3>
+                <h3>回答 Answer</h3>
                 <pre>{{ selectedLogDetail.log.answer }}</pre>
               </section>
               <section>
-                <h3>Prompt Preview</h3>
-                <pre>{{ selectedLogDetail.log.promptPreview || 'No prompt preview stored.' }}</pre>
+                <h3>提示词预览 Prompt Preview</h3>
+                <pre>{{ selectedLogDetail.log.promptPreview || '没有保存 prompt preview。' }}</pre>
               </section>
             </div>
 
@@ -900,26 +908,26 @@ onMounted(async () => {
             </div>
 
             <div class="chunk-list">
-              <h3>Retrieved Chunks</h3>
+              <h3>召回片段 Retrieved Chunks</h3>
               <div v-for="chunk in selectedLogDetail.chunks" :key="chunk.chunkId" class="chunk-row">
                 <strong>#{{ chunk.chunkId }} - {{ chunk.documentTitle }}</strong>
                 <span>{{ chunk.content }}</span>
-                <small>score {{ chunk.score }} - tokens {{ chunk.tokenCount }}</small>
+                <small>分数 {{ chunk.score }} - tokens {{ chunk.tokenCount }}</small>
               </div>
               <div v-if="selectedLogDetail.chunks.length === 0" class="empty-state compact">
-                No active chunk text found for the saved chunk ids.
+                没有找到这些 chunk ids 对应的 active chunk 文本。
               </div>
             </div>
 
             <div class="feedback-list">
-              <h3>Feedback</h3>
+              <h3>反馈 Feedback</h3>
               <div v-for="feedback in selectedLogDetail.feedback" :key="feedback.id" class="feedback-row">
-                <strong>{{ feedback.helpful ? 'Helpful' : 'Bad case' }}</strong>
-                <span>{{ feedback.reason || 'No reason provided' }}</span>
+                <strong>{{ feedback.helpful ? '有帮助' : 'Bad case' }}</strong>
+                <span>{{ feedback.reason || '未填写原因' }}</span>
                 <small>{{ formatDate(feedback.createdAt) }}</small>
               </div>
               <div v-if="selectedLogDetail.feedback.length === 0" class="empty-state compact">
-                No feedback recorded for this ask log.
+                这条问答日志暂无反馈。
               </div>
             </div>
           </div>
