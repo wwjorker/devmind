@@ -639,10 +639,14 @@ onMounted(async () => {
                   <p>Upload a Markdown or TXT note. The backend will create a document and rebuild chunks.</p>
                 </div>
               </div>
-              <label>
-                File
-                <input :key="importFileInputKey" type="file" accept=".md,.markdown,.txt" @change="onImportFileChange" />
-              </label>
+              <div class="field-group">
+                <span>File</span>
+                <label class="import-file-picker">
+                  <input :key="importFileInputKey" type="file" accept=".md,.markdown,.txt" @change="onImportFileChange" />
+                  <span class="file-button">Choose file</span>
+                  <span class="file-name">{{ selectedImportFile?.name || 'No file chosen' }}</span>
+                </label>
+              </div>
               <div class="form-row">
                 <label>
                   Title
