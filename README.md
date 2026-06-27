@@ -65,7 +65,7 @@ cd backend
 mvn test
 ```
 
-创建 `devmind` 数据库并配置本地 MySQL、Redis、模型环境变量后，启动后端服务，默认端口为 `8081`。
+后端要求 Java 17。创建 `devmind` 数据库并配置本地 MySQL、Redis、模型环境变量后，启动后端服务，默认端口为 `8081`。
 
 前端：
 
@@ -118,6 +118,7 @@ http://127.0.0.1:5173
 ## 文档
 
 - 项目方向护栏：[docs/project-direction-cn.md](docs/project-direction-cn.md)
+- Java 17 环境说明：[docs/environment-jdk17-cn.md](docs/environment-jdk17-cn.md)
 - 演示脚本：[docs/demo/devmind-demo-script-cn.md](docs/demo/devmind-demo-script-cn.md)
 - 后端说明：[backend/README.md](backend/README.md)
 - 前端说明：[frontend/README.md](frontend/README.md)
