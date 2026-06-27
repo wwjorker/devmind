@@ -92,7 +92,7 @@ const askForm = reactive({
 
 const feedbackForm = reactive({
   helpful: false,
-  reason: '这个回答基本可用，但这里把它标记为 bad case，用于测试评估闭环。',
+  reason: '',
   expectedAnswer: '回答应该提到缓存空值、参数校验、限流，以及监控异常缓存未命中率。'
 });
 
@@ -733,7 +733,7 @@ onMounted(async () => {
               <pre>{{ askResponse.answer }}</pre>
 
               <div class="citation-list">
-                <h3>引用来源 Citations</h3>
+                <h3>引用来源</h3>
                 <div v-for="citation in askResponse.citations" :key="citation.chunkId" class="citation">
                   <strong>#{{ citation.chunkId }}</strong>
                   <span>{{ citation.documentTitle }}</span>
@@ -745,33 +745,37 @@ onMounted(async () => {
               </div>
 
               <div class="token-strip">
-                <span>Prompt {{ askResponse.promptTokens ?? '-' }}</span>
-                <span>Completion {{ askResponse.completionTokens ?? '-' }}</span>
-                <span>Total {{ askResponse.totalTokens ?? '-' }}</span>
-                <span>Chunks {{ askResponse.retrievedChunks?.length ?? 0 }}</span>
+                <span>提示词 token {{ askResponse.promptTokens ?? '-' }}</span>
+                <span>回答 token {{ askResponse.completionTokens ?? '-' }}</span>
+                <span>总 token {{ askResponse.totalTokens ?? '-' }}</span>
+                <span>召回片段 {{ askResponse.retrievedChunks?.length ?? 0 }}</span>
               </div>
 
               <details class="debug-details">
-                <summary>提示词预览 Prompt Preview 与召回片段 Chunks</summary>
+                <summary>提示词预览与召回片段</summary>
                 <pre>{{ askResponse.promptPreview }}</pre>
                 <div class="chunk-list">
                   <div v-for="chunk in askResponse.retrievedChunks" :key="chunk.chunkId" class="chunk-row">
                     <strong>#{{ chunk.chunkId }} - {{ chunk.documentTitle }}</strong>
                     <span>{{ chunk.content }}</span>
-                    <small>分数 {{ chunk.score }} - tokens {{ chunk.tokenCount }}</small>
+                    <small>分数 {{ chunk.score }} - token {{ chunk.tokenCount }}</small>
                   </div>
                   <div v-if="askResponse.retrievedChunks.length === 0" class="empty-state compact">
                     {{
                       restoredFromLog
                         ? '这个回答来自历史问答日志。只有保存的 chunk ids 仍然指向 active chunks 时，前端才能重新加载片段内容。'
-                        : '检索返回 0 个 chunks，所以后端跳过了 LLM provider。'
+                        : '检索返回 0 个召回片段，所以后端跳过了模型调用。'
                     }}
                   </div>
                 </div>
               </details>
 
               <div class="feedback-box">
-                <textarea v-model="feedbackForm.reason" rows="2"></textarea>
+                <textarea
+                  v-model="feedbackForm.reason"
+                  rows="2"
+                  placeholder="如果回答不理想，可以记录原因；保存 bad case 后会进入评估闭环。"
+                ></textarea>
                 <div class="feedback-actions">
                   <button class="secondary-button" :disabled="loading.feedback" @click="submitFeedback(true)">有帮助</button>
                   <button class="danger-button" :disabled="loading.feedback" @click="submitFeedback(false)">保存 bad case</button>
@@ -786,7 +790,7 @@ onMounted(async () => {
           <div class="panel-header">
             <div>
               <h2>评估看板</h2>
-              <p>用于持续改进 RAG 效果的 bad-case 反馈闭环。</p>
+              <p>用于持续改进 RAG 效果的 bad case 反馈闭环。</p>
             </div>
             <button class="icon-button" title="刷新评估数据" @click="loadEvaluation">
               <span v-html="icons.refresh"></span>
@@ -827,7 +831,7 @@ onMounted(async () => {
                     {{ testCase.covered ? '已覆盖' : '未运行' }}
                   </span>
                   <small v-if="testCase.covered">
-                    log #{{ testCase.lastAskLogId }} - {{ testCase.lastRetrievedChunkCount }} chunks
+                    log #{{ testCase.lastAskLogId }} - {{ testCase.lastRetrievedChunkCount }} 个片段
                   </small>
                   <small v-else>询问这个问题即可覆盖该 case</small>
                 </div>
@@ -859,7 +863,7 @@ onMounted(async () => {
                   {{ log.status === 1 ? '成功' : '失败' }}
                 </span>
                 <span>{{ log.modelProvider }}</span>
-                <span>{{ log.retrievedChunkCount }} chunks</span>
+                <span>{{ log.retrievedChunkCount }} 个片段</span>
                 <span>{{ log.elapsedMs }}ms</span>
                 <span>{{ formatDate(log.createdAt) }}</span>
                 <button class="mini-button" type="button" :disabled="loading.logDetail" @click="openLogDetail(log)">详情</button>
@@ -885,42 +889,42 @@ onMounted(async () => {
               <span>{{ selectedLogDetail.log.mock ? 'Mock/本地' : '真实模型' }}</span>
               <span>{{ selectedLogDetail.log.modelProvider }}</span>
               <span>检索词: {{ selectedLogDetail.log.retrievalKeyword }}</span>
-              <span>chunks {{ selectedLogDetail.log.retrievedChunkCount }}</span>
+              <span>召回片段 {{ selectedLogDetail.log.retrievedChunkCount }}</span>
               <span>{{ selectedLogDetail.log.elapsedMs }}ms</span>
             </div>
 
             <div class="log-detail-grid">
               <section>
-                <h3>回答 Answer</h3>
+                <h3>回答</h3>
                 <pre>{{ selectedLogDetail.log.answer }}</pre>
               </section>
               <section>
-                <h3>提示词预览 Prompt Preview</h3>
+                <h3>提示词预览</h3>
                 <pre>{{ selectedLogDetail.log.promptPreview || '没有保存 prompt preview。' }}</pre>
               </section>
             </div>
 
             <div class="token-strip">
-              <span>Prompt {{ selectedLogDetail.log.promptTokens ?? '-' }}</span>
-              <span>Completion {{ selectedLogDetail.log.completionTokens ?? '-' }}</span>
-              <span>Total {{ selectedLogDetail.log.totalTokens ?? '-' }}</span>
-              <span>Chunk ids {{ selectedLogDetail.log.retrievedChunkIds || '-' }}</span>
+              <span>提示词 token {{ selectedLogDetail.log.promptTokens ?? '-' }}</span>
+              <span>回答 token {{ selectedLogDetail.log.completionTokens ?? '-' }}</span>
+              <span>总 token {{ selectedLogDetail.log.totalTokens ?? '-' }}</span>
+              <span>片段 ids {{ selectedLogDetail.log.retrievedChunkIds || '-' }}</span>
             </div>
 
             <div class="chunk-list">
-              <h3>召回片段 Retrieved Chunks</h3>
+              <h3>召回片段</h3>
               <div v-for="chunk in selectedLogDetail.chunks" :key="chunk.chunkId" class="chunk-row">
                 <strong>#{{ chunk.chunkId }} - {{ chunk.documentTitle }}</strong>
                 <span>{{ chunk.content }}</span>
-                <small>分数 {{ chunk.score }} - tokens {{ chunk.tokenCount }}</small>
+                <small>分数 {{ chunk.score }} - token {{ chunk.tokenCount }}</small>
               </div>
               <div v-if="selectedLogDetail.chunks.length === 0" class="empty-state compact">
-                没有找到这些 chunk ids 对应的 active chunk 文本。
+                没有找到这些片段 id 对应的 active chunk 文本。
               </div>
             </div>
 
             <div class="feedback-list">
-              <h3>反馈 Feedback</h3>
+              <h3>反馈</h3>
               <div v-for="feedback in selectedLogDetail.feedback" :key="feedback.id" class="feedback-row">
                 <strong>{{ feedback.helpful ? '有帮助' : 'Bad case' }}</strong>
                 <span>{{ feedback.reason || '未填写原因' }}</span>
