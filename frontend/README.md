@@ -9,13 +9,13 @@
 - 手动创建知识文档
 - 导入 `.txt / .md / .markdown` 笔记文件
 - AI 问答
-- 引用来源 Citations 展示
-- Token 用量展示
+- 引用来源展示
+- token 用量展示
 - 无上下文兜底状态展示
 - 问答日志列表
 - 页面刷新后从后端 ask logs 恢复最近一次回答
-- 问答日志详情：回答、Prompt Preview、token、召回 chunks、feedback
-- Helpful / bad-case 反馈提交
+- 问答日志详情：回答、提示词预览、token、召回片段、反馈
+- 有帮助 / bad case 反馈提交
 - RAG 评估集覆盖率展示
 
 ## 本地启动
@@ -46,9 +46,9 @@ Vite dev server 会把 `/api` 请求代理到后端。
 1. 登录或注册本地账号。
 2. 创建一篇 Redis 缓存穿透笔记，或者导入 `backend/docs/samples/redis-cache-penetration.md`。
 3. 在 AI 问答区提问：`面试中应该如何解释 Redis 缓存穿透？`
-4. 查看回答、引用来源、召回 chunks、Prompt Preview 和 token 用量。
-5. 提交 helpful 或 bad case 反馈。
-6. 打开评估看板，查看 bad case 和 RAG evaluation dataset 覆盖率。
+4. 查看回答、引用来源、召回片段、提示词预览和 token 用量。
+5. 提交“有帮助”或 bad case 反馈。
+6. 打开评估看板，查看 bad case 和 RAG 评估集覆盖率。
 
 更完整的展示顺序见根目录：[docs/demo/devmind-demo-script-cn.md](../docs/demo/devmind-demo-script-cn.md)。
 
@@ -60,7 +60,7 @@ Vite dev server 会把 `/api` 请求代理到后端。
 Kubernetes pod eviction policy 是什么？
 ```
 
-如果知识库没有相关 chunks，后端会返回兜底回答，并跳过 LLM Provider 调用。
+如果知识库没有相关召回片段，后端会返回兜底回答，并跳过模型调用。
 
 ## 构建
 
