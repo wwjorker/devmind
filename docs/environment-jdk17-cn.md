@@ -113,6 +113,26 @@ mvn test
 
 如果本机 Maven 没配好，也可以先依赖 IDEA 运行后端，并以 GitHub Actions 的 CI 结果作为干净环境验证。
 
+## 环境变量和密钥怎么放
+
+项目里提供了一个安全模板：
+
+```text
+backend\.env.example
+```
+
+这个文件只放占位值，用来提醒需要哪些配置。真实的 MySQL 密码、Redis 密码、DeepSeek API Key 不要提交到 GitHub。
+
+本地开发时可以放在：
+
+- IDEA 的 Run Configuration 环境变量里。
+- Windows 用户环境变量里。
+- 只存在本机且被 `.gitignore` 忽略的 `.env` 文件里。
+
+注意：Spring Boot 默认不会自动读取 `.env` 文件，所以 `.env.example` 主要是配置清单，不是自动生效文件。
+
+如果真实 API Key 曾经暴露在截图、聊天记录或错误提交里，建议去模型平台控制台重置 key。重置后，旧 key 会失效，新 key 再配置到本地运行环境即可。
+
 ## 面试怎么解释
 
 如果面试官问为什么用 Java 17，可以这样说：
