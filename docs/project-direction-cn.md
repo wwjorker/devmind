@@ -86,6 +86,7 @@ v1 目标是完成可演示、可讲解、可写简历的主链路：
 
 - 文档管理与导入。
 - chunk 生成与检索。
+- 多关键词召回、元数据召回和重复 chunk 降权。
 - AI 问答与引用来源。
 - Mock/DeepSeek Provider 切换。
 - Ask Log、Prompt Preview、token 统计。
@@ -100,4 +101,3 @@ v2 再考虑：
 - PDF/OCR 导入。
 - 更正式的离线评估指标，例如 hit rate、MRR。
 - 更细粒度的权限和限流。
-

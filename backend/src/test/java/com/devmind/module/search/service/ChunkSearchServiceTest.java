@@ -66,6 +66,62 @@ class ChunkSearchServiceTest {
         assertThat(responses.get(0).getScore()).isGreaterThan(1);
     }
 
+    @Test
+    void searchChunksShouldIncludeChunksWhenDocumentMetadataMatchesKeyword() {
+        DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        ChunkSearchService searchService = new ChunkSearchService(chunkMapper, documentMapper);
+
+        DocumentChunk chunk = chunk(
+                10L,
+                100L,
+                0,
+                "This note explains empty-value caching and rate limiting."
+        );
+        KnowledgeDocument document = document(100L, "Redis cache penetration interview note");
+
+        when(documentMapper.selectList(any())).thenReturn(List.of(document), List.of(document));
+        when(chunkMapper.selectList(any())).thenReturn(List.of(chunk));
+
+        List<ChunkSearchResponse> responses = searchService.searchChunks(1L, List.of("Redis"), 3);
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).getDocumentTitle()).isEqualTo("Redis cache penetration interview note");
+        assertThat(responses.get(0).getScore()).isGreaterThan(1);
+    }
+
+    @Test
+    void searchChunksShouldDownrankDuplicateContentAfterFirstResult() {
+        DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        ChunkSearchService searchService = new ChunkSearchService(chunkMapper, documentMapper);
+
+        DocumentChunk firstDuplicate = chunk(
+                10L,
+                100L,
+                0,
+                "Redis cache penetration happens when repeated misses hit MySQL."
+        );
+        DocumentChunk secondDuplicate = chunk(
+                11L,
+                101L,
+                0,
+                "Redis cache penetration happens when repeated misses hit MySQL."
+        );
+        KnowledgeDocument firstDocument = document(100L, "Redis cache penetration review");
+        KnowledgeDocument secondDocument = document(101L, "Redis cache penetration copied note");
+
+        when(documentMapper.selectList(any()))
+                .thenReturn(List.of(firstDocument, secondDocument), List.of(firstDocument, secondDocument));
+        when(chunkMapper.selectList(any())).thenReturn(List.of(firstDuplicate, secondDuplicate));
+
+        List<ChunkSearchResponse> responses = searchService.searchChunks(1L, List.of("Redis", "cache", "penetration"), 5);
+
+        assertThat(responses).hasSize(2);
+        assertThat(responses.get(0).getScore()).isGreaterThan(responses.get(1).getScore());
+        assertThat(responses).extracting(ChunkSearchResponse::getChunkId).containsExactly(10L, 11L);
+    }
+
     private DocumentChunk chunk(Long id, Long documentId, Integer chunkIndex, String content) {
         DocumentChunk chunk = new DocumentChunk();
         chunk.setId(id);
