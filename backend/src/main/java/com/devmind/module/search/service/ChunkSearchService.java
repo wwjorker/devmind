@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -50,12 +51,14 @@ public class ChunkSearchService {
         }
 
         int safeLimit = resolveLimit(limit);
-        int queryLimit = Math.min(safeLimit * normalizedKeywords.size(), MAX_LIMIT);
+        int queryLimit = Math.min(safeLimit * Math.max(normalizedKeywords.size(), 1) * 3, MAX_LIMIT);
+        Set<Long> matchingDocumentIds = findMatchingDocumentIds(userId, normalizedKeywords);
 
         LambdaQueryWrapper<DocumentChunk> chunkQuery = new LambdaQueryWrapper<>();
         chunkQuery.eq(DocumentChunk::getUserId, userId)
                 .eq(DocumentChunk::getStatus, STATUS_ACTIVE)
                 .and(wrapper -> {
+                    boolean hasCondition = false;
                     for (int i = 0; i < normalizedKeywords.size(); i++) {
                         String keyword = normalizedKeywords.get(i);
                         if (i == 0) {
@@ -63,6 +66,13 @@ public class ChunkSearchService {
                         } else {
                             wrapper.or().like(DocumentChunk::getContent, keyword);
                         }
+                        hasCondition = true;
+                    }
+                    if (!matchingDocumentIds.isEmpty()) {
+                        if (hasCondition) {
+                            wrapper.or();
+                        }
+                        wrapper.in(DocumentChunk::getDocumentId, matchingDocumentIds);
                     }
                 })
                 .orderByDesc(DocumentChunk::getUpdatedAt)
@@ -78,9 +88,14 @@ public class ChunkSearchService {
                 .collect(Collectors.toSet());
         Map<Long, KnowledgeDocument> documentMap = findActiveDocuments(userId, documentIds);
 
-        return chunks.stream()
+        List<ChunkSearchResponse> responses = chunks.stream()
                 .filter(chunk -> documentMap.containsKey(chunk.getDocumentId()))
                 .map(chunk -> toResponse(chunk, documentMap.get(chunk.getDocumentId()), normalizedKeywords))
+                .sorted(Comparator.comparing(ChunkSearchResponse::getScore).reversed()
+                        .thenComparing(ChunkSearchResponse::getChunkId))
+                .toList();
+
+        return applyDuplicateContentPenalty(responses).stream()
                 .sorted(Comparator.comparing(ChunkSearchResponse::getScore).reversed()
                         .thenComparing(ChunkSearchResponse::getChunkId))
                 .limit(safeLimit)
@@ -123,6 +138,30 @@ public class ChunkSearchService {
                 .toList();
     }
 
+    private Set<Long> findMatchingDocumentIds(Long userId, List<String> keywords) {
+        LambdaQueryWrapper<KnowledgeDocument> documentQuery = new LambdaQueryWrapper<>();
+        documentQuery.eq(KnowledgeDocument::getUserId, userId)
+                .eq(KnowledgeDocument::getStatus, STATUS_ACTIVE)
+                .and(wrapper -> {
+                    for (int i = 0; i < keywords.size(); i++) {
+                        String keyword = keywords.get(i);
+                        if (i > 0) {
+                            wrapper.or();
+                        }
+                        wrapper.like(KnowledgeDocument::getTitle, keyword)
+                                .or()
+                                .like(KnowledgeDocument::getTags, keyword)
+                                .or()
+                                .like(KnowledgeDocument::getSourceType, keyword);
+                    }
+                })
+                .last("LIMIT " + MAX_LIMIT);
+
+        return documentMapper.selectList(documentQuery).stream()
+                .map(KnowledgeDocument::getId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
     private Map<Long, KnowledgeDocument> findActiveDocuments(Long userId, Set<Long> documentIds) {
         LambdaQueryWrapper<KnowledgeDocument> documentQuery = new LambdaQueryWrapper<>();
         documentQuery.eq(KnowledgeDocument::getUserId, userId)
@@ -154,6 +193,22 @@ public class ChunkSearchService {
                 chunk.getTokenCount(),
                 calculateScore(chunk, document, keywords)
         );
+    }
+
+    private List<ChunkSearchResponse> applyDuplicateContentPenalty(List<ChunkSearchResponse> responses) {
+        Map<String, Integer> seenContentCounts = new HashMap<>();
+        for (ChunkSearchResponse response : responses) {
+            String fingerprint = contentFingerprint(response.getContent());
+            if (!StringUtils.hasText(fingerprint)) {
+                continue;
+            }
+            int seenCount = seenContentCounts.getOrDefault(fingerprint, 0);
+            if (seenCount > 0) {
+                response.setScore(Math.max(1, response.getScore() / (seenCount + 1)));
+            }
+            seenContentCounts.put(fingerprint, seenCount + 1);
+        }
+        return responses;
     }
 
     private List<String> normalizeKeywords(List<String> keywords) {
@@ -209,5 +264,14 @@ public class ChunkSearchService {
             index = lowerText.indexOf(lowerKeyword, index + lowerKeyword.length());
         }
         return count;
+    }
+
+    private String contentFingerprint(String content) {
+        if (!StringUtils.hasText(content)) {
+            return "";
+        }
+        return content.toLowerCase()
+                .replaceAll("\\s+", "")
+                .replaceAll("[\\p{Punct}，。！？；：“”‘’、（）【】《》]", "");
     }
 }
