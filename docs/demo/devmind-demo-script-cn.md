@@ -129,6 +129,9 @@ Kubernetes Pod 驱逐策略是什么？
 
 打开“评估看板”，观察：
 
+- 检索评估通过率。
+- 每个标准问题实际解析出的检索词。
+- 检索命中的关键词、召回片段数和 Top 文档。
 - RAG 评估集覆盖率。
 - 哪些标准问题已被问过。
 - 问答日志。
@@ -137,7 +140,8 @@ Kubernetes Pod 驱逐策略是什么？
 可讲点：
 
 ```text
-我不是只看模型有没有回答，而是用标准问题和历史日志检查检索覆盖情况。
+我不是只看模型有没有回答，而是用标准问题直接跑检索，检查关键词解析、召回片段和期望知识点命中情况。
+历史问答日志用于看真实请求的 provider、token、耗时和引用来源。
 后续可以基于 bad case 继续优化 Prompt、检索策略和文档内容。
 ```
 
@@ -156,7 +160,7 @@ Kubernetes Pod 驱逐策略是什么？
 -> 路由到 Mock 或 DeepSeek Provider
 -> 返回答案和 citations
 -> 记录 ask log、token、耗时、召回 chunk
--> 通过 feedback 和 evaluation dataset 做质量闭环
+-> 通过 feedback、evaluation dataset 和 retrieval evaluation 做质量闭环
 ```
 
 ## 4. 不要这样演示
@@ -172,7 +176,7 @@ Kubernetes Pod 驱逐策略是什么？
 
 ```text
 知识库问答本身确实常见，所以我没有只做聊天页面。
-这个项目重点放在 Java 后端工程链路上：认证、数据隔离、文档分块、检索、Prompt、Provider 抽象、日志、token 成本、bad case 和评估集。
+这个项目重点放在 Java 后端工程链路上：认证、数据隔离、文档分块、检索、Prompt、Provider 抽象、日志、token 成本、bad case 和标准问题检索评估。
 它的价值不是“我也做了一个知识库”，而是我能解释每个后端模块为什么这样设计。
 例如检索层不是只查正文，还会把标题、标签、类型作为候选召回，并对重复 chunk 降权；后续再升级到 BM25、混合检索和离线评估。
 ```

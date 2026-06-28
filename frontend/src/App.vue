@@ -14,6 +14,7 @@ import {
   type LoginResponse,
   type PageResult,
   type RagEvaluationDataset,
+  type RagRetrievalEvaluation,
   type UserProfile
 } from './api';
 import { icons } from './icons';
@@ -37,6 +38,7 @@ const selectedLogDetail = ref<{
 } | null>(null);
 const evaluation = ref<EvaluationSummary | null>(null);
 const evaluationDataset = ref<RagEvaluationDataset | null>(null);
+const retrievalEvaluation = ref<RagRetrievalEvaluation | null>(null);
 const loading = reactive({
   auth: false,
   documents: false,
@@ -202,6 +204,7 @@ function clearLocalSession() {
   selectedLogDetail.value = null;
   evaluation.value = null;
   evaluationDataset.value = null;
+  retrievalEvaluation.value = null;
 }
 
 async function logout() {
@@ -347,15 +350,18 @@ async function loadEvaluation() {
   }
   loading.evaluation = true;
   try {
-    const [summary, dataset] = await Promise.all([
+    const [summary, dataset, retrieval] = await Promise.all([
       apiRequest<EvaluationSummary>('/api/v1/ai/evaluation/summary?recentLimit=5'),
-      apiRequest<RagEvaluationDataset>('/api/v1/ai/evaluation/dataset')
+      apiRequest<RagEvaluationDataset>('/api/v1/ai/evaluation/dataset'),
+      apiRequest<RagRetrievalEvaluation>('/api/v1/ai/evaluation/retrieval')
     ]);
     evaluation.value = summary;
     evaluationDataset.value = dataset;
+    retrievalEvaluation.value = retrieval;
   } catch {
     evaluation.value = null;
     evaluationDataset.value = null;
+    retrievalEvaluation.value = null;
   } finally {
     loading.evaluation = false;
   }
@@ -803,6 +809,56 @@ onMounted(async () => {
               <small>{{ formatDate(badCase.createdAt) }}</small>
             </div>
             <div v-if="!evaluation?.recentBadCases?.length" class="empty-state">暂无 bad case。</div>
+          </div>
+
+          <div class="evaluation-dataset">
+            <div class="dataset-header">
+              <div>
+                <h3>检索评估</h3>
+                <p>用标准问题直接跑检索，检查召回是否命中预期知识点。</p>
+              </div>
+              <div class="dataset-score">
+                <strong>{{ retrievalEvaluation?.passedCaseCount ?? 0 }}/{{ retrievalEvaluation?.totalCaseCount ?? 0 }}</strong>
+                <span>通过率 {{ Math.round((retrievalEvaluation?.passRate ?? 0) * 100) }}%</span>
+              </div>
+            </div>
+
+            <div class="evaluation-case-list">
+              <div
+                v-for="testCase in retrievalEvaluation?.cases || []"
+                :key="`retrieval-${testCase.caseId}`"
+                class="evaluation-case-row retrieval-case-row"
+              >
+                <div>
+                  <strong>{{ testCase.question }}</strong>
+                  <span>{{ testCase.caseId }} - {{ testCase.category }} - {{ testCase.riskType }}</span>
+                </div>
+                <div class="case-keywords">
+                  <span v-for="keyword in testCase.queryKeywords" :key="`${testCase.caseId}-query-${keyword}`">
+                    检索词: {{ keyword }}
+                  </span>
+                  <span
+                    v-for="keyword in testCase.matchedExpectedKeywords"
+                    :key="`${testCase.caseId}-matched-${keyword}`"
+                    class="matched-keyword"
+                  >
+                    命中: {{ keyword }}
+                  </span>
+                </div>
+                <div class="case-status">
+                  <span :class="['status-badge', testCase.passed ? 'success' : 'failed']">
+                    {{ testCase.passed ? '通过' : '需复查' }}
+                  </span>
+                  <small>{{ testCase.retrievedChunkCount }} 个片段</small>
+                </div>
+                <p>{{ testCase.note }}</p>
+                <p v-if="testCase.topDocumentTitles.length">Top 文档：{{ testCase.topDocumentTitles.join('、') }}</p>
+                <p v-if="testCase.missingExpectedKeywords.length">
+                  缺失关键词：{{ testCase.missingExpectedKeywords.join('、') }}
+                </p>
+              </div>
+              <div v-if="!retrievalEvaluation?.cases?.length" class="empty-state">检索评估暂未加载。</div>
+            </div>
           </div>
 
           <div class="evaluation-dataset">

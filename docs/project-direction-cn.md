@@ -20,6 +20,7 @@ DevMind 是一个面向国内 Java 后端直接求职的 AI 知识库项目。
 -> token / 耗时观测
 -> bad case 反馈
 -> RAG 评估集
+-> 标准问题检索评估
 ```
 
 面试时要强调：AI 是系统中的一条业务链路，不是单独调用一个聊天接口。
@@ -53,7 +54,7 @@ DevMind 是一个面向国内 Java 后端直接求职的 AI 知识库项目。
 - 文档分块、检索、Prompt 构建、引用来源。
 - LLM Provider 抽象、Mock/真实模型切换。
 - 问答日志、token 成本、耗时、失败兜底。
-- bad case 反馈和 RAG 评估集。
+- bad case 反馈、RAG 评估集和标准问题检索评估。
 - CI、README、运行说明、面试讲解文档。
 
 低优先级：
@@ -106,6 +107,7 @@ v1 目标是完成可演示、可讲解、可写简历的主链路：
 - Ask Log、Prompt Preview、token 统计。
 - bad case 反馈。
 - RAG evaluation dataset 覆盖率。
+- retrieval evaluation 检索评估通过率。
 - 前端可视化演示。
 
 v2 再考虑：
@@ -121,7 +123,7 @@ v2 再考虑：
 当前 DevMind 已经能作为 Java 后端求职项目展示，但和高阶 AI 应用简历相比，还缺少几类硬点：
 
 - 更强检索：BM25、向量检索、混合检索、rerank。
-- 更强评估：hit rate、MRR、标准评测集、bad case 归因。
+- 更强评估：当前已完成标准问题检索评估，后续补 hit rate、MRR、标准评测集和 bad case 归因。
 - 更强输入：PDF、Word、OCR、多模态解析。
 - 更强编排：Tool Calling、Provider fallback、流式输出、限流和重试。
 
