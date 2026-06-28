@@ -24,8 +24,9 @@ AiAskService
 - 业务服务不依赖某个厂商 API。
 - 本地开发默认使用 Mock，稳定且低成本。
 - 演示或真实问答时切换到 DeepSeek。
-- 后续可以扩展其他 Provider 或 provider fallback。
+- 真实模型调用失败时可以降级到 Mock Provider，避免核心问答接口直接 500。
+- 后续可以继续扩展通义千问等其他 Provider。
 
 ## 面试表达
 
-我没有把 DeepSeek 调用直接写死在业务 Service 里，而是通过 `LlmClient` 接口隔离模型供应商。这样可以支持 Mock/DeepSeek 切换，方便本地测试、控制成本，也避免 RAG 主链路和单一模型厂商强耦合。
+我没有把 DeepSeek 调用直接写死在业务 Service 里，而是通过 `LlmClient` 接口隔离模型供应商。这样可以支持 Mock/DeepSeek 切换，方便本地测试、控制成本，也避免 RAG 主链路和单一模型厂商强耦合。真实模型异常时，系统还能记录失败日志并降级到 Mock Provider，保证接口有可控兜底。

@@ -149,7 +149,7 @@ SELECT
     @llm_doc_id,
     @demo_user_id,
     0,
-    'DevMind 使用 LlmClient 接口和 LlmClientRouter 隔离模型供应商。MockLlmClient 用于本地开发测试，DeepSeekLlmClient 用于真实模型调用。这样业务服务不直接依赖某个厂商 API，方便切换模型、控制成本和扩展 provider fallback。',
+    'DevMind 使用 LlmClient 接口和 LlmClientRouter 隔离模型供应商。MockLlmClient 用于本地开发测试，DeepSeekLlmClient 用于真实模型调用。这样业务服务不直接依赖某个厂商 API，方便切换模型、控制成本，并已支持真实模型失败后的 provider fallback。',
     110,
     1
 WHERE @demo_user_id IS NOT NULL;

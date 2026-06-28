@@ -1,6 +1,7 @@
 package com.devmind.module.ai.llm;
 
 import com.devmind.common.exception.BizException;
+import com.devmind.common.api.ResultCode;
 import com.devmind.module.ai.config.AiProperties;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +38,24 @@ class LlmClientRouterTest {
                 .hasMessageContaining("unsupported llm provider: unknown");
     }
 
+    @Test
+    void fallbackShouldUseMockWhenConfiguredProviderFails() {
+        AiProperties aiProperties = new AiProperties();
+        aiProperties.setProvider("deepseek");
+        LlmClientRouter router = new LlmClientRouter(
+                aiProperties,
+                List.of(new FailingClient("deepseek"), new StubClient("mock"))
+        );
+
+        LlmResponse response = router.generateFallbackFromConfiguredProvider(
+                new LlmRequest("question", "prompt", List.of(), List.of())
+        );
+
+        assertThat(response.getModelProvider()).isEqualTo("deepseek->mock-model");
+        assertThat(response.getAnswer()).isEqualTo("answer from mock");
+        assertThat(response.isMock()).isTrue();
+    }
+
     private static class StubClient implements LlmClient {
 
         private final String provider;
@@ -53,6 +72,25 @@ class LlmClientRouterTest {
         @Override
         public LlmResponse generate(LlmRequest request) {
             return new LlmResponse("answer from " + provider, provider + "-model", false);
+        }
+    }
+
+    private static class FailingClient implements LlmClient {
+
+        private final String provider;
+
+        private FailingClient(String provider) {
+            this.provider = provider;
+        }
+
+        @Override
+        public boolean supports(String provider) {
+            return this.provider.equals(provider);
+        }
+
+        @Override
+        public LlmResponse generate(LlmRequest request) {
+            throw new BizException(ResultCode.INTERNAL_ERROR, "provider failed");
         }
     }
 }

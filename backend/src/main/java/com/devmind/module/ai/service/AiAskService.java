@@ -68,9 +68,10 @@ public class AiAskService {
             );
         }
 
+        LlmRequest llmRequest = new LlmRequest(question, promptPreview, chunks, citations);
         LlmResponse llmResponse;
         try {
-            llmResponse = llmClientRouter.generate(new LlmRequest(question, promptPreview, chunks, citations));
+            llmResponse = llmClientRouter.generate(llmRequest);
         } catch (RuntimeException ex) {
             long elapsedMs = System.currentTimeMillis() - startTime;
             String modelProvider = llmClientRouter.getConfiguredProvider();
@@ -85,7 +86,7 @@ public class AiAskService {
                     chunks,
                     elapsedMs
             );
-            throw ex;
+            llmResponse = llmClientRouter.generateFallbackFromConfiguredProvider(llmRequest);
         }
         String answer = llmResponse.getAnswer();
         String modelProvider = llmResponse.getModelProvider();

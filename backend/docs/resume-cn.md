@@ -23,7 +23,7 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 当前版本适合写进 Java 后端简历，但表述要准确：
 
 ```text
-已完成：认证、文档管理、文件导入、自动分块、MySQL FULLTEXT 检索、多关键词与元数据召回、Prompt 构造、DeepSeek/Mock Provider、引用来源、token 统计、问答日志、bad case 反馈、检索评估看板、前后端联调和 GitHub Actions CI。
+已完成：认证、文档管理、文件导入、自动分块、MySQL FULLTEXT 检索、多关键词与元数据召回、Prompt 构造、DeepSeek/Mock Provider、Provider fallback、引用来源、token 统计、问答日志、bad case 反馈、检索评估看板、前后端联调和 GitHub Actions CI。
 
 未完成：向量检索、rerank、PDF/OCR、SSE 流式输出、生产级部署。
 ```
@@ -36,6 +36,7 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 - 实现 RAG 问答链路，包括问题关键词解析、chunk 检索、Prompt 构造、LLM 调用、答案返回和 citations 引用来源追踪。
 - 优化检索策略，引入 MySQL FULLTEXT 相关性检索，并结合中英文多关键词、标题/标签/类型等元数据召回和重复 chunk 降权，降低相似笔记挤占引用结果的问题。
 - 抽象 `LlmClient` 与 `LlmClientRouter`，支持 Mock 与 DeepSeek Provider 切换，降低模型调用与业务编排耦合，便于本地测试和后续扩展其他模型。
+- 实现 Provider fallback：真实模型调用失败时先记录失败日志，再降级到本地 Mock Provider 返回带引用来源的兜底回答，避免接口直接 500。
 - 基于 Spring Security、JWT、BCrypt 和 Redis blacklist 实现认证与退出登录，退出时将 token 写入 Redis 并设置剩余 TTL，避免未过期 token 继续访问。
 - 设计 `ai_ask_log` 问答日志，记录 provider、prompt preview、召回 chunk、token usage、耗时和成功/兜底/失败状态，用于成本观测与问题排查。
 - 设计 `ai_ask_feedback`、RAG evaluation dataset 与检索评估接口，支持 bad case 标注、标准问题覆盖率、检索通过率、命中关键词和问答日志回放。
@@ -58,6 +59,7 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 提问时先解析关键词，再检索相关 chunk；
 检索结果会综合内容、标题、标签和类型打分，并对重复片段降权；
 随后系统构造 Prompt，路由到 Mock 或 DeepSeek Provider；
+如果真实模型调用失败，会先记录失败日志，再降级到本地 Mock Provider；
 模型回答后返回引用来源、token 用量和耗时；
 如果回答不好，用户可以提交 bad case feedback；
 最后评估看板会统计标准问题覆盖率、检索通过率和 bad case 情况。
@@ -151,7 +153,7 @@ matched / missing keywords
 
 第三阶段：增强工程深度。
 
-- 增加限流、接口幂等、失败重试和 Provider fallback。
+- 增加限流、接口幂等和失败重试。
 - 支持 PDF/Word 文档解析。
 - 增加 SSE 流式输出。
 
