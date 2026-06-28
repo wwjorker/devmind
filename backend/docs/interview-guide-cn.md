@@ -257,7 +257,7 @@ CRUD 只是知识库入口，核心是后面的 RAG 链路和质量闭环：
 
 ### Q4：如果 DeepSeek 挂了怎么办？
 
-当前通过 `LlmClient` 抽象隔离 provider，并记录失败日志。后续可以加 provider fallback、超时配置、限流和重试。
+当前通过 `LlmClient` 抽象隔离 provider。真实模型调用失败时，系统会先记录失败日志，再降级到本地 Mock Provider 返回兜底回答，避免接口直接 500。后续还可以继续补超时配置、限流和重试。
 
 ### Q5：为什么需要前端？
 
@@ -284,5 +284,5 @@ Swagger 和 HTTP 文件适合开发调试，但面试展示时不直观。前端
 
 1. PDF/Word 文档解析。
 2. SSE 流式输出。
-3. Provider fallback 和限流。
+3. 接口限流、超时配置和重试。
 4. 轻量 Tool Calling。

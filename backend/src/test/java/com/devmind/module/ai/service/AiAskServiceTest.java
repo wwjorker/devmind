@@ -3,8 +3,10 @@ package com.devmind.module.ai.service;
 import com.devmind.module.ai.dto.AskRequest;
 import com.devmind.module.ai.llm.LlmClientRouter;
 import com.devmind.module.ai.llm.LlmRequest;
+import com.devmind.module.ai.llm.LlmResponse;
 import com.devmind.module.ai.vo.AskResponse;
 import com.devmind.module.search.service.ChunkSearchService;
+import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -99,5 +101,71 @@ class AiAskServiceTest {
         assertThat(response.getLogId()).isEqualTo(89L);
         assertThat(response.getAnswer()).contains("当前知识库没有足够信息");
         verify(llmClientRouter, never()).generate(any(LlmRequest.class));
+    }
+
+    @Test
+    void askShouldFallbackToMockWhenConfiguredProviderFails() {
+        ChunkSearchService chunkSearchService = mock(ChunkSearchService.class);
+        AiAskLogService askLogService = mock(AiAskLogService.class);
+        LlmClientRouter llmClientRouter = mock(LlmClientRouter.class);
+        ChunkSearchResponse chunk = new ChunkSearchResponse(
+                10L,
+                20L,
+                "Redis 缓存穿透复盘",
+                "bug_review",
+                "redis,cache",
+                0,
+                "缓存穿透可以通过缓存空值和限流缓解。",
+                32,
+                91
+        );
+
+        when(chunkSearchService.searchChunks(eq(1L), anyList(), anyInt())).thenReturn(List.of(chunk));
+        when(llmClientRouter.getConfiguredProvider()).thenReturn("deepseek");
+        when(llmClientRouter.generate(any(LlmRequest.class))).thenThrow(new RuntimeException("DeepSeek timeout"));
+        when(llmClientRouter.generateFallbackFromConfiguredProvider(any(LlmRequest.class)))
+                .thenReturn(new LlmResponse("这是降级后的本地回答。", "deepseek->mock-local", true));
+        when(askLogService.saveSuccessLog(
+                eq(1L),
+                any(),
+                any(),
+                any(),
+                any(),
+                eq("deepseek->mock-local"),
+                eq(true),
+                isNull(),
+                isNull(),
+                isNull(),
+                anyList(),
+                anyLong()
+        )).thenReturn(90L);
+
+        AiAskService aiAskService = new AiAskService(
+                chunkSearchService,
+                askLogService,
+                new PromptBuilderService(),
+                new RetrievalKeywordService(),
+                llmClientRouter
+        );
+        AskRequest request = new AskRequest();
+        request.setQuestion("Redis 缓存穿透怎么处理？");
+
+        AskResponse response = aiAskService.ask(1L, request);
+
+        assertThat(response.getLogId()).isEqualTo(90L);
+        assertThat(response.getModelProvider()).isEqualTo("deepseek->mock-local");
+        assertThat(response.isMock()).isTrue();
+        assertThat(response.getAnswer()).contains("降级后的本地回答");
+        verify(askLogService).saveFailureLog(
+                eq(1L),
+                eq("Redis 缓存穿透怎么处理？"),
+                any(),
+                any(),
+                eq("DeepSeek timeout"),
+                eq("deepseek"),
+                eq(false),
+                eq(List.of(chunk)),
+                anyLong()
+        );
     }
 }

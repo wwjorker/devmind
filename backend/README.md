@@ -16,6 +16,7 @@ knowledge document
 -> no-context fallback when retrieval is empty
 -> prompt building
 -> LLM provider
+-> provider fallback when the real model fails
 -> answer with citations
 -> success/failure ask log with token usage
 -> bad-case feedback
@@ -40,6 +41,7 @@ This makes the project easier to explain in Java backend interviews because the 
 - RAG ask flow with prompt preview and citations
 - Pluggable LLM layer with `MockLlmClient` and `DeepSeekLlmClient`
 - DeepSeek real-model integration through environment variables
+- Provider fallback from the configured real model to local mock when the model call fails
 - AI ask logs with success/failure status, provider, latency, retrieved chunk ids, and token usage
 - AI feedback records for helpful labels and bad-case collection
 - Evaluation summary API for total feedback, bad-case count, bad-case rate, and recent bad cases
@@ -136,6 +138,10 @@ sequenceDiagram
     AI-->>Client: answer + citations + logId
     LLM--xAI: provider error
     AI->>Log: save failure log with provider, chunks, latency, reason
+    AI->>LLM: fallback to mock provider
+    LLM-->>AI: local fallback answer
+    AI->>Log: save fallback success log with provider chain
+    AI-->>Client: fallback answer + citations + logId
     end
     Client->>Feedback: POST feedback for logId
 ```
@@ -202,6 +208,8 @@ status: success or failed
 Logout writes the current JWT into a Redis blacklist with a TTL equal to the token's remaining lifetime. The authentication filter checks the blacklist before accepting a bearer token.
 
 When retrieval returns no chunks, the backend returns a deterministic fallback answer instead of calling the LLM provider. This avoids unsupported answers and saves model tokens.
+
+When retrieval has context but the configured real model fails, DevMind records a failed ask log first, then falls back to `MockLlmClient` and returns a local answer with the original citations. The response provider is stored as a provider chain such as `deepseek->mock-local`, so the UI and ask-log history can distinguish a normal real-model answer from a degraded answer.
 
 Feedback records store:
 
