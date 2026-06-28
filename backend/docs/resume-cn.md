@@ -18,6 +18,18 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 基于 Spring Boot 和 Vue 3 设计并实现开发学习知识库系统，支持知识文档管理、Markdown/TXT 导入、自动分块、多关键词与元数据检索、RAG 问答、DeepSeek 模型调用、引用来源追踪、token 成本观测、问答日志和 bad case 评估闭环。
 ```
 
+## 当前可投递版本
+
+当前版本适合写进 Java 后端简历，但表述要准确：
+
+```text
+已完成：认证、文档管理、文件导入、自动分块、多关键词检索、Prompt 构造、DeepSeek/Mock Provider、引用来源、token 统计、问答日志、bad case 反馈、评估看板、前后端联调和 GitHub Actions CI。
+
+未完成：向量检索、rerank、PDF/OCR、SSE 流式输出、生产级部署。
+```
+
+面试时可以主动说“第一版先做可解释关键词检索和完整后端链路，后续再升级向量检索和 rerank”。这比把项目包装成生产级 AI Agent 更稳。
+
 ## 简历 Bullet 版本
 
 - 设计用户级知识库数据模型，实现知识文档 CRUD、软归档、Markdown/TXT 导入、自动 chunk 生成与文档更新后的 chunk 重建机制。
