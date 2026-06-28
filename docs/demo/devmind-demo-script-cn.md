@@ -4,6 +4,14 @@
 
 ## 1. 启动顺序
 
+如果本地数据已经被多次测试污染，先在 DBeaver 执行演示数据重置脚本：
+
+```text
+backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql
+```
+
+注意：这个脚本只清理并重建 `testuser` 的 DevMind 演示数据，不会删除其他用户，也不会影响 `F:\cangqiong`。
+
 先启动后端：
 
 ```text
@@ -30,12 +38,26 @@ http://127.0.0.1:5173
 
 使用本地测试账号登录。这个步骤说明系统不是匿名 demo，而是有用户级数据隔离。
 
-### 步骤 2：导入中文笔记
+### 步骤 2：准备中文知识文档
 
-在“知识文档”区域导入：
+正式演示建议使用 SQL 脚本提前准备好下面 6 类材料：
+
+- Redis 缓存穿透复盘
+- JWT 退出登录与 Redis 黑名单
+- Flyway migration 数据库迁移
+- LlmClient 与 LLM Provider 抽象
+- RAG 无上下文兜底
+- RAG 回答质量评估
+
+如果想演示“文件导入”能力，可以在“知识文档”区域手动导入：
 
 ```text
 backend/docs/samples/redis-cache-penetration.md
+backend/docs/samples/jwt-logout-redis-blacklist.md
+backend/docs/samples/flyway-migration.md
+backend/docs/samples/llm-provider-abstraction.md
+backend/docs/samples/no-context-fallback.md
+backend/docs/samples/rag-quality-evaluation.md
 ```
 
 导入后端会创建知识文档，并自动生成 chunks。
@@ -65,7 +87,29 @@ backend/docs/samples/redis-cache-penetration.md
 如果多篇笔记内容重复，系统会对后续重复片段降权，避免同一段材料占满全部引用。
 ```
 
-### 步骤 4：提问无资料问题
+### 步骤 4：提问后端工程问题
+
+继续问几个能展示“不是单纯 AI 套壳”的问题：
+
+```text
+JWT 退出登录为什么需要 Redis 黑名单？
+```
+
+```text
+这个项目里 Flyway migration 解决了什么问题？
+```
+
+```text
+为什么 DevMind 要抽象 LlmClient，而不是直接调用 DeepSeek？
+```
+
+可讲点：
+
+```text
+这些问题不只是测试模型效果，而是展示后端工程设计：认证安全、数据库迁移、接口抽象和 Provider 解耦。
+```
+
+### 步骤 5：提问无资料问题
 
 输入：
 
@@ -81,7 +125,7 @@ Kubernetes Pod 驱逐策略是什么？
 当检索不到上下文时，系统不强行编答案，这属于 RAG 幻觉控制。
 ```
 
-### 步骤 5：查看评估看板
+### 步骤 6：查看评估看板
 
 打开“评估看板”，观察：
 
@@ -96,6 +140,8 @@ Kubernetes Pod 驱逐策略是什么？
 我不是只看模型有没有回答，而是用标准问题和历史日志检查检索覆盖情况。
 后续可以基于 bad case 继续优化 Prompt、检索策略和文档内容。
 ```
+
+如果已经执行过上面的标准问题，评估集覆盖率会从 0/8 逐步提升。Kubernetes 问题即使被覆盖，也应该是 0 chunk 的无上下文兜底，这是负样例，不是失败。
 
 ## 3. 面试讲解顺序
 

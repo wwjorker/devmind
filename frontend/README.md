@@ -44,11 +44,13 @@ Vite dev server 会把 `/api` 请求代理到后端。
 ## 演示流程
 
 1. 登录或注册本地账号。
-2. 创建一篇 Redis 缓存穿透笔记，或者导入 `backend/docs/samples/redis-cache-penetration.md`。
-3. 在 AI 问答区提问：`面试中应该如何解释 Redis 缓存穿透？`
-4. 查看回答、引用来源、召回片段、提示词预览和 token 用量。
-5. 提交“有帮助”或 bad case 反馈。
-6. 打开评估看板，查看 bad case 和 RAG 评估集覆盖率。
+2. 如果本地数据很乱，可以先在 DBeaver 执行 `backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql`，为 `testuser` 重建一套标准演示数据。
+3. 如果要演示文件导入，可以导入 `backend/docs/samples/redis-cache-penetration.md` 或其他 samples 目录下的 Markdown 笔记。
+4. 在 AI 问答区提问：`面试中应该如何解释 Redis 缓存穿透？`
+5. 查看回答、引用来源、召回片段、提示词预览和 token 用量。
+6. 继续提问 JWT、Flyway、LlmClient 等工程设计问题，展示项目不是单纯 AI 套壳。
+7. 提交“有帮助”或 bad case 反馈。
+8. 打开评估看板，查看 bad case 和 RAG 评估集覆盖率。
 
 更完整的展示顺序见根目录：[docs/demo/devmind-demo-script-cn.md](../docs/demo/devmind-demo-script-cn.md)。
 
@@ -57,7 +59,7 @@ Vite dev server 会把 `/api` 请求代理到后端。
 可以提问：
 
 ```text
-Kubernetes pod eviction policy 是什么？
+Kubernetes Pod 驱逐策略是什么？
 ```
 
 如果知识库没有相关召回片段，后端会返回兜底回答，并跳过模型调用。
