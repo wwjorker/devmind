@@ -7,10 +7,12 @@ import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
+import com.devmind.module.search.dto.ChunkFullTextMatch;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -53,6 +55,14 @@ public class ChunkSearchService {
         int safeLimit = resolveLimit(limit);
         int queryLimit = Math.min(safeLimit * Math.max(normalizedKeywords.size(), 1) * 3, MAX_LIMIT);
         Set<Long> matchingDocumentIds = findMatchingDocumentIds(userId, normalizedKeywords);
+        List<ChunkFullTextMatch> fullTextMatches = findFullTextMatches(userId, normalizedKeywords, queryLimit);
+        Map<Long, Double> fullTextScoreMap = fullTextMatches.stream()
+                .filter(match -> match.getId() != null)
+                .collect(Collectors.toMap(
+                        ChunkFullTextMatch::getId,
+                        match -> safeFullTextScore(match.getFullTextScore()),
+                        Math::max
+                ));
 
         LambdaQueryWrapper<DocumentChunk> chunkQuery = new LambdaQueryWrapper<>();
         chunkQuery.eq(DocumentChunk::getUserId, userId)
@@ -78,7 +88,7 @@ public class ChunkSearchService {
                 .orderByDesc(DocumentChunk::getUpdatedAt)
                 .last("LIMIT " + queryLimit);
 
-        List<DocumentChunk> chunks = chunkMapper.selectList(chunkQuery);
+        List<DocumentChunk> chunks = mergeCandidates(fullTextMatches, chunkMapper.selectList(chunkQuery));
         if (chunks.isEmpty()) {
             return List.of();
         }
@@ -90,7 +100,12 @@ public class ChunkSearchService {
 
         List<ChunkSearchResponse> responses = chunks.stream()
                 .filter(chunk -> documentMap.containsKey(chunk.getDocumentId()))
-                .map(chunk -> toResponse(chunk, documentMap.get(chunk.getDocumentId()), normalizedKeywords))
+                .map(chunk -> toResponse(
+                        chunk,
+                        documentMap.get(chunk.getDocumentId()),
+                        normalizedKeywords,
+                        fullTextScoreMap.getOrDefault(chunk.getId(), 0.0)
+                ))
                 .sorted(Comparator.comparing(ChunkSearchResponse::getScore).reversed()
                         .thenComparing(ChunkSearchResponse::getChunkId))
                 .toList();
@@ -100,6 +115,59 @@ public class ChunkSearchService {
                         .thenComparing(ChunkSearchResponse::getChunkId))
                 .limit(safeLimit)
                 .toList();
+    }
+
+    private List<ChunkFullTextMatch> findFullTextMatches(Long userId, List<String> keywords, int limit) {
+        String fullTextQuery = String.join(" ", keywords);
+        if (!StringUtils.hasText(fullTextQuery)) {
+            return List.of();
+        }
+        List<ChunkFullTextMatch> matches = chunkMapper.searchActiveChunksByFullText(userId, fullTextQuery, limit);
+        if (matches == null) {
+            return List.of();
+        }
+        return matches;
+    }
+
+    private List<DocumentChunk> mergeCandidates(List<ChunkFullTextMatch> fullTextMatches,
+                                                List<DocumentChunk> keywordMatches) {
+        Map<Long, DocumentChunk> candidates = new HashMap<>();
+        List<DocumentChunk> orderedCandidates = new ArrayList<>();
+
+        if (fullTextMatches != null) {
+            for (ChunkFullTextMatch match : fullTextMatches) {
+                DocumentChunk chunk = toDocumentChunk(match);
+                if (chunk.getId() != null && !candidates.containsKey(chunk.getId())) {
+                    candidates.put(chunk.getId(), chunk);
+                    orderedCandidates.add(chunk);
+                }
+            }
+        }
+
+        if (keywordMatches != null) {
+            for (DocumentChunk chunk : keywordMatches) {
+                if (chunk.getId() != null && !candidates.containsKey(chunk.getId())) {
+                    candidates.put(chunk.getId(), chunk);
+                    orderedCandidates.add(chunk);
+                }
+            }
+        }
+
+        return orderedCandidates;
+    }
+
+    private DocumentChunk toDocumentChunk(ChunkFullTextMatch match) {
+        DocumentChunk chunk = new DocumentChunk();
+        chunk.setId(match.getId());
+        chunk.setDocumentId(match.getDocumentId());
+        chunk.setUserId(match.getUserId());
+        chunk.setChunkIndex(match.getChunkIndex());
+        chunk.setContent(match.getContent());
+        chunk.setTokenCount(match.getTokenCount());
+        chunk.setStatus(match.getStatus());
+        chunk.setCreatedAt(match.getCreatedAt());
+        chunk.setUpdatedAt(match.getUpdatedAt());
+        return chunk;
     }
 
     public List<ChunkSearchResponse> findChunksByIds(Long userId, List<Long> chunkIds) {
@@ -182,6 +250,13 @@ public class ChunkSearchService {
     private ChunkSearchResponse toResponse(DocumentChunk chunk,
                                            KnowledgeDocument document,
                                            List<String> keywords) {
+        return toResponse(chunk, document, keywords, 0.0);
+    }
+
+    private ChunkSearchResponse toResponse(DocumentChunk chunk,
+                                           KnowledgeDocument document,
+                                           List<String> keywords,
+                                           double fullTextScore) {
         return new ChunkSearchResponse(
                 chunk.getId(),
                 chunk.getDocumentId(),
@@ -191,7 +266,7 @@ public class ChunkSearchService {
                 chunk.getChunkIndex(),
                 chunk.getContent(),
                 chunk.getTokenCount(),
-                calculateScore(chunk, document, keywords)
+                calculateScore(chunk, document, keywords, fullTextScore)
         );
     }
 
@@ -239,8 +314,11 @@ public class ChunkSearchService {
                 ));
     }
 
-    private int calculateScore(DocumentChunk chunk, KnowledgeDocument document, List<String> keywords) {
-        int score = 0;
+    private int calculateScore(DocumentChunk chunk,
+                               KnowledgeDocument document,
+                               List<String> keywords,
+                               double fullTextScore) {
+        int score = fullTextScoreContribution(fullTextScore);
         for (String keyword : keywords) {
             String lowerKeyword = keyword.toLowerCase();
             score += countOccurrences(chunk.getContent(), lowerKeyword) * 10;
@@ -249,6 +327,20 @@ public class ChunkSearchService {
             score += countOccurrences(document.getSourceType(), lowerKeyword);
         }
         return Math.max(score, 1);
+    }
+
+    private int fullTextScoreContribution(double fullTextScore) {
+        if (fullTextScore <= 0) {
+            return 0;
+        }
+        return Math.min((int) Math.round(fullTextScore * 100), 200);
+    }
+
+    private double safeFullTextScore(Double fullTextScore) {
+        if (fullTextScore == null || fullTextScore.isNaN() || fullTextScore.isInfinite()) {
+            return 0.0;
+        }
+        return Math.max(fullTextScore, 0.0);
     }
 
     private int countOccurrences(String text, String lowerKeyword) {

@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS knowledge_document_chunk (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     INDEX idx_document_status_index (document_id, status, chunk_index),
     INDEX idx_user_status (user_id, status),
+    FULLTEXT INDEX ft_chunk_content (content),
     CONSTRAINT fk_document_chunk_document FOREIGN KEY (document_id) REFERENCES knowledge_document(id),
     CONSTRAINT fk_document_chunk_user FOREIGN KEY (user_id) REFERENCES user_account(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
