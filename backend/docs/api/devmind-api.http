@@ -34,11 +34,11 @@ Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "title": "Redis cache penetration review",
-  "content": "Problem:\nThe API may hit the database repeatedly when a missing key is requested many times.\n\nRoot cause:\nThe system only caches existing data, so non-existing data bypasses Redis every time.\n\nSolution:\nCache empty values for a short TTL, validate illegal parameters early, and add rate limiting for abnormal traffic.\n\nInterview talking point:\nCache penetration is different from cache breakdown and cache avalanche. The key is to protect the database from repeated misses.",
+  "title": "Redis 缓存穿透复盘",
+  "content": "问题：\n当大量请求访问一个不存在的 key 时，请求可能反复绕过 Redis，直接打到 MySQL。\n\n根因：\n系统只缓存真实存在的数据，不存在的数据没有写入缓存，所以每次请求都会成为缓存未命中。\n\n解决方案：\n对不存在的数据缓存空值并设置较短 TTL，入口处校验非法参数，对异常流量限流，并在高风险查询场景使用布隆过滤器提前拦截。\n\n面试表达：\n缓存穿透和缓存击穿、缓存雪崩不同，核心目标是保护数据库免受重复 miss 冲击。",
   "sourceType": "bug_review",
   "tags": "redis,cache,backend",
-  "summary": "A short review note about cache penetration."
+  "summary": "一篇关于 Redis 缓存穿透的复盘笔记。"
 }
 
 > {% client.global.set("documentId", response.body.data.id); %}
@@ -174,11 +174,11 @@ Authorization: Bearer {{authToken}}
 Content-Type: application/json
 
 {
-  "title": "Redis cache penetration review updated",
-  "content": "Updated problem:\nRepeated requests for non-existing data can bypass Redis and pressure MySQL.\n\nUpdated solution:\nCache empty values, validate parameters, add rate limiting, and monitor abnormal miss rates.\n\nRAG note:\nAfter this update, old chunks should be archived and new chunks should be generated.",
+  "title": "Redis 缓存穿透复盘 updated",
+  "content": "更新问题：\n重复请求不存在的数据会绕过 Redis，持续压到 MySQL。\n\n更新方案：\n缓存空值、参数校验、限流，并监控异常 miss 率。\n\nRAG note：\n文档更新后旧 chunk 应归档，新 chunk 应重新生成。",
   "sourceType": "bug_review",
   "tags": "redis,cache,backend,rag",
-  "summary": "Updated cache penetration note."
+  "summary": "更新后的 Redis 缓存穿透复盘。"
 }
 
 ### Archive Document
