@@ -122,7 +122,7 @@ v2 再考虑：
 
 当前 DevMind 已经能作为 Java 后端求职项目展示，但和高阶 AI 应用简历相比，还缺少几类硬点：
 
-- 更强检索：BM25、向量检索、混合检索、rerank。
+- 更强检索：当前已加入 MySQL FULLTEXT/BM25-style 相关性检索，后续补向量检索、混合检索和 rerank。
 - 更强评估：当前已完成标准问题检索评估，后续补 hit rate、MRR、标准评测集和 bad case 归因。
 - 更强输入：PDF、Word、OCR、多模态解析。
 - 更强编排：Tool Calling、Provider fallback、流式输出、限流和重试。

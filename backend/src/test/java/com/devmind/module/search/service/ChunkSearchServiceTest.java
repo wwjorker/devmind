@@ -4,6 +4,7 @@ import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
+import com.devmind.module.search.dto.ChunkFullTextMatch;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.junit.jupiter.api.Test;
 
@@ -11,6 +12,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -122,6 +124,36 @@ class ChunkSearchServiceTest {
         assertThat(responses).extracting(ChunkSearchResponse::getChunkId).containsExactly(10L, 11L);
     }
 
+    @Test
+    void searchChunksShouldIncludeFullTextMatchesWhenLikeQueryFindsNothing() {
+        DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        ChunkSearchService searchService = new ChunkSearchService(chunkMapper, documentMapper);
+
+        ChunkFullTextMatch fullTextMatch = fullTextMatch(
+                10L,
+                100L,
+                0,
+                "Repeated misses may overload MySQL when cache penetration happens.",
+                1.25
+        );
+        KnowledgeDocument document = document(100L, "Redis cache penetration review");
+
+        when(chunkMapper.searchActiveChunksByFullText(any(), any(), anyInt())).thenReturn(List.of(fullTextMatch));
+        when(chunkMapper.selectList(any())).thenReturn(List.of());
+        when(documentMapper.selectList(any())).thenReturn(List.of(), List.of(document));
+
+        List<ChunkSearchResponse> responses = searchService.searchChunks(
+                1L,
+                List.of("Redis", "cache", "penetration"),
+                3
+        );
+
+        assertThat(responses).hasSize(1);
+        assertThat(responses.get(0).getChunkId()).isEqualTo(10L);
+        assertThat(responses.get(0).getScore()).isGreaterThanOrEqualTo(125);
+    }
+
     private DocumentChunk chunk(Long id, Long documentId, Integer chunkIndex, String content) {
         DocumentChunk chunk = new DocumentChunk();
         chunk.setId(id);
@@ -143,5 +175,22 @@ class ChunkSearchServiceTest {
         document.setTags("redis,cache");
         document.setStatus(1);
         return document;
+    }
+
+    private ChunkFullTextMatch fullTextMatch(Long id,
+                                             Long documentId,
+                                             Integer chunkIndex,
+                                             String content,
+                                             Double fullTextScore) {
+        ChunkFullTextMatch match = new ChunkFullTextMatch();
+        match.setId(id);
+        match.setDocumentId(documentId);
+        match.setUserId(1L);
+        match.setChunkIndex(chunkIndex);
+        match.setContent(content);
+        match.setTokenCount(32);
+        match.setStatus(1);
+        match.setFullTextScore(fullTextScore);
+        return match;
     }
 }

@@ -33,6 +33,7 @@ This makes the project easier to explain in Java backend interviews because the 
 - Text and Markdown note import with automatic document creation
 - Automatic document chunk generation and rebuild on update
 - Multilingual keyword retrieval for Chinese and English technical questions
+- MySQL FULLTEXT relevance retrieval for chunk content
 - Metadata-aware retrieval across chunk content, document title, tags, and source type
 - Duplicate chunk downranking to reduce repeated citations from copied notes
 - No-context fallback to avoid unsupported model answers
@@ -237,25 +238,29 @@ latest ask log id and retrieved chunk count
 
 ## Retrieval Quality V1
 
-DevMind does not rely on a single raw keyword. The ask flow first resolves multiple retrieval keywords from the user question, including Chinese technical phrases and English tokens. Search then uses two candidate sources:
+DevMind does not rely on a single raw keyword. The ask flow first resolves multiple retrieval keywords from the user question, including Chinese technical phrases and English tokens. Search then uses three candidate sources:
 
 ```text
-document chunk content
+MySQL FULLTEXT retrieval over chunk content
+keyword LIKE fallback over chunk content
 document metadata: title, tags, source type
 ```
 
 Scores are explainable:
 
 ```text
+FULLTEXT relevance: capped BM25-style contribution
 content match:     +10 per occurrence
 title match:       +5 per occurrence
 tags match:        +3 per occurrence
 source type match: +1 per occurrence
 ```
 
+MySQL InnoDB FULLTEXT provides a lightweight BM25-style relevance signal. DevMind combines that signal with the explicit keyword and metadata scores so the ranking is still easy to inspect during debugging.
+
 After initial ranking, repeated chunk content is downranked. This prevents copied notes from occupying all top citations and gives the prompt more diverse context.
 
-This is still a lightweight keyword retrieval implementation. It is intentionally easy to explain in a Java backend interview, and it leaves a clear upgrade path to BM25, hybrid keyword/vector retrieval, and reranking.
+This is still a lightweight retrieval implementation. It is intentionally easy to explain in a Java backend interview, and it leaves a clear upgrade path to hybrid keyword/vector retrieval and reranking.
 
 ## Document Import
 
