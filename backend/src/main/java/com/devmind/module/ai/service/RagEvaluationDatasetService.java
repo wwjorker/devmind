@@ -5,11 +5,19 @@ import com.devmind.module.ai.entity.AiAskLog;
 import com.devmind.module.ai.mapper.AiAskLogMapper;
 import com.devmind.module.ai.vo.RagEvaluationCaseResponse;
 import com.devmind.module.ai.vo.RagEvaluationDatasetResponse;
+import com.devmind.module.ai.vo.RagRetrievalEvaluationCaseResponse;
+import com.devmind.module.ai.vo.RagRetrievalEvaluationResponse;
+import com.devmind.module.search.service.ChunkSearchService;
+import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 public class RagEvaluationDatasetService {
@@ -90,9 +98,15 @@ public class RagEvaluationDatasetService {
     );
 
     private final AiAskLogMapper askLogMapper;
+    private final ChunkSearchService chunkSearchService;
+    private final RetrievalKeywordService retrievalKeywordService;
 
-    public RagEvaluationDatasetService(AiAskLogMapper askLogMapper) {
+    public RagEvaluationDatasetService(AiAskLogMapper askLogMapper,
+                                       ChunkSearchService chunkSearchService,
+                                       RetrievalKeywordService retrievalKeywordService) {
         this.askLogMapper = askLogMapper;
+        this.chunkSearchService = chunkSearchService;
+        this.retrievalKeywordService = retrievalKeywordService;
     }
 
     public RagEvaluationDatasetResponse dataset(Long userId) {
@@ -112,6 +126,26 @@ public class RagEvaluationDatasetService {
                 caseResponses.size(),
                 coveredCaseCount,
                 coverageRate,
+                caseResponses
+        );
+    }
+
+    public RagRetrievalEvaluationResponse retrievalEvaluation(Long userId) {
+        List<RagRetrievalEvaluationCaseResponse> caseResponses = CASES.stream()
+                .map(caseDefinition -> evaluateRetrievalCase(userId, caseDefinition))
+                .toList();
+
+        int passedCaseCount = (int) caseResponses.stream()
+                .filter(response -> Boolean.TRUE.equals(response.getPassed()))
+                .count();
+        double passRate = caseResponses.isEmpty()
+                ? 0.0
+                : roundToFourDecimals((double) passedCaseCount / caseResponses.size());
+
+        return new RagRetrievalEvaluationResponse(
+                caseResponses.size(),
+                passedCaseCount,
+                passRate,
                 caseResponses
         );
     }
@@ -154,6 +188,100 @@ public class RagEvaluationDatasetService {
                 covered ? latestLog.getRetrievedChunkIds() : null,
                 covered ? latestLog.getCreatedAt() : null
         );
+    }
+
+    private RagRetrievalEvaluationCaseResponse evaluateRetrievalCase(Long userId,
+                                                                    EvaluationCaseDefinition caseDefinition) {
+        List<String> queryKeywords = retrievalKeywordService.resolveKeywords(caseDefinition.question());
+        List<ChunkSearchResponse> chunks = chunkSearchService.searchChunks(userId, queryKeywords, 5);
+        boolean expectedNoContext = "no_context_negative_case".equals(caseDefinition.riskType());
+        List<String> matchedKeywords = matchedExpectedKeywords(caseDefinition.expectedKeywords(), chunks);
+        List<String> missingKeywords = missingExpectedKeywords(caseDefinition.expectedKeywords(), matchedKeywords);
+        boolean passed = expectedNoContext ? chunks.isEmpty() : !chunks.isEmpty();
+
+        return new RagRetrievalEvaluationCaseResponse(
+                caseDefinition.caseId(),
+                caseDefinition.category(),
+                caseDefinition.question(),
+                caseDefinition.expectedKeywords(),
+                queryKeywords,
+                matchedKeywords,
+                missingKeywords,
+                caseDefinition.expectedEvidence(),
+                caseDefinition.riskType(),
+                passed,
+                expectedNoContext,
+                chunks.size(),
+                topChunkIds(chunks),
+                topDocumentTitles(chunks),
+                retrievalNote(expectedNoContext, chunks, matchedKeywords)
+        );
+    }
+
+    private List<String> matchedExpectedKeywords(List<String> expectedKeywords, List<ChunkSearchResponse> chunks) {
+        String searchableText = chunks.stream()
+                .map(this::searchableText)
+                .reduce("", (left, right) -> left + "\n" + right)
+                .toLowerCase(Locale.ROOT);
+
+        List<String> matched = new ArrayList<>();
+        for (String keyword : expectedKeywords) {
+            if (searchableText.contains(keyword.toLowerCase(Locale.ROOT))) {
+                matched.add(keyword);
+            }
+        }
+        return matched;
+    }
+
+    private String searchableText(ChunkSearchResponse chunk) {
+        return String.join(" ",
+                safeText(chunk.getDocumentTitle()),
+                safeText(chunk.getSourceType()),
+                safeText(chunk.getTags()),
+                safeText(chunk.getContent()));
+    }
+
+    private List<String> missingExpectedKeywords(List<String> expectedKeywords, List<String> matchedKeywords) {
+        Set<String> matchedSet = new LinkedHashSet<>(matchedKeywords);
+        return expectedKeywords.stream()
+                .filter(keyword -> !matchedSet.contains(keyword))
+                .toList();
+    }
+
+    private List<Long> topChunkIds(List<ChunkSearchResponse> chunks) {
+        return chunks.stream()
+                .map(ChunkSearchResponse::getChunkId)
+                .toList();
+    }
+
+    private List<String> topDocumentTitles(List<ChunkSearchResponse> chunks) {
+        return chunks.stream()
+                .map(ChunkSearchResponse::getDocumentTitle)
+                .filter(title -> title != null && !title.isBlank())
+                .distinct()
+                .toList();
+    }
+
+    private String retrievalNote(boolean expectedNoContext,
+                                 List<ChunkSearchResponse> chunks,
+                                 List<String> matchedKeywords) {
+        if (expectedNoContext && chunks.isEmpty()) {
+            return "Expected no-context fallback: no chunks were retrieved.";
+        }
+        if (expectedNoContext) {
+            return "Needs review: this negative case retrieved chunks and may cause unsupported answers.";
+        }
+        if (chunks.isEmpty()) {
+            return "Needs review: no chunks were retrieved for a positive evaluation case.";
+        }
+        if (matchedKeywords.isEmpty()) {
+            return "Retrieved chunks exist, but none of the expected keywords were found in the retrieved context.";
+        }
+        return "Retrieved chunks are available and contain expected evidence keywords.";
+    }
+
+    private String safeText(String value) {
+        return value == null ? "" : value;
     }
 
     private double roundToFourDecimals(double value) {

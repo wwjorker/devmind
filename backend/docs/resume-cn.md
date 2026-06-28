@@ -15,7 +15,7 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 ## 一句话项目介绍
 
 ```text
-基于 Spring Boot 和 Vue 3 设计并实现开发学习知识库系统，支持知识文档管理、Markdown/TXT 导入、自动分块、多关键词与元数据检索、RAG 问答、DeepSeek 模型调用、引用来源追踪、token 成本观测、问答日志和 bad case 评估闭环。
+基于 Spring Boot 和 Vue 3 设计并实现开发学习知识库系统，支持知识文档管理、Markdown/TXT 导入、自动分块、多关键词与元数据检索、RAG 问答、DeepSeek 模型调用、引用来源追踪、token 成本观测、问答日志、bad case 反馈和标准问题检索评估。
 ```
 
 ## 当前可投递版本
@@ -23,7 +23,7 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 当前版本适合写进 Java 后端简历，但表述要准确：
 
 ```text
-已完成：认证、文档管理、文件导入、自动分块、多关键词检索、Prompt 构造、DeepSeek/Mock Provider、引用来源、token 统计、问答日志、bad case 反馈、评估看板、前后端联调和 GitHub Actions CI。
+已完成：认证、文档管理、文件导入、自动分块、多关键词检索、Prompt 构造、DeepSeek/Mock Provider、引用来源、token 统计、问答日志、bad case 反馈、检索评估看板、前后端联调和 GitHub Actions CI。
 
 未完成：向量检索、rerank、PDF/OCR、SSE 流式输出、生产级部署。
 ```
@@ -38,14 +38,14 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 - 抽象 `LlmClient` 与 `LlmClientRouter`，支持 Mock 与 DeepSeek Provider 切换，降低模型调用与业务编排耦合，便于本地测试和后续扩展其他模型。
 - 基于 Spring Security、JWT、BCrypt 和 Redis blacklist 实现认证与退出登录，退出时将 token 写入 Redis 并设置剩余 TTL，避免未过期 token 继续访问。
 - 设计 `ai_ask_log` 问答日志，记录 provider、prompt preview、召回 chunk、token usage、耗时和成功/兜底/失败状态，用于成本观测与问题排查。
-- 设计 `ai_ask_feedback`、RAG evaluation dataset 与前端评估看板，支持 bad case 标注、期望答案记录、覆盖率统计和问答日志回放。
+- 设计 `ai_ask_feedback`、RAG evaluation dataset 与检索评估接口，支持 bad case 标注、标准问题覆盖率、检索通过率、命中关键词和问答日志回放。
 - 引入 Flyway 管理数据库结构版本，并配置 GitHub Actions 执行后端测试和前端构建，提升项目初始化、协作和持续集成的工程化程度。
 
 ## 更短版本
 
 - 基于 Spring Boot + Vue 3 实现开发学习知识库与 RAG 问答系统，支持文档导入、自动分块、多关键词检索、Prompt 构造、DeepSeek 调用和引用来源展示。
 - 抽象 LLM Provider 层，支持 Mock/DeepSeek 切换，并记录 token usage、耗时、召回 chunk 和模型来源，实现 AI 调用可观测。
-- 设计 bad case feedback、RAG evaluation dataset 和评估看板，支持回答质量反馈、期望答案沉淀和检索覆盖率分析。
+- 设计 bad case feedback、RAG evaluation dataset 和检索评估看板，支持回答质量反馈、期望答案沉淀、检索覆盖率和召回质量分析。
 
 ## 面试主线
 
@@ -60,7 +60,7 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 随后系统构造 Prompt，路由到 Mock 或 DeepSeek Provider；
 模型回答后返回引用来源、token 用量和耗时；
 如果回答不好，用户可以提交 bad case feedback；
-最后评估看板会统计标准问题覆盖率和 bad case 情况。
+最后评估看板会统计标准问题覆盖率、检索通过率和 bad case 情况。
 ```
 
 ## 项目亮点解释
@@ -127,6 +127,8 @@ retrieved chunks
 helpful / bad case
 reason
 hit coverage
+retrieval pass rate
+matched / missing keywords
 ```
 
 这说明项目考虑了后续 RAG 迭代，而不是只做一次性 demo。

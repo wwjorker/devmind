@@ -137,6 +137,31 @@ export interface RagEvaluationDataset {
   cases: RagEvaluationCase[];
 }
 
+export interface RagRetrievalEvaluationCase {
+  caseId: string;
+  category: string;
+  question: string;
+  expectedKeywords: string[];
+  queryKeywords: string[];
+  matchedExpectedKeywords: string[];
+  missingExpectedKeywords: string[];
+  expectedEvidence: string;
+  riskType: string;
+  passed: boolean;
+  expectedNoContext: boolean;
+  retrievedChunkCount: number;
+  topChunkIds: number[];
+  topDocumentTitles: string[];
+  note: string;
+}
+
+export interface RagRetrievalEvaluation {
+  totalCaseCount: number;
+  passedCaseCount: number;
+  passRate: number;
+  cases: RagRetrievalEvaluationCase[];
+}
+
 const TOKEN_KEY = 'devmind_token';
 
 export function getToken() {

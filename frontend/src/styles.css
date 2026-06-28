@@ -887,6 +887,35 @@ textarea:focus {
   text-align: right;
 }
 
+.case-status .status-badge {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 58px;
+  padding: 4px 7px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.status-badge.success {
+  background: #e8f6ef;
+  color: #1f7045;
+}
+
+.status-badge.failed {
+  background: #fff4f1;
+  color: var(--danger);
+}
+
+.case-keywords .matched-keyword {
+  background: #e8f6ef;
+  color: #1f7045;
+}
+
+.retrieval-case-row p + p {
+  margin-top: -4px;
+}
+
 .log-list {
   display: grid;
   gap: 8px;

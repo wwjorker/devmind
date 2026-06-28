@@ -14,6 +14,7 @@ import com.devmind.module.ai.vo.AskLogResponse;
 import com.devmind.module.ai.vo.AskResponse;
 import com.devmind.module.ai.vo.EvaluationSummaryResponse;
 import com.devmind.module.ai.vo.RagEvaluationDatasetResponse;
+import com.devmind.module.ai.vo.RagRetrievalEvaluationResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -81,5 +82,10 @@ public class AiAskController {
     @GetMapping("/evaluation/dataset")
     public Result<RagEvaluationDatasetResponse> evaluationDataset(@AuthenticationPrincipal AuthenticatedUser user) {
         return Result.success(evaluationDatasetService.dataset(user.userId()));
+    }
+
+    @GetMapping("/evaluation/retrieval")
+    public Result<RagRetrievalEvaluationResponse> retrievalEvaluation(@AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(evaluationDatasetService.retrievalEvaluation(user.userId()));
     }
 }
