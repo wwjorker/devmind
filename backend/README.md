@@ -36,7 +36,7 @@ This makes the project easier to explain in Java backend interviews because the 
 - Multilingual keyword retrieval for Chinese and English technical questions
 - `RetrievalStrategy` abstraction with keyword baseline and hybrid retrieval strategy
 - MySQL FULLTEXT relevance retrieval for chunk content
-- Local embedding-style similarity rerank for hybrid retrieval experiments
+- `EmbeddingClient` abstraction with a local embedding-style implementation for hybrid retrieval experiments
 - Metadata-aware retrieval across chunk content, document title, tags, and source type
 - Duplicate chunk downranking to reduce repeated citations from copied notes
 - No-context fallback to avoid unsupported model answers
@@ -252,7 +252,7 @@ The retrieval evaluation API runs the same standard cases against the retrieval 
 
 ## Retrieval Quality V1
 
-The retrieval layer is exposed through a `RetrievalStrategy` interface. DevMind currently uses `HybridRetrievalStrategy` as the primary strategy. It keeps the explainable keyword/FULLTEXT baseline, then adds a local embedding-style similarity rerank so the same AI ask and evaluation flow can compare retrieval strategies without changing the rest of the system.
+The retrieval layer is exposed through a `RetrievalStrategy` interface, while embedding-style similarity is isolated behind an `EmbeddingClient` interface. DevMind currently uses `HybridRetrievalStrategy` as the primary strategy. It keeps the explainable keyword/FULLTEXT baseline, then adds a local `EmbeddingClient` rerank so the same AI ask and evaluation flow can compare retrieval strategies without changing the rest of the system.
 
 DevMind does not rely on a single raw keyword. The ask flow first resolves multiple retrieval keywords from the user question, including Chinese technical phrases and English tokens. Search then uses multiple candidate sources:
 
@@ -260,7 +260,7 @@ DevMind does not rely on a single raw keyword. The ask flow first resolves multi
 MySQL FULLTEXT retrieval over chunk content
 keyword LIKE fallback over chunk content
 document metadata: title, tags, source type
-local embedding-style similarity over title, tags, and chunk content
+EmbeddingClient similarity over title, tags, and chunk content
 ```
 
 Keyword scores are explainable:
@@ -275,7 +275,7 @@ source type match: +1 per occurrence
 
 MySQL InnoDB FULLTEXT provides a lightweight BM25-style relevance signal. DevMind combines that signal with the explicit keyword and metadata scores so the ranking is still easy to inspect during debugging.
 
-The local embedding-style rerank is intentionally deterministic: it builds a normalized sparse vector from English tokens and Chinese bigrams, then uses cosine similarity as an additional ranking signal. This is not a production vector database yet; it is a measurable hybrid retrieval skeleton that can later swap the local embedding implementation for a real embedding provider and vector store.
+The local embedding-style rerank is intentionally deterministic: the current `EmbeddingClient` builds a normalized sparse vector from English tokens and Chinese bigrams, then uses cosine similarity as an additional ranking signal. This is not a production vector database yet; it is a measurable hybrid retrieval skeleton that can later swap the local embedding implementation for a real embedding provider and vector store without rewriting the RAG orchestration.
 
 After initial ranking, repeated chunk content is downranked in the keyword baseline. This prevents copied notes from occupying all top citations and gives the prompt more diverse context.
 

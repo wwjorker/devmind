@@ -8,10 +8,16 @@ import java.util.Locale;
 import java.util.Map;
 
 @Component
-public class LocalEmbeddingClient {
+public class LocalEmbeddingClient implements EmbeddingClient {
 
     private static final int MIN_CHINESE_GRAM_LENGTH = 2;
 
+    @Override
+    public String providerName() {
+        return "local-sparse-vector";
+    }
+
+    @Override
     public Map<String, Double> embed(String text) {
         if (!StringUtils.hasText(text)) {
             return Map.of();
@@ -24,6 +30,7 @@ public class LocalEmbeddingClient {
         return normalize(vector);
     }
 
+    @Override
     public double cosineSimilarity(Map<String, Double> left, Map<String, Double> right) {
         if (left == null || right == null || left.isEmpty() || right.isEmpty()) {
             return 0.0;

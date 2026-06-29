@@ -1325,3 +1325,34 @@ RAG 的核心原则是：回答应该基于检索到的知识库上下文。
 - 评估集可以复用。
 - 后续接真实向量库时风险更小。
 - 简历上可以讲清楚从关键词检索到混合检索的演进过程。
+
+## 46 为什么还要抽象 EmbeddingClient
+
+上一轮 `HybridRetrievalStrategy` 已经能把关键词召回和本地相似度重排合在一起，但如果业务代码直接依赖 `LocalEmbeddingClient`，后面接真实 embedding 模型时就需要改检索策略本身。
+
+所以这一轮把 embedding 能力抽成 `EmbeddingClient` 接口：
+
+```text
+HybridRetrievalStrategy
+-> EmbeddingClient 接口
+-> LocalEmbeddingClient 本地实现
+-> 未来可以新增 DeepSeekEmbeddingClient / QwenEmbeddingClient / VectorStoreEmbeddingClient
+```
+
+这样做的价值是：
+
+- 检索编排层只关心“把文本转成向量、计算相似度”，不关心具体 provider。
+- 本地开发可以继续使用确定性的 local sparse vector，测试稳定、成本为 0。
+- 后续接真实 embedding API 或向量数据库时，可以新增实现类，而不是重写 RAG 主流程。
+
+面试时可以这样讲：
+
+```text
+我没有把 embedding 实现硬编码进检索策略，而是抽象了 EmbeddingClient。当前 LocalEmbeddingClient 用本地稀疏向量保证可测试和低成本，后续可以替换为真实 embedding provider 或向量库实现。这样 AI Ask、评估集和检索策略不用大改，符合面向接口编程和可演进设计。
+```
+
+后面需要让 Claude Code 做一次阶段性审查，重点看：
+
+- `HybridRetrievalStrategy` 是否真的走进 AI Ask 和 RAG Evaluation 主链路。
+- `EmbeddingClient` 抽象是否合理，是否有过度设计。
+- README / resume / interview guide 有没有把 local embedding 过度包装成生产级向量库。

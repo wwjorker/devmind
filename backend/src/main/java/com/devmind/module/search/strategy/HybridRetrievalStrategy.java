@@ -5,7 +5,7 @@ import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
-import com.devmind.module.search.embedding.LocalEmbeddingClient;
+import com.devmind.module.search.embedding.EmbeddingClient;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
@@ -36,12 +36,12 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
     private final KeywordRetrievalStrategy keywordRetrievalStrategy;
     private final DocumentChunkMapper chunkMapper;
     private final KnowledgeDocumentMapper documentMapper;
-    private final LocalEmbeddingClient embeddingClient;
+    private final EmbeddingClient embeddingClient;
 
     public HybridRetrievalStrategy(KeywordRetrievalStrategy keywordRetrievalStrategy,
                                    DocumentChunkMapper chunkMapper,
                                    KnowledgeDocumentMapper documentMapper,
-                                   LocalEmbeddingClient embeddingClient) {
+                                   EmbeddingClient embeddingClient) {
         this.keywordRetrievalStrategy = keywordRetrievalStrategy;
         this.chunkMapper = chunkMapper;
         this.documentMapper = documentMapper;
