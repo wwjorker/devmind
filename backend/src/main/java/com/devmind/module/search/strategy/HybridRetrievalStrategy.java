@@ -6,6 +6,7 @@ import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
 import com.devmind.module.search.embedding.EmbeddingClient;
+import com.devmind.module.search.embedding.EmbeddingTextBuilder;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
@@ -37,15 +38,18 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
     private final DocumentChunkMapper chunkMapper;
     private final KnowledgeDocumentMapper documentMapper;
     private final EmbeddingClient embeddingClient;
+    private final EmbeddingTextBuilder embeddingTextBuilder;
 
     public HybridRetrievalStrategy(KeywordRetrievalStrategy keywordRetrievalStrategy,
                                    DocumentChunkMapper chunkMapper,
                                    KnowledgeDocumentMapper documentMapper,
-                                   EmbeddingClient embeddingClient) {
+                                   EmbeddingClient embeddingClient,
+                                   EmbeddingTextBuilder embeddingTextBuilder) {
         this.keywordRetrievalStrategy = keywordRetrievalStrategy;
         this.chunkMapper = chunkMapper;
         this.documentMapper = documentMapper;
         this.embeddingClient = embeddingClient;
+        this.embeddingTextBuilder = embeddingTextBuilder;
     }
 
     @Override
@@ -96,7 +100,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
     }
 
     private List<ChunkSearchResponse> retrieveByLocalEmbedding(Long userId, List<String> keywords) {
-        Map<String, Double> queryVector = embeddingClient.embed(String.join(" ", keywords));
+        Map<String, Double> queryVector = embeddingClient.embed(embeddingTextBuilder.buildForQuery(keywords));
         if (queryVector.isEmpty()) {
             return List.of();
         }
@@ -124,9 +128,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
             if (document == null) {
                 continue;
             }
-            String embeddingText = safeText(document.getTitle()) + " "
-                    + safeText(document.getTags()) + " "
-                    + safeText(chunk.getContent());
+            String embeddingText = embeddingTextBuilder.buildForChunk(document, chunk);
             double similarity = embeddingClient.cosineSimilarity(queryVector, embeddingClient.embed(embeddingText));
             if (similarity <= 0.0) {
                 continue;
@@ -182,10 +184,6 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
 
     private int safeScore(Integer score) {
         return score == null ? 0 : Math.max(score, 0);
-    }
-
-    private String safeText(String text) {
-        return text == null ? "" : text;
     }
 
     private List<String> normalizeKeywords(List<String> keywords) {

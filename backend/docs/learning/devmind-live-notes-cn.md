@@ -1303,7 +1303,7 @@ RAG 的核心原则是：回答应该基于检索到的知识库上下文。
 -> 提取多个检索词
 -> KeywordRetrievalStrategy 做 MySQL FULLTEXT / 关键词 / 元数据召回
 -> LocalEmbeddingClient 把问题和 chunk 转成稀疏向量
--> 用 cosine similarity 做本地 embedding-style 重排
+-> 用 cosine similarity 做本地稀疏向量重排
 -> 合并分数并返回 TopK chunk
 ```
 
@@ -1316,7 +1316,7 @@ RAG 的核心原则是：回答应该基于检索到的知识库上下文。
 面试时要诚实讲：
 
 ```text
-当前版本已经有 hybrid retrieval 的工程结构和本地 embedding-style rerank，但还没有接外部 embedding API 和向量数据库。这样做的目的是先把策略抽象、评估基线和问答链路稳定下来，下一步可以把本地 embedding 实现替换成真实 embedding provider，并用同一套 Hit@3/MRR 评估集对比提升。
+当前版本已经有 hybrid retrieval 的工程结构和本地稀疏向量 rerank，但还没有接外部 embedding API 和向量数据库。这里的本地稀疏向量不是神经网络 embedding，它只是词袋 + 中文 bigram 的确定性向量空间模型。这样做的目的是先把策略抽象、评估基线和问答链路稳定下来，下一步可以把本地实现替换成真实 embedding provider，并用同一套 Hit@3/MRR 评估集对比提升。
 ```
 
 这一步的价值不是“我已经做了生产级向量检索”，而是：
@@ -1356,3 +1356,27 @@ HybridRetrievalStrategy
 - `HybridRetrievalStrategy` 是否真的走进 AI Ask 和 RAG Evaluation 主链路。
 - `EmbeddingClient` 抽象是否合理，是否有过度设计。
 - README / resume / interview guide 有没有把 local embedding 过度包装成生产级向量库。
+# 2026-06-30
+
+## 统一 embedding 输入文本
+
+这一步不是为了立刻“堆新技术”，而是为了让后续真正接 embedding API、向量表或向量数据库时有稳定边界。
+
+项目新增 `EmbeddingTextBuilder`，统一规定 chunk 做相似度计算时使用这些字段：
+
+- 文档标题
+- 来源类型
+- 标签
+- chunk 内容
+
+这样做的原因：
+
+1. 只用 chunk 内容可能漏掉标题和标签里的重要技术词。
+2. 如果索引时和查询重排时拼接字段不一致，评估结果会不稳定。
+3. 后续把本地 sparse vector 换成 DeepSeek / 通义 embedding 或向量库时，只需要复用同一个文本构造逻辑。
+
+面试可以这样讲：
+
+```text
+我把 embedding 输入文本单独抽成 EmbeddingTextBuilder，而不是散落在检索代码里手拼字符串。这样后续无论是本地向量、外部 embedding API 还是向量库持久化，都能保证索引和检索用的是同一套字段。
+```
