@@ -820,6 +820,8 @@ onMounted(async () => {
               <div class="dataset-score">
                 <strong>{{ retrievalEvaluation?.passedCaseCount ?? 0 }}/{{ retrievalEvaluation?.totalCaseCount ?? 0 }}</strong>
                 <span>通过率 {{ Math.round((retrievalEvaluation?.passRate ?? 0) * 100) }}%</span>
+                <span>Hit@{{ retrievalEvaluation?.evaluationK ?? 3 }} {{ Math.round((retrievalEvaluation?.hitAtK ?? 0) * 100) }}%</span>
+                <span>MRR {{ (retrievalEvaluation?.mrr ?? 0).toFixed(3) }}</span>
               </div>
             </div>
 
@@ -850,6 +852,11 @@ onMounted(async () => {
                     {{ testCase.passed ? '通过' : '需复查' }}
                   </span>
                   <small>{{ testCase.retrievedChunkCount }} 个片段</small>
+                  <small v-if="!testCase.expectedNoContext">
+                    {{ testCase.hitAtK ? `Hit@${retrievalEvaluation?.evaluationK ?? 3}` : `未进 Top ${retrievalEvaluation?.evaluationK ?? 3}` }}
+                  </small>
+                  <small v-if="testCase.firstRelevantRank">首个相关排名 #{{ testCase.firstRelevantRank }}</small>
+                  <small v-if="testCase.reciprocalRank !== null">RR {{ testCase.reciprocalRank.toFixed(3) }}</small>
                 </div>
                 <p>{{ testCase.note }}</p>
                 <p v-if="testCase.topDocumentTitles.length">Top 文档：{{ testCase.topDocumentTitles.join('、') }}</p>
@@ -865,7 +872,7 @@ onMounted(async () => {
             <div class="dataset-header">
               <div>
                 <h3>RAG 评估集</h3>
-                <p>用标准问题检查检索覆盖率和无上下文兜底效果。</p>
+                <p>用标准问题检查检索覆盖率、Hit@3、MRR 和无上下文兜底效果。</p>
               </div>
               <div class="dataset-score">
                 <strong>{{ evaluationDataset?.coveredCaseCount ?? 0 }}/{{ evaluationDataset?.totalCaseCount ?? 0 }}</strong>

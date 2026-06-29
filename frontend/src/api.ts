@@ -150,6 +150,9 @@ export interface RagRetrievalEvaluationCase {
   passed: boolean;
   expectedNoContext: boolean;
   retrievedChunkCount: number;
+  firstRelevantRank: number | null;
+  hitAtK: boolean;
+  reciprocalRank: number | null;
   topChunkIds: number[];
   topDocumentTitles: string[];
   note: string;
@@ -159,6 +162,10 @@ export interface RagRetrievalEvaluation {
   totalCaseCount: number;
   passedCaseCount: number;
   passRate: number;
+  positiveCaseCount: number;
+  evaluationK: number;
+  hitAtK: number;
+  mrr: number;
   cases: RagRetrievalEvaluationCase[];
 }
 

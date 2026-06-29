@@ -76,9 +76,9 @@ class RagEvaluationDatasetServiceTest {
                         2L,
                         "Redis cache penetration review",
                         "bug_review",
-                        "Redis,cache,penetration,JWT,Flyway,LlmClient,RAG,evaluation,bad case",
+                        "Redis,cache,penetration,JWT,logout,blacklist,Flyway,migration,database,LlmClient,DeepSeek,Mock,provider,RAG,evaluation,bad case,fallback,retrieval,chunks,hit rate,MRR",
                         0,
-                        "Redis cache penetration can use empty-value caching, rate limiting, JWT logout blacklist, Flyway migration, LlmClient provider abstraction, and RAG evaluation with bad cases.",
+                        "Redis cache penetration can use empty-value caching and rate limiting. JWT logout uses a Redis blacklist. Flyway handles database migration. LlmClient provider abstraction supports DeepSeek and Mock. No-context fallback depends on retrieval chunks. RAG evaluation uses bad cases, Hit@K, MRR, and hit rate metrics.",
                         120,
                         91
                 )
@@ -95,11 +95,18 @@ class RagEvaluationDatasetServiceTest {
         assertThat(response.getTotalCaseCount()).isEqualTo(8);
         assertThat(response.getPassedCaseCount()).isEqualTo(7);
         assertThat(response.getPassRate()).isEqualTo(0.875);
+        assertThat(response.getPositiveCaseCount()).isEqualTo(7);
+        assertThat(response.getEvaluationK()).isEqualTo(3);
+        assertThat(response.getHitAtK()).isEqualTo(1.0);
+        assertThat(response.getMrr()).isEqualTo(1.0);
         assertThat(response.getCases())
                 .filteredOn(caseResponse -> "redis-cache-penetration-basic".equals(caseResponse.getCaseId()))
                 .singleElement()
                 .satisfies(caseResponse -> {
                     assertThat(caseResponse.getPassed()).isTrue();
+                    assertThat(caseResponse.getFirstRelevantRank()).isEqualTo(1);
+                    assertThat(caseResponse.getHitAtK()).isTrue();
+                    assertThat(caseResponse.getReciprocalRank()).isEqualTo(1.0);
                     assertThat(caseResponse.getRetrievedChunkCount()).isEqualTo(1);
                     assertThat(caseResponse.getTopChunkIds()).containsExactly(3L);
                     assertThat(caseResponse.getMatchedExpectedKeywords()).contains("Redis", "cache", "penetration");
@@ -108,6 +115,63 @@ class RagEvaluationDatasetServiceTest {
                 .filteredOn(caseResponse -> "unknown-kubernetes-fallback".equals(caseResponse.getCaseId()))
                 .singleElement()
                 .satisfies(caseResponse -> assertThat(caseResponse.getPassed()).isFalse());
+    }
+
+    @Test
+    void retrievalEvaluationShouldFailPositiveCaseWhenRelevantChunkIsOutsideTopK() {
+        AiAskLogMapper askLogMapper = mock(AiAskLogMapper.class);
+        ChunkSearchService chunkSearchService = mock(ChunkSearchService.class);
+        RetrievalKeywordService retrievalKeywordService = mock(RetrievalKeywordService.class);
+
+        when(retrievalKeywordService.resolveKeywords(any())).thenReturn(List.of("Redis"));
+        when(chunkSearchService.searchChunks(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5))).thenReturn(List.of(
+                unrelatedChunk(11L, "unrelated first"),
+                unrelatedChunk(12L, "unrelated second"),
+                unrelatedChunk(13L, "unrelated third"),
+                new ChunkSearchResponse(
+                        14L,
+                        4L,
+                        "Redis cache penetration review",
+                        "bug_review",
+                        "Redis,cache,penetration",
+                        0,
+                        "Redis cache penetration can use empty-value caching and rate limiting.",
+                        80,
+                        50
+                )
+        ));
+
+        RagEvaluationDatasetService service = new RagEvaluationDatasetService(
+                askLogMapper,
+                chunkSearchService,
+                retrievalKeywordService
+        );
+
+        RagRetrievalEvaluationResponse response = service.retrievalEvaluation(1L);
+
+        assertThat(response.getCases())
+                .filteredOn(caseResponse -> "redis-cache-penetration-basic".equals(caseResponse.getCaseId()))
+                .singleElement()
+                .satisfies(caseResponse -> {
+                    assertThat(caseResponse.getPassed()).isFalse();
+                    assertThat(caseResponse.getFirstRelevantRank()).isEqualTo(4);
+                    assertThat(caseResponse.getHitAtK()).isFalse();
+                    assertThat(caseResponse.getReciprocalRank()).isEqualTo(0.25);
+                });
+    }
+
+    private ChunkSearchResponse unrelatedChunk(Long chunkId, String title) {
+        return new ChunkSearchResponse(
+                chunkId,
+                10L,
+                title,
+                "general_note",
+                "general",
+                0,
+                "This note is unrelated to the expected evidence.",
+                40,
+                10
+        );
     }
 
     private RagEvaluationDatasetService newService(AiAskLogMapper askLogMapper) {

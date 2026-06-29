@@ -46,6 +46,7 @@ This makes the project easier to explain in Java backend interviews because the 
 - AI feedback records for helpful labels and bad-case collection
 - Evaluation summary API for total feedback, bad-case count, bad-case rate, and recent bad cases
 - RAG evaluation dataset API for standard questions, expected answers, expected keywords, and ask-log coverage
+- Retrieval evaluation metrics with Hit@3, MRR, first relevant rank, and no-context negative cases
 - OpenAPI / Swagger UI and IDEA HTTP Client examples
 
 ## Tech Stack
@@ -243,6 +244,8 @@ risk type
 covered status
 latest ask log id and retrieved chunk count
 ```
+
+The retrieval evaluation API runs the same standard cases against the retrieval layer and reports pass rate, positive case count, Hit@K, MRR, first relevant rank, matched keywords, and missing keywords. Negative no-context cases are treated separately: they pass only when no chunk is retrieved.
 
 ## Retrieval Quality V1
 

@@ -16,7 +16,7 @@
 - 页面刷新后从后端 ask logs 恢复最近一次回答
 - 问答日志详情：回答、提示词预览、token、召回片段、反馈
 - 有帮助 / bad case 反馈提交
-- RAG 评估集覆盖率展示
+- RAG 评估集覆盖率、Hit@3 和 MRR 展示
 
 ## 本地启动
 
@@ -50,7 +50,7 @@ Vite dev server 会把 `/api` 请求代理到后端。
 5. 查看回答、引用来源、召回片段、提示词预览和 token 用量。
 6. 继续提问 JWT、Flyway、LlmClient 等工程设计问题，展示项目不是单纯 AI 套壳。
 7. 提交“有帮助”或 bad case 反馈。
-8. 打开评估看板，查看 bad case 和 RAG 评估集覆盖率。
+8. 打开评估看板，查看 bad case、RAG 评估集覆盖率、Hit@3 和 MRR。
 
 更完整的展示顺序见根目录：[docs/demo/devmind-demo-script-cn.md](../docs/demo/devmind-demo-script-cn.md)。
 

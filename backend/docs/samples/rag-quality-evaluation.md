@@ -14,14 +14,15 @@ DevMind 设计了三层质量反馈：
 2. `ai_ask_feedback` 记录用户对某次回答的 helpful / bad case 标记、原因和期望答案。
 3. RAG evaluation dataset 保存标准问题、期望关键词和期望答案，用来检查标准问题是否被问过、是否召回了上下文。
 
-## 后续指标
+## 当前指标
 
-当前版本主要展示覆盖率和 bad case 反馈。后续可以继续补：
+当前版本已经把标准问题检索评估从“召回非空”升级为可量化指标：
 
-- hit rate：期望文档或 chunk 是否被召回。
-- MRR：正确结果在召回列表中的排名是否足够靠前。
+- Hit@3：正向 case 的 Top 3 召回片段中是否出现相关证据。
+- MRR：第一个相关片段的排名倒数，用来判断相关证据是否足够靠前。
 - bad case rate：用户标记为坏例子的比例。
+- no-context case：对知识库没有资料的问题，检查系统是否正确返回无上下文兜底。
 
 ## 面试表达
 
-我没有只看模型有没有输出，而是通过问答日志、bad case feedback 和 evaluation dataset 建立质量闭环。后续可以基于标准问题继续补 hit rate、MRR 等离线评估指标。
+我没有只看模型有没有输出，而是通过问答日志、bad case feedback、evaluation dataset、Hit@3 和 MRR 建立质量闭环。这样后续接入 embedding 或混合检索时，可以用同一批标准问题对比检索质量是否真的提升。
