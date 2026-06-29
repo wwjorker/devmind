@@ -4,6 +4,7 @@ import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
+import com.devmind.module.search.embedding.EmbeddingTextBuilder;
 import com.devmind.module.search.embedding.LocalEmbeddingClient;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.junit.jupiter.api.Test;
@@ -27,7 +28,8 @@ class HybridRetrievalStrategyTest {
                 keywordStrategy,
                 chunkMapper,
                 documentMapper,
-                new LocalEmbeddingClient()
+                new LocalEmbeddingClient(),
+                new EmbeddingTextBuilder()
         );
 
         when(keywordStrategy.retrieve(eq(1L), eq(List.of("Redis", "cache")), eq(6)))
@@ -68,7 +70,8 @@ class HybridRetrievalStrategyTest {
                 keywordStrategy,
                 chunkMapper,
                 documentMapper,
-                new LocalEmbeddingClient()
+                new LocalEmbeddingClient(),
+                new EmbeddingTextBuilder()
         );
 
         when(keywordStrategy.retrieve(eq(1L), eq(List.of("penetration")), eq(3))).thenReturn(List.of());
