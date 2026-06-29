@@ -20,6 +20,7 @@ DevMind 设计了三层质量反馈：
 
 - Hit@3：正向 case 的 Top 3 召回片段中是否命中人工标注的相关文档。
 - MRR：第一个命中 gold 文档的片段排名倒数，用来判断相关证据是否足够靠前。
+- 检索基线元信息：接口会返回 `retrievalStrategy`、`retrievalLimit` 和 `relevanceMode`，说明当前分数来自哪套检索策略和哪种相关性判定。
 - bad case rate：用户标记为坏例子的比例。
 - no-context case：对知识库没有资料的问题，检查系统是否正确返回无上下文兜底。
 

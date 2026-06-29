@@ -9,6 +9,10 @@ public class RagRetrievalEvaluationResponse {
     private double passRate;
     private int positiveCaseCount;
     private int evaluationK;
+    private int retrievalLimit;
+    private String retrievalStrategy;
+    private String retrievalStrategyDescription;
+    private String relevanceMode;
     private double hitAtK;
     private double mrr;
     private List<RagRetrievalEvaluationCaseResponse> cases;
@@ -21,6 +25,10 @@ public class RagRetrievalEvaluationResponse {
                                           double passRate,
                                           int positiveCaseCount,
                                           int evaluationK,
+                                          int retrievalLimit,
+                                          String retrievalStrategy,
+                                          String retrievalStrategyDescription,
+                                          String relevanceMode,
                                           double hitAtK,
                                           double mrr,
                                           List<RagRetrievalEvaluationCaseResponse> cases) {
@@ -29,6 +37,10 @@ public class RagRetrievalEvaluationResponse {
         this.passRate = passRate;
         this.positiveCaseCount = positiveCaseCount;
         this.evaluationK = evaluationK;
+        this.retrievalLimit = retrievalLimit;
+        this.retrievalStrategy = retrievalStrategy;
+        this.retrievalStrategyDescription = retrievalStrategyDescription;
+        this.relevanceMode = relevanceMode;
         this.hitAtK = hitAtK;
         this.mrr = mrr;
         this.cases = cases;
@@ -72,6 +84,38 @@ public class RagRetrievalEvaluationResponse {
 
     public void setEvaluationK(int evaluationK) {
         this.evaluationK = evaluationK;
+    }
+
+    public int getRetrievalLimit() {
+        return retrievalLimit;
+    }
+
+    public void setRetrievalLimit(int retrievalLimit) {
+        this.retrievalLimit = retrievalLimit;
+    }
+
+    public String getRetrievalStrategy() {
+        return retrievalStrategy;
+    }
+
+    public void setRetrievalStrategy(String retrievalStrategy) {
+        this.retrievalStrategy = retrievalStrategy;
+    }
+
+    public String getRetrievalStrategyDescription() {
+        return retrievalStrategyDescription;
+    }
+
+    public void setRetrievalStrategyDescription(String retrievalStrategyDescription) {
+        this.retrievalStrategyDescription = retrievalStrategyDescription;
+    }
+
+    public String getRelevanceMode() {
+        return relevanceMode;
+    }
+
+    public void setRelevanceMode(String relevanceMode) {
+        this.relevanceMode = relevanceMode;
     }
 
     public double getHitAtK() {

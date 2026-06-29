@@ -86,6 +86,10 @@ class RagEvaluationDatasetServiceTest {
         assertThat(response.getPassRate()).isEqualTo(1.0);
         assertThat(response.getPositiveCaseCount()).isEqualTo(7);
         assertThat(response.getEvaluationK()).isEqualTo(3);
+        assertThat(response.getRetrievalLimit()).isEqualTo(5);
+        assertThat(response.getRetrievalStrategy()).isEqualTo("mysql-fulltext-keyword-v1");
+        assertThat(response.getRetrievalStrategyDescription()).contains("FULLTEXT");
+        assertThat(response.getRelevanceMode()).isEqualTo("gold-document-title");
         assertThat(response.getHitAtK()).isEqualTo(1.0);
         assertThat(response.getMrr()).isEqualTo(1.0);
         assertThat(response.getCases())
