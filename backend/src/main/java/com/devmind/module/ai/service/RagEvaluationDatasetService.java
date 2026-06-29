@@ -30,6 +30,7 @@ public class RagEvaluationDatasetService {
                     "redis-cache-penetration-basic",
                     "redis",
                     "面试中应该如何解释 Redis 缓存穿透？",
+                    List.of("Redis 缓存穿透复盘", "Redis cache penetration review", "Redis cache penetration review updated", "redis-cache-penetration"),
                     List.of("Redis", "cache", "penetration"),
                     "应该说明缓存穿透是请求不存在的数据导致缓存未命中并反复打到数据库，解决方案包括缓存空值、参数校验、布隆过滤器或限流，并能区分缓存击穿和缓存雪崩。",
                     "证据应该来自 Redis 缓存穿透笔记、bug 复盘或后端缓存设计文档。",
@@ -39,6 +40,7 @@ public class RagEvaluationDatasetService {
                     "redis-cache-penetration-cn",
                     "redis",
                     "Redis 缓存穿透怎么解决？",
+                    List.of("Redis 缓存穿透复盘", "Redis cache penetration review", "Redis cache penetration review updated", "redis-cache-penetration"),
                     List.of("Redis", "缓存穿透", "空值", "限流"),
                     "应该说明缓存空值、过滤非法参数、布隆过滤器或限流，并说明目标是保护数据库免受重复 miss 冲击。",
                     "证据应该来自中文或英文 Redis 缓存穿透 chunk。",
@@ -48,6 +50,7 @@ public class RagEvaluationDatasetService {
                     "jwt-logout-blacklist",
                     "security",
                     "JWT 退出登录为什么需要 Redis 黑名单？",
+                    List.of("JWT 退出登录与 Redis 黑名单"),
                     List.of("JWT", "logout", "Redis", "blacklist"),
                     "应该说明 JWT 无状态导致服务端默认不保存会话，未过期 token 退出后仍可能可用；把 token 放入 Redis 黑名单并设置剩余 TTL，可以在认证过滤器中拦截已退出 token。",
                     "证据应该来自 JWT、Redis 黑名单或登录认证设计笔记。",
@@ -57,6 +60,7 @@ public class RagEvaluationDatasetService {
                     "flyway-migration",
                     "database",
                     "这个项目里 Flyway migration 解决了什么问题？",
+                    List.of("Flyway migration 数据库迁移"),
                     List.of("Flyway", "migration", "database"),
                     "应该说明 Flyway 用版本化脚本管理表结构变更，应用启动时自动迁移，避免不同环境手动执行 SQL 导致结构漂移。",
                     "证据应该来自数据库迁移、本地启动或工程化初始化文档。",
@@ -66,6 +70,7 @@ public class RagEvaluationDatasetService {
                     "llm-provider-abstraction",
                     "ai_engineering",
                     "为什么 DevMind 要抽象 LlmClient，而不是直接调用 DeepSeek？",
+                    List.of("LlmClient 与 LLM Provider 抽象"),
                     List.of("LlmClient", "DeepSeek", "Mock", "provider"),
                     "应该说明 LlmClient 可以隔离模型供应商，支持 Mock/DeepSeek 切换、本地测试、成本控制，并避免业务服务和某个厂商 API 强耦合。",
                     "证据应该来自 LLM Provider 抽象、架构说明或 AI Ask 主链路文档。",
@@ -75,6 +80,7 @@ public class RagEvaluationDatasetService {
                     "no-context-fallback",
                     "rag",
                     "检索不到 chunk 时 DevMind 应该怎么处理？",
+                    List.of("RAG 无上下文兜底"),
                     List.of("fallback", "retrieval", "chunks"),
                     "应该说明系统不能强行编答案，应返回知识库资料不足的兜底提示；必要时跳过模型调用，减少幻觉和无效成本。",
                     "证据应该来自 RAG 兜底、幻觉控制或无上下文处理文档。",
@@ -84,6 +90,7 @@ public class RagEvaluationDatasetService {
                     "unknown-kubernetes-fallback",
                     "negative_case",
                     "Kubernetes Pod 驱逐策略是什么？",
+                    List.of(),
                     List.of("Kubernetes", "pod", "eviction"),
                     "如果知识库没有 Kubernetes 笔记，期望行为是返回无上下文兜底，而不是编造答案。",
                     "除非已经添加 Kubernetes 笔记，否则期望证据是召回 chunk 数为 0。",
@@ -93,6 +100,7 @@ public class RagEvaluationDatasetService {
                     "rag-evaluation-purpose",
                     "evaluation",
                     "怎么判断 RAG 回答质量是否足够好？",
+                    List.of("RAG 回答质量评估"),
                     List.of("RAG", "evaluation", "bad case", "hit rate"),
                     "应该说明可以用标准问题、期望答案、召回 chunks、bad case feedback、Hit@K 和 MRR 评估链路质量。",
                     "证据应该来自 evaluation dataset、bad case 或 RAG 质量分析文档。",
@@ -220,7 +228,7 @@ public class RagEvaluationDatasetService {
         boolean expectedNoContext = "no_context_negative_case".equals(caseDefinition.riskType());
         List<String> matchedKeywords = matchedExpectedKeywords(caseDefinition.expectedKeywords(), chunks);
         List<String> missingKeywords = missingExpectedKeywords(caseDefinition.expectedKeywords(), matchedKeywords);
-        Integer firstRelevantRank = expectedNoContext ? null : firstRelevantRank(caseDefinition.expectedKeywords(), chunks);
+        Integer firstRelevantRank = expectedNoContext ? null : firstRelevantRank(caseDefinition.relevantDocumentTitles(), chunks);
         Boolean hitAtK = expectedNoContext
                 ? chunks.isEmpty()
                 : firstRelevantRank != null && firstRelevantRank <= RETRIEVAL_EVALUATION_K;
@@ -234,6 +242,7 @@ public class RagEvaluationDatasetService {
                 caseDefinition.category(),
                 caseDefinition.question(),
                 caseDefinition.expectedKeywords(),
+                caseDefinition.relevantDocumentTitles(),
                 queryKeywords,
                 matchedKeywords,
                 missingKeywords,
@@ -266,20 +275,20 @@ public class RagEvaluationDatasetService {
         return matched;
     }
 
-    private Integer firstRelevantRank(List<String> expectedKeywords, List<ChunkSearchResponse> chunks) {
+    private Integer firstRelevantRank(List<String> relevantDocumentTitles, List<ChunkSearchResponse> chunks) {
         for (int index = 0; index < chunks.size(); index++) {
-            if (containsAnyExpectedKeyword(expectedKeywords, chunks.get(index))) {
+            if (isGoldDocumentHit(relevantDocumentTitles, chunks.get(index))) {
                 return index + 1;
             }
         }
         return null;
     }
 
-    private boolean containsAnyExpectedKeyword(List<String> expectedKeywords, ChunkSearchResponse chunk) {
-        String searchableText = searchableText(chunk).toLowerCase(Locale.ROOT);
-        return expectedKeywords.stream()
-                .map(keyword -> keyword.toLowerCase(Locale.ROOT))
-                .anyMatch(searchableText::contains);
+    private boolean isGoldDocumentHit(List<String> relevantDocumentTitles, ChunkSearchResponse chunk) {
+        String documentTitle = normalizeTitle(chunk.getDocumentTitle());
+        return relevantDocumentTitles.stream()
+                .map(this::normalizeTitle)
+                .anyMatch(documentTitle::equals);
     }
 
     private String searchableText(ChunkSearchResponse chunk) {
@@ -325,17 +334,25 @@ public class RagEvaluationDatasetService {
         if (chunks.isEmpty()) {
             return "Needs review: no chunks were retrieved for a positive evaluation case.";
         }
-        if (matchedKeywords.isEmpty()) {
-            return "Retrieved chunks exist, but none of the expected keywords were found in the retrieved context.";
-        }
         if (Boolean.TRUE.equals(hitAtK)) {
-            return "Hit@" + RETRIEVAL_EVALUATION_K + " passed: the first relevant chunk is ranked #" + firstRelevantRank + ".";
+            return "Hit@" + RETRIEVAL_EVALUATION_K + " passed: the first gold document chunk is ranked #" + firstRelevantRank + ".";
         }
-        return "Needs review: relevant evidence was found, but it did not enter Top " + RETRIEVAL_EVALUATION_K + ".";
+        if (firstRelevantRank != null) {
+            return "Needs review: a gold document chunk was found at rank #" + firstRelevantRank
+                    + ", but it did not enter Top " + RETRIEVAL_EVALUATION_K + ".";
+        }
+        if (matchedKeywords.isEmpty()) {
+            return "Needs review: retrieved chunks exist, but no gold document chunk was retrieved and none of the expected keywords were found.";
+        }
+        return "Needs review: expected keywords were found, but no gold document chunk was retrieved.";
     }
 
     private String safeText(String value) {
         return value == null ? "" : value;
+    }
+
+    private String normalizeTitle(String value) {
+        return safeText(value).trim().toLowerCase(Locale.ROOT);
     }
 
     private double roundToFourDecimals(double value) {
@@ -345,6 +362,7 @@ public class RagEvaluationDatasetService {
     private record EvaluationCaseDefinition(String caseId,
                                             String category,
                                             String question,
+                                            List<String> relevantDocumentTitles,
                                             List<String> expectedKeywords,
                                             String expectedAnswer,
                                             String expectedEvidence,

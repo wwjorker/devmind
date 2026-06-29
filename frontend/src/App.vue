@@ -815,7 +815,7 @@ onMounted(async () => {
             <div class="dataset-header">
               <div>
                 <h3>检索评估</h3>
-                <p>用标准问题直接跑检索，检查召回是否命中预期知识点。</p>
+                <p>用标准问题直接跑检索，检查召回是否命中人工标注的相关文档。</p>
               </div>
               <div class="dataset-score">
                 <strong>{{ retrievalEvaluation?.passedCaseCount ?? 0 }}/{{ retrievalEvaluation?.totalCaseCount ?? 0 }}</strong>
@@ -835,6 +835,9 @@ onMounted(async () => {
                   <strong>{{ testCase.question }}</strong>
                   <span>{{ testCase.caseId }} - {{ testCase.category }} - {{ testCase.riskType }}</span>
                 </div>
+                <p v-if="testCase.relevantDocumentTitles.length">
+                  Gold 文档：{{ testCase.relevantDocumentTitles.join('、') }}
+                </p>
                 <div class="case-keywords">
                   <span v-for="keyword in testCase.queryKeywords" :key="`${testCase.caseId}-query-${keyword}`">
                     检索词: {{ keyword }}

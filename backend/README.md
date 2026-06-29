@@ -237,6 +237,7 @@ The evaluation dataset API returns standard RAG test cases and marks whether the
 case id
 category
 question
+relevant document titles
 expected keywords
 expected answer
 expected evidence
@@ -245,7 +246,7 @@ covered status
 latest ask log id and retrieved chunk count
 ```
 
-The retrieval evaluation API runs the same standard cases against the retrieval layer and reports pass rate, positive case count, Hit@K, MRR, first relevant rank, matched keywords, and missing keywords. Negative no-context cases are treated separately: they pass only when no chunk is retrieved.
+The retrieval evaluation API runs the same standard cases against the retrieval layer and judges relevance by manually labeled gold document titles. It reports pass rate, positive case count, Hit@K, MRR, first relevant rank, matched keywords, and missing keywords. Matched keywords are diagnostic only; they are not used as the relevance judge. Negative no-context cases are treated separately: they pass only when no chunk is retrieved.
 
 ## Retrieval Quality V1
 

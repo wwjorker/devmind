@@ -189,7 +189,7 @@ SELECT
     'RAG 回答质量评估',
     CONCAT(
         '# RAG 回答质量评估\n\n',
-        'AI 问答系统不能只看有没有回答，还要判断回答是否基于正确上下文、是否召回了相关 chunk、是否覆盖了期望知识点。\n\n',
+        'AI 问答系统不能只看有没有回答，还要判断回答是否基于正确上下文、是否召回了人工标注的相关文档。\n\n',
         'DevMind 通过 ai_ask_log 记录问答日志，通过 ai_ask_feedback 记录 helpful 或 bad case，通过 RAG evaluation dataset 保存标准问题、期望关键词和期望答案。\n\n',
         '当前版本会展示覆盖率、Hit@3、MRR 和 bad case 反馈，用来判断召回结果是否命中并排在前面。'
     ),

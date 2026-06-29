@@ -8,6 +8,7 @@ public class RagRetrievalEvaluationCaseResponse {
     private String category;
     private String question;
     private List<String> expectedKeywords;
+    private List<String> relevantDocumentTitles;
     private List<String> queryKeywords;
     private List<String> matchedExpectedKeywords;
     private List<String> missingExpectedKeywords;
@@ -30,6 +31,7 @@ public class RagRetrievalEvaluationCaseResponse {
                                               String category,
                                               String question,
                                               List<String> expectedKeywords,
+                                              List<String> relevantDocumentTitles,
                                               List<String> queryKeywords,
                                               List<String> matchedExpectedKeywords,
                                               List<String> missingExpectedKeywords,
@@ -48,6 +50,7 @@ public class RagRetrievalEvaluationCaseResponse {
         this.category = category;
         this.question = question;
         this.expectedKeywords = expectedKeywords;
+        this.relevantDocumentTitles = relevantDocumentTitles;
         this.queryKeywords = queryKeywords;
         this.matchedExpectedKeywords = matchedExpectedKeywords;
         this.missingExpectedKeywords = missingExpectedKeywords;
@@ -94,6 +97,14 @@ public class RagRetrievalEvaluationCaseResponse {
 
     public void setExpectedKeywords(List<String> expectedKeywords) {
         this.expectedKeywords = expectedKeywords;
+    }
+
+    public List<String> getRelevantDocumentTitles() {
+        return relevantDocumentTitles;
+    }
+
+    public void setRelevantDocumentTitles(List<String> relevantDocumentTitles) {
+        this.relevantDocumentTitles = relevantDocumentTitles;
     }
 
     public List<String> getQueryKeywords() {
