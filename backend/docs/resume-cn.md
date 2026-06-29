@@ -39,14 +39,14 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 - 实现 Provider fallback：真实模型调用失败时先记录失败日志，再降级到本地 Mock Provider 返回带引用来源的兜底回答，避免接口直接 500。
 - 基于 Spring Security、JWT、BCrypt 和 Redis blacklist 实现认证与退出登录，退出时将 token 写入 Redis 并设置剩余 TTL，避免未过期 token 继续访问。
 - 设计 `ai_ask_log` 问答日志，记录 provider、prompt preview、召回 chunk、token usage、耗时和成功/兜底/失败状态，用于成本观测与问题排查。
-- 设计 `ai_ask_feedback`、RAG evaluation dataset 与检索评估接口，支持 bad case 标注、标准问题覆盖率、Hit@3、MRR、首个相关片段排名、命中关键词和问答日志回放。
+- 设计 `ai_ask_feedback`、RAG evaluation dataset 与检索评估接口，支持 bad case 标注、标准问题覆盖率、基于人工 gold label 的 Hit@3/MRR、首个相关片段排名、关键词诊断和问答日志回放。
 - 引入 Flyway 管理数据库结构版本，并配置 GitHub Actions 执行后端测试和前端构建，提升项目初始化、协作和持续集成的工程化程度。
 
 ## 更短版本
 
 - 基于 Spring Boot + Vue 3 实现开发学习知识库与 RAG 问答系统，支持文档导入、自动分块、MySQL FULLTEXT 与多关键词检索、Prompt 构造、DeepSeek 调用和引用来源展示。
 - 抽象 LLM Provider 层，支持 Mock/DeepSeek 切换，并记录 token usage、耗时、召回 chunk 和模型来源，实现 AI 调用可观测。
-- 设计 bad case feedback、RAG evaluation dataset 和检索评估看板，支持回答质量反馈、期望答案沉淀、Hit@3/MRR 检索评估和召回质量分析。
+- 设计 bad case feedback、RAG evaluation dataset 和检索评估看板，支持回答质量反馈、期望答案沉淀、基于相关文档标注的 Hit@3/MRR 检索评估和召回质量分析。
 
 ## 面试主线
 
@@ -62,7 +62,7 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 如果真实模型调用失败，会先记录失败日志，再降级到本地 Mock Provider；
 模型回答后返回引用来源、token 用量和耗时；
 如果回答不好，用户可以提交 bad case feedback；
-最后评估看板会统计标准问题覆盖率、按 Hit@3 判定的检索通过率、MRR 和 bad case 情况。
+最后评估看板会统计标准问题覆盖率、按人工标注相关文档计算的 Hit@3、MRR 和 bad case 情况。
 ```
 
 ## 项目亮点解释

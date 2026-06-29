@@ -142,6 +142,7 @@ export interface RagRetrievalEvaluationCase {
   category: string;
   question: string;
   expectedKeywords: string[];
+  relevantDocumentTitles: string[];
   queryKeywords: string[];
   matchedExpectedKeywords: string[];
   missingExpectedKeywords: string[];

@@ -69,20 +69,9 @@ class RagEvaluationDatasetServiceTest {
         ChunkSearchService chunkSearchService = mock(ChunkSearchService.class);
         RetrievalKeywordService retrievalKeywordService = mock(RetrievalKeywordService.class);
 
-        when(retrievalKeywordService.resolveKeywords(any())).thenReturn(List.of("Redis"));
-        when(chunkSearchService.searchChunks(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5))).thenReturn(List.of(
-                new ChunkSearchResponse(
-                        3L,
-                        2L,
-                        "Redis cache penetration review",
-                        "bug_review",
-                        "Redis,cache,penetration,JWT,logout,blacklist,Flyway,migration,database,LlmClient,DeepSeek,Mock,provider,RAG,evaluation,bad case,fallback,retrieval,chunks,hit rate,MRR",
-                        0,
-                        "Redis cache penetration can use empty-value caching and rate limiting. JWT logout uses a Redis blacklist. Flyway handles database migration. LlmClient provider abstraction supports DeepSeek and Mock. No-context fallback depends on retrieval chunks. RAG evaluation uses bad cases, Hit@K, MRR, and hit rate metrics.",
-                        120,
-                        91
-                )
-        ));
+        when(retrievalKeywordService.resolveKeywords(any())).thenAnswer(invocation -> keywordsForQuestion(invocation.getArgument(0)));
+        when(chunkSearchService.searchChunks(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5)))
+                .thenAnswer(invocation -> chunksForKeywords(invocation.getArgument(1)));
 
         RagEvaluationDatasetService service = new RagEvaluationDatasetService(
                 askLogMapper,
@@ -93,8 +82,8 @@ class RagEvaluationDatasetServiceTest {
         RagRetrievalEvaluationResponse response = service.retrievalEvaluation(1L);
 
         assertThat(response.getTotalCaseCount()).isEqualTo(8);
-        assertThat(response.getPassedCaseCount()).isEqualTo(7);
-        assertThat(response.getPassRate()).isEqualTo(0.875);
+        assertThat(response.getPassedCaseCount()).isEqualTo(8);
+        assertThat(response.getPassRate()).isEqualTo(1.0);
         assertThat(response.getPositiveCaseCount()).isEqualTo(7);
         assertThat(response.getEvaluationK()).isEqualTo(3);
         assertThat(response.getHitAtK()).isEqualTo(1.0);
@@ -108,13 +97,18 @@ class RagEvaluationDatasetServiceTest {
                     assertThat(caseResponse.getHitAtK()).isTrue();
                     assertThat(caseResponse.getReciprocalRank()).isEqualTo(1.0);
                     assertThat(caseResponse.getRetrievedChunkCount()).isEqualTo(1);
-                    assertThat(caseResponse.getTopChunkIds()).containsExactly(3L);
+                    assertThat(caseResponse.getTopChunkIds()).containsExactly(17L);
+                    assertThat(caseResponse.getRelevantDocumentTitles()).contains("Redis 缓存穿透复盘");
                     assertThat(caseResponse.getMatchedExpectedKeywords()).contains("Redis", "cache", "penetration");
                 });
         assertThat(response.getCases())
                 .filteredOn(caseResponse -> "unknown-kubernetes-fallback".equals(caseResponse.getCaseId()))
                 .singleElement()
-                .satisfies(caseResponse -> assertThat(caseResponse.getPassed()).isFalse());
+                .satisfies(caseResponse -> {
+                    assertThat(caseResponse.getPassed()).isTrue();
+                    assertThat(caseResponse.getExpectedNoContext()).isTrue();
+                    assertThat(caseResponse.getRetrievedChunkCount()).isZero();
+                });
     }
 
     @Test
@@ -157,7 +151,66 @@ class RagEvaluationDatasetServiceTest {
                     assertThat(caseResponse.getFirstRelevantRank()).isEqualTo(4);
                     assertThat(caseResponse.getHitAtK()).isFalse();
                     assertThat(caseResponse.getReciprocalRank()).isEqualTo(0.25);
+                    assertThat(caseResponse.getNote()).contains("rank #4", "Top 3");
                 });
+    }
+
+    private List<String> keywordsForQuestion(String question) {
+        if (question.contains("Kubernetes")) {
+            return List.of("Kubernetes");
+        }
+        if (question.contains("JWT")) {
+            return List.of("JWT", "Redis", "黑名单");
+        }
+        if (question.contains("Flyway")) {
+            return List.of("Flyway", "migration");
+        }
+        if (question.contains("LlmClient")) {
+            return List.of("LlmClient", "DeepSeek");
+        }
+        if (question.contains("检索不到")) {
+            return List.of("fallback", "chunks");
+        }
+        if (question.contains("RAG")) {
+            return List.of("RAG", "evaluation");
+        }
+        return List.of("Redis", "缓存穿透");
+    }
+
+    private List<ChunkSearchResponse> chunksForKeywords(List<String> keywords) {
+        if (keywords.contains("Kubernetes")) {
+            return List.of();
+        }
+        if (keywords.contains("JWT")) {
+            return List.of(chunk(18L, "JWT 退出登录与 Redis 黑名单", "JWT logout uses a Redis blacklist."));
+        }
+        if (keywords.contains("Flyway")) {
+            return List.of(chunk(19L, "Flyway migration 数据库迁移", "Flyway manages database migration scripts."));
+        }
+        if (keywords.contains("LlmClient")) {
+            return List.of(chunk(20L, "LlmClient 与 LLM Provider 抽象", "LlmClient separates DeepSeek and Mock providers."));
+        }
+        if (keywords.contains("fallback")) {
+            return List.of(chunk(21L, "RAG 无上下文兜底", "No-context fallback avoids hallucination when retrieval chunks are empty."));
+        }
+        if (keywords.contains("RAG")) {
+            return List.of(chunk(22L, "RAG 回答质量评估", "RAG evaluation uses bad cases, Hit@K, MRR, and hit rate metrics."));
+        }
+        return List.of(chunk(17L, "Redis 缓存穿透复盘", "Redis cache penetration can use empty-value caching and rate limiting."));
+    }
+
+    private ChunkSearchResponse chunk(Long chunkId, String title, String content) {
+        return new ChunkSearchResponse(
+                chunkId,
+                chunkId,
+                title,
+                "demo_note",
+                title,
+                0,
+                content,
+                80,
+                91
+        );
     }
 
     private ChunkSearchResponse unrelatedChunk(Long chunkId, String title) {
