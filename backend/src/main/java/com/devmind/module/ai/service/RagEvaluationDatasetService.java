@@ -7,7 +7,7 @@ import com.devmind.module.ai.vo.RagEvaluationCaseResponse;
 import com.devmind.module.ai.vo.RagEvaluationDatasetResponse;
 import com.devmind.module.ai.vo.RagRetrievalEvaluationCaseResponse;
 import com.devmind.module.ai.vo.RagRetrievalEvaluationResponse;
-import com.devmind.module.search.service.ChunkSearchService;
+import com.devmind.module.search.strategy.RetrievalStrategy;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.springframework.stereotype.Service;
 
@@ -24,9 +24,6 @@ public class RagEvaluationDatasetService {
 
     private static final int RETRIEVAL_EVALUATION_K = 3;
     private static final int RETRIEVAL_EVALUATION_LIMIT = 5;
-    private static final String RETRIEVAL_STRATEGY = "mysql-fulltext-keyword-v1";
-    private static final String RETRIEVAL_STRATEGY_DESCRIPTION =
-            "MySQL FULLTEXT plus multi-keyword metadata scoring";
     private static final String RELEVANCE_MODE = "gold-document-title";
 
     private static final List<EvaluationCaseDefinition> CASES = List.of(
@@ -113,14 +110,14 @@ public class RagEvaluationDatasetService {
     );
 
     private final AiAskLogMapper askLogMapper;
-    private final ChunkSearchService chunkSearchService;
+    private final RetrievalStrategy retrievalStrategy;
     private final RetrievalKeywordService retrievalKeywordService;
 
     public RagEvaluationDatasetService(AiAskLogMapper askLogMapper,
-                                       ChunkSearchService chunkSearchService,
+                                       RetrievalStrategy retrievalStrategy,
                                        RetrievalKeywordService retrievalKeywordService) {
         this.askLogMapper = askLogMapper;
-        this.chunkSearchService = chunkSearchService;
+        this.retrievalStrategy = retrievalStrategy;
         this.retrievalKeywordService = retrievalKeywordService;
     }
 
@@ -180,8 +177,8 @@ public class RagEvaluationDatasetService {
                 positiveCaseCount,
                 RETRIEVAL_EVALUATION_K,
                 RETRIEVAL_EVALUATION_LIMIT,
-                RETRIEVAL_STRATEGY,
-                RETRIEVAL_STRATEGY_DESCRIPTION,
+                retrievalStrategy.strategyName(),
+                retrievalStrategy.description(),
                 RELEVANCE_MODE,
                 hitAtK,
                 mrr,
@@ -232,7 +229,7 @@ public class RagEvaluationDatasetService {
     private RagRetrievalEvaluationCaseResponse evaluateRetrievalCase(Long userId,
                                                                     EvaluationCaseDefinition caseDefinition) {
         List<String> queryKeywords = retrievalKeywordService.resolveKeywords(caseDefinition.question());
-        List<ChunkSearchResponse> chunks = chunkSearchService.searchChunks(userId, queryKeywords, RETRIEVAL_EVALUATION_LIMIT);
+        List<ChunkSearchResponse> chunks = retrievalStrategy.retrieve(userId, queryKeywords, RETRIEVAL_EVALUATION_LIMIT);
         boolean expectedNoContext = "no_context_negative_case".equals(caseDefinition.riskType());
         List<String> matchedKeywords = matchedExpectedKeywords(caseDefinition.expectedKeywords(), chunks);
         List<String> missingKeywords = missingExpectedKeywords(caseDefinition.expectedKeywords(), matchedKeywords);

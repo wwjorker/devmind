@@ -4,7 +4,7 @@ import com.devmind.module.ai.entity.AiAskLog;
 import com.devmind.module.ai.mapper.AiAskLogMapper;
 import com.devmind.module.ai.vo.RagEvaluationDatasetResponse;
 import com.devmind.module.ai.vo.RagRetrievalEvaluationResponse;
-import com.devmind.module.search.service.ChunkSearchService;
+import com.devmind.module.search.strategy.RetrievalStrategy;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.junit.jupiter.api.Test;
 
@@ -66,16 +66,18 @@ class RagEvaluationDatasetServiceTest {
     @Test
     void retrievalEvaluationShouldRunRetrievalAgainstStaticCases() {
         AiAskLogMapper askLogMapper = mock(AiAskLogMapper.class);
-        ChunkSearchService chunkSearchService = mock(ChunkSearchService.class);
+        RetrievalStrategy retrievalStrategy = mock(RetrievalStrategy.class);
         RetrievalKeywordService retrievalKeywordService = mock(RetrievalKeywordService.class);
 
         when(retrievalKeywordService.resolveKeywords(any())).thenAnswer(invocation -> keywordsForQuestion(invocation.getArgument(0)));
-        when(chunkSearchService.searchChunks(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5)))
+        when(retrievalStrategy.strategyName()).thenReturn("mysql-fulltext-keyword-v1");
+        when(retrievalStrategy.description()).thenReturn("MySQL FULLTEXT plus multi-keyword metadata scoring");
+        when(retrievalStrategy.retrieve(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5)))
                 .thenAnswer(invocation -> chunksForKeywords(invocation.getArgument(1)));
 
         RagEvaluationDatasetService service = new RagEvaluationDatasetService(
                 askLogMapper,
-                chunkSearchService,
+                retrievalStrategy,
                 retrievalKeywordService
         );
 
@@ -118,11 +120,13 @@ class RagEvaluationDatasetServiceTest {
     @Test
     void retrievalEvaluationShouldFailPositiveCaseWhenRelevantChunkIsOutsideTopK() {
         AiAskLogMapper askLogMapper = mock(AiAskLogMapper.class);
-        ChunkSearchService chunkSearchService = mock(ChunkSearchService.class);
+        RetrievalStrategy retrievalStrategy = mock(RetrievalStrategy.class);
         RetrievalKeywordService retrievalKeywordService = mock(RetrievalKeywordService.class);
 
         when(retrievalKeywordService.resolveKeywords(any())).thenReturn(List.of("Redis"));
-        when(chunkSearchService.searchChunks(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5))).thenReturn(List.of(
+        when(retrievalStrategy.strategyName()).thenReturn("mysql-fulltext-keyword-v1");
+        when(retrievalStrategy.description()).thenReturn("MySQL FULLTEXT plus multi-keyword metadata scoring");
+        when(retrievalStrategy.retrieve(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5))).thenReturn(List.of(
                 unrelatedChunk(11L, "unrelated first"),
                 unrelatedChunk(12L, "unrelated second"),
                 unrelatedChunk(13L, "unrelated third"),
@@ -141,7 +145,7 @@ class RagEvaluationDatasetServiceTest {
 
         RagEvaluationDatasetService service = new RagEvaluationDatasetService(
                 askLogMapper,
-                chunkSearchService,
+                retrievalStrategy,
                 retrievalKeywordService
         );
 
@@ -234,7 +238,7 @@ class RagEvaluationDatasetServiceTest {
     private RagEvaluationDatasetService newService(AiAskLogMapper askLogMapper) {
         return new RagEvaluationDatasetService(
                 askLogMapper,
-                mock(ChunkSearchService.class),
+                mock(RetrievalStrategy.class),
                 mock(RetrievalKeywordService.class)
         );
     }
