@@ -5,7 +5,7 @@ import com.devmind.module.ai.llm.LlmClientRouter;
 import com.devmind.module.ai.llm.LlmRequest;
 import com.devmind.module.ai.llm.LlmResponse;
 import com.devmind.module.ai.vo.AskResponse;
-import com.devmind.module.search.service.ChunkSearchService;
+import com.devmind.module.search.strategy.RetrievalStrategy;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.junit.jupiter.api.Test;
 
@@ -27,10 +27,10 @@ class AiAskServiceTest {
 
     @Test
     void askShouldReturnGroundedFallbackWhenNoChunksWereRetrieved() {
-        ChunkSearchService chunkSearchService = mock(ChunkSearchService.class);
+        RetrievalStrategy retrievalStrategy = mock(RetrievalStrategy.class);
         AiAskLogService askLogService = mock(AiAskLogService.class);
         LlmClientRouter llmClientRouter = mock(LlmClientRouter.class);
-        when(chunkSearchService.searchChunks(eq(1L), anyList(), anyInt())).thenReturn(List.of());
+        when(retrievalStrategy.retrieve(eq(1L), anyList(), anyInt())).thenReturn(List.of());
         when(askLogService.saveSuccessLog(
                 eq(1L),
                 any(),
@@ -46,7 +46,7 @@ class AiAskServiceTest {
                 anyLong()
         )).thenReturn(88L);
         AiAskService aiAskService = new AiAskService(
-                chunkSearchService,
+                retrievalStrategy,
                 askLogService,
                 new PromptBuilderService(),
                 new RetrievalKeywordService(),
@@ -68,10 +68,10 @@ class AiAskServiceTest {
 
     @Test
     void askShouldReturnChineseFallbackWhenChineseQuestionHasNoChunks() {
-        ChunkSearchService chunkSearchService = mock(ChunkSearchService.class);
+        RetrievalStrategy retrievalStrategy = mock(RetrievalStrategy.class);
         AiAskLogService askLogService = mock(AiAskLogService.class);
         LlmClientRouter llmClientRouter = mock(LlmClientRouter.class);
-        when(chunkSearchService.searchChunks(eq(1L), anyList(), anyInt())).thenReturn(List.of());
+        when(retrievalStrategy.retrieve(eq(1L), anyList(), anyInt())).thenReturn(List.of());
         when(askLogService.saveSuccessLog(
                 eq(1L),
                 any(),
@@ -87,7 +87,7 @@ class AiAskServiceTest {
                 anyLong()
         )).thenReturn(89L);
         AiAskService aiAskService = new AiAskService(
-                chunkSearchService,
+                retrievalStrategy,
                 askLogService,
                 new PromptBuilderService(),
                 new RetrievalKeywordService(),
@@ -105,7 +105,7 @@ class AiAskServiceTest {
 
     @Test
     void askShouldFallbackToMockWhenConfiguredProviderFails() {
-        ChunkSearchService chunkSearchService = mock(ChunkSearchService.class);
+        RetrievalStrategy retrievalStrategy = mock(RetrievalStrategy.class);
         AiAskLogService askLogService = mock(AiAskLogService.class);
         LlmClientRouter llmClientRouter = mock(LlmClientRouter.class);
         ChunkSearchResponse chunk = new ChunkSearchResponse(
@@ -120,7 +120,7 @@ class AiAskServiceTest {
                 91
         );
 
-        when(chunkSearchService.searchChunks(eq(1L), anyList(), anyInt())).thenReturn(List.of(chunk));
+        when(retrievalStrategy.retrieve(eq(1L), anyList(), anyInt())).thenReturn(List.of(chunk));
         when(llmClientRouter.getConfiguredProvider()).thenReturn("deepseek");
         when(llmClientRouter.generate(any(LlmRequest.class))).thenThrow(new RuntimeException("DeepSeek timeout"));
         when(llmClientRouter.generateFallbackFromConfiguredProvider(any(LlmRequest.class)))
@@ -141,7 +141,7 @@ class AiAskServiceTest {
         )).thenReturn(90L);
 
         AiAskService aiAskService = new AiAskService(
-                chunkSearchService,
+                retrievalStrategy,
                 askLogService,
                 new PromptBuilderService(),
                 new RetrievalKeywordService(),

@@ -6,7 +6,7 @@ import com.devmind.module.ai.llm.LlmRequest;
 import com.devmind.module.ai.llm.LlmResponse;
 import com.devmind.module.ai.vo.AskResponse;
 import com.devmind.module.ai.vo.CitationResponse;
-import com.devmind.module.search.service.ChunkSearchService;
+import com.devmind.module.search.strategy.RetrievalStrategy;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,18 +29,18 @@ public class AiAskService {
             请先添加相关笔记，或者调整问题后再提问。
             """;
 
-    private final ChunkSearchService chunkSearchService;
+    private final RetrievalStrategy retrievalStrategy;
     private final AiAskLogService askLogService;
     private final PromptBuilderService promptBuilderService;
     private final RetrievalKeywordService retrievalKeywordService;
     private final LlmClientRouter llmClientRouter;
 
-    public AiAskService(ChunkSearchService chunkSearchService,
+    public AiAskService(RetrievalStrategy retrievalStrategy,
                         AiAskLogService askLogService,
                         PromptBuilderService promptBuilderService,
                         RetrievalKeywordService retrievalKeywordService,
                         LlmClientRouter llmClientRouter) {
-        this.chunkSearchService = chunkSearchService;
+        this.retrievalStrategy = retrievalStrategy;
         this.askLogService = askLogService;
         this.promptBuilderService = promptBuilderService;
         this.retrievalKeywordService = retrievalKeywordService;
@@ -56,7 +56,7 @@ public class AiAskService {
                 ? DEFAULT_RETRIEVAL_LIMIT
                 : request.getRetrievalLimit();
 
-        List<ChunkSearchResponse> chunks = chunkSearchService.searchChunks(userId, retrievalKeywords, retrievalLimit);
+        List<ChunkSearchResponse> chunks = retrievalStrategy.retrieve(userId, retrievalKeywords, retrievalLimit);
         String promptPreview = promptBuilderService.buildPrompt(question, chunks);
         List<CitationResponse> citations = buildCitations(chunks);
         if (chunks.isEmpty()) {

@@ -34,6 +34,7 @@ This makes the project easier to explain in Java backend interviews because the 
 - Text and Markdown note import with automatic document creation
 - Automatic document chunk generation and rebuild on update
 - Multilingual keyword retrieval for Chinese and English technical questions
+- `RetrievalStrategy` abstraction for keyword baseline and future vector/hybrid retrieval
 - MySQL FULLTEXT relevance retrieval for chunk content
 - Metadata-aware retrieval across chunk content, document title, tags, and source type
 - Duplicate chunk downranking to reduce repeated citations from copied notes
@@ -249,6 +250,8 @@ latest ask log id and retrieved chunk count
 The retrieval evaluation API runs the same standard cases against the retrieval layer and judges relevance by manually labeled gold document titles. It reports pass rate, positive case count, Hit@K, MRR, first relevant rank, matched keywords, and missing keywords. Matched keywords are diagnostic only; they are not used as the relevance judge. Negative no-context cases are treated separately: they pass only when no chunk is retrieved.
 
 ## Retrieval Quality V1
+
+The retrieval layer is exposed through a `RetrievalStrategy` interface. The current implementation is `KeywordRetrievalStrategy`, which keeps the first version simple and measurable while leaving the AI ask flow and RAG evaluation pipeline ready for future embedding or hybrid retrieval strategies.
 
 DevMind does not rely on a single raw keyword. The ask flow first resolves multiple retrieval keywords from the user question, including Chinese technical phrases and English tokens. Search then uses three candidate sources:
 

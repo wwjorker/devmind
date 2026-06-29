@@ -34,7 +34,7 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 
 - 设计用户级知识库数据模型，实现知识文档 CRUD、软归档、Markdown/TXT 导入、自动 chunk 生成与文档更新后的 chunk 重建机制。
 - 实现 RAG 问答链路，包括问题关键词解析、chunk 检索、Prompt 构造、LLM 调用、答案返回和 citations 引用来源追踪。
-- 优化检索策略，引入 MySQL FULLTEXT 相关性检索，并结合中英文多关键词、标题/标签/类型等元数据召回和重复 chunk 降权，降低相似笔记挤占引用结果的问题。
+- 抽象 `RetrievalStrategy` 检索策略层，当前实现 MySQL FULLTEXT + 多关键词 baseline，并结合标题/标签/类型等元数据召回和重复 chunk 降权，后续可在同一 AI Ask 与 evaluation 流程下扩展 embedding 或 hybrid retrieval。
 - 抽象 `LlmClient` 与 `LlmClientRouter`，支持 Mock 与 DeepSeek Provider 切换，降低模型调用与业务编排耦合，便于本地测试和后续扩展其他模型。
 - 实现 Provider fallback：真实模型调用失败时先记录失败日志，再降级到本地 Mock Provider 返回带引用来源的兜底回答，避免接口直接 500。
 - 基于 Spring Security、JWT、BCrypt 和 Redis blacklist 实现认证与退出登录，退出时将 token 写入 Redis 并设置剩余 TTL，避免未过期 token 继续访问。
