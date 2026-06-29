@@ -12,6 +12,8 @@ class LocalEmbeddingClientTest {
 
     @Test
     void shouldCreateComparableVectorsForRelatedText() {
+        assertThat(embeddingClient.providerName()).isEqualTo("local-sparse-vector");
+
         Map<String, Double> queryVector = embeddingClient.embed("Redis cache penetration");
         Map<String, Double> relatedVector = embeddingClient.embed(
                 "Redis cache penetration can repeatedly hit MySQL for missing keys"

@@ -114,7 +114,8 @@ sequenceDiagram
 
 - Soft archive is used for documents and chunks to preserve history.
 - Chunks are rebuilt after document updates to keep retrieval results aligned with the latest content.
-- Retrieval v0 uses keyword matching first, because it is easy to debug before introducing embeddings.
+- Retrieval uses a `RetrievalStrategy` abstraction so keyword, hybrid, and future vector strategies can share the same ask and evaluation flow.
+- `EmbeddingClient` separates embedding-style similarity from retrieval orchestration, so the local sparse-vector implementation can later be replaced by a real embedding provider or vector store.
 - `LlmClient` separates model-provider implementation from RAG orchestration.
 - Ask logs record question, retrieval keyword, chunk ids, answer, provider, token usage, and elapsed time for later bad-case analysis.
 - Ask feedback stores helpfulness labels, reasons, and expected answers so bad cases can become a small evaluation dataset.
@@ -124,7 +125,7 @@ sequenceDiagram
 ## Next Improvements
 
 - Add DeepSeek real-call smoke test with environment-only API key.
-- Add embedding and vector retrieval.
-- Add hybrid retrieval: keyword + vector.
+- Add external embedding provider and vector-store retrieval.
+- Compare keyword baseline, local hybrid retrieval, and future vector retrieval with the same gold-label evaluation set.
 - Add reranking.
 - Use feedback labels to build retrieval evaluation and bad-case reports.

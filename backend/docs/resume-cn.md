@@ -23,18 +23,18 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 当前版本适合写进 Java 后端简历，但表述要准确：
 
 ```text
-已完成：认证、文档管理、文件导入、自动分块、MySQL FULLTEXT 检索、多关键词与元数据召回、本地 embedding 相似度重排、混合检索策略抽象、Prompt 构造、DeepSeek/Mock Provider、Provider fallback、引用来源、token 统计、问答日志、bad case 反馈、检索评估看板、前后端联调和 GitHub Actions CI。
+已完成：认证、文档管理、文件导入、自动分块、MySQL FULLTEXT 检索、多关键词与元数据召回、本地 embedding 相似度重排、RetrievalStrategy 与 EmbeddingClient 抽象、Prompt 构造、DeepSeek/Mock Provider、Provider fallback、引用来源、token 统计、问答日志、bad case 反馈、检索评估看板、前后端联调和 GitHub Actions CI。
 
 未完成：外部 embedding API、向量数据库、专业 rerank、PDF/OCR、SSE 流式输出、生产级部署。
 ```
 
-面试时可以主动说“第一版先做 MySQL FULLTEXT 与可解释关键词检索，把完整后端链路和评估闭环跑通；当前已经抽象 RetrievalStrategy，并加入本地 embedding 相似度重排作为混合检索雏形，下一步会接外部 embedding 和向量库做指标对比”。这比把项目包装成生产级 AI Agent 更稳。
+面试时可以主动说“第一版先做 MySQL FULLTEXT 与可解释关键词检索，把完整后端链路和评估闭环跑通；当前已经抽象 RetrievalStrategy 和 EmbeddingClient，并加入本地 embedding 相似度重排作为混合检索雏形，下一步会接外部 embedding 和向量库做指标对比”。这比把项目包装成生产级 AI Agent 更稳。
 
 ## 简历 Bullet 版本
 
 - 设计用户级知识库数据模型，实现知识文档 CRUD、软归档、Markdown/TXT 导入、自动 chunk 生成与文档更新后的 chunk 重建机制。
 - 实现 RAG 问答链路，包括问题关键词解析、chunk 检索、Prompt 构造、LLM 调用、答案返回和 citations 引用来源追踪。
-- 抽象 `RetrievalStrategy` 检索策略层，实现 MySQL FULLTEXT + 多关键词 baseline 与本地 embedding 相似度重排的 hybrid retrieval，并在同一 AI Ask 与 evaluation 流程下支持后续替换外部 embedding/vector store。
+- 抽象 `RetrievalStrategy` 检索策略层与 `EmbeddingClient` 向量表示层，实现 MySQL FULLTEXT + 多关键词 baseline 与本地 embedding 相似度重排的 hybrid retrieval，并在同一 AI Ask 与 evaluation 流程下支持后续替换外部 embedding/vector store。
 - 抽象 `LlmClient` 与 `LlmClientRouter`，支持 Mock 与 DeepSeek Provider 切换，降低模型调用与业务编排耦合，便于本地测试和后续扩展其他模型。
 - 实现 Provider fallback：真实模型调用失败时先记录失败日志，再降级到本地 Mock Provider 返回带引用来源的兜底回答，避免接口直接 500。
 - 基于 Spring Security、JWT、BCrypt 和 Redis blacklist 实现认证与退出登录，退出时将 token 写入 Redis 并设置剩余 TTL，避免未过期 token 继续访问。
