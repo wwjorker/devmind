@@ -12,19 +12,13 @@ MySQL
 Redis
 ```
 
-这和 `F:\cangqiong` 项目互不影响。DevMind 在：
+这和其他本地项目互不影响。DevMind 在：
 
 ```text
 F:\AI项目\devmind
 ```
 
-苍穹外卖在：
-
-```text
-F:\cangqiong
-```
-
-两个项目是不同目录、不同 IDEA 项目、不同 Git 仓库，不需要互相改配置。
+其他项目可以保持在自己的目录、IDEA 项目和 Git 仓库中，不需要和 DevMind 互相改配置。
 
 ## 为什么你会看到 Java 19 或 Java 8
 

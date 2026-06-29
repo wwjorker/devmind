@@ -30,13 +30,7 @@ F:\AI项目\devmind
 └── docs      演示脚本、学习笔记、项目说明
 ```
 
-不要修改或移动：
-
-```text
-F:\cangqiong
-```
-
-这是另一个苍穹外卖项目，DevMind 不应影响它。
+不要修改或移动用户的其他本地项目。DevMind 的代码、脚本和 Git 操作都应限制在当前仓库内。
 
 ## 当前技术栈
 
@@ -114,7 +108,7 @@ F:\AI项目\devmind\backend\docs\interview-guide-cn.md
 
 - IDEA 项目 SDK 建议使用 Java 17。当前可用的是 IDEA 自带 JBR：`F:\IntelliJ IDEA 2024.1.2\jbr`
 - Windows 终端里的 `java -version` 仍可能是 Java 8，这不代表 IDEA 启动后端失败。
-- 不要全局修改 Java 环境变量，避免影响苍穹外卖等其他项目。
+- 不要全局修改 Java 环境变量，避免影响其他本地项目。
 - DeepSeek API Key 可以先放在本地 IDEA 运行配置的环境变量里，但不要提交 `.idea`。
 - 正式投简历或公开演示前，建议重置 DeepSeek API Key。
 
@@ -133,8 +127,8 @@ F:\AI项目\devmind\backend\docs\interview-guide-cn.md
 
 - 删除 `testuser` 账号
 - 删除其他用户数据
-- 修改 `sky_take_out`
-- 修改 `F:\cangqiong`
+- 修改其他业务数据库
+- 修改当前仓库之外的本地项目目录
 
 如果 DBeaver 执行时报 `Illegal mix of collations`，脚本开头需要有：
 
@@ -174,4 +168,3 @@ SET @demo_username := _utf8mb4'testuser' COLLATE utf8mb4_unicode_ci;
 - Redis logout blacklist 解决什么问题
 - Flyway migration 解决什么问题
 - bad case 和评估集如何帮助持续优化 RAG
-

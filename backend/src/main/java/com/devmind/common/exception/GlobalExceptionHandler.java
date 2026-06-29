@@ -3,6 +3,8 @@ package com.devmind.common.exception;
 import com.devmind.common.api.Result;
 import com.devmind.common.api.ResultCode;
 import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindException;
@@ -15,6 +17,8 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(BizException.class)
     @ResponseStatus(HttpStatus.OK)
@@ -54,6 +58,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleException(Exception ex) {
-        return Result.fail(ResultCode.INTERNAL_ERROR.getCode(), ex.getMessage());
+        log.error("Unhandled server exception", ex);
+        return Result.fail(ResultCode.INTERNAL_ERROR);
     }
 }

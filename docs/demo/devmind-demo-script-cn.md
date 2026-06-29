@@ -10,7 +10,7 @@
 backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql
 ```
 
-注意：这个脚本只清理并重建 `testuser` 的 DevMind 演示数据，不会删除其他用户，也不会影响 `F:\cangqiong`。
+注意：这个脚本只清理并重建 `testuser` 的 DevMind 演示数据，不会删除其他用户，也不会影响其他本地项目。
 
 先启动后端：
 

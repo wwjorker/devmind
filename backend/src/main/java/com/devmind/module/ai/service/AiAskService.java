@@ -8,6 +8,8 @@ import com.devmind.module.ai.vo.AskResponse;
 import com.devmind.module.ai.vo.CitationResponse;
 import com.devmind.module.search.service.ChunkSearchService;
 import com.devmind.module.search.vo.ChunkSearchResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -15,6 +17,7 @@ import java.util.List;
 @Service
 public class AiAskService {
 
+    private static final Logger log = LoggerFactory.getLogger(AiAskService.class);
     private static final int DEFAULT_RETRIEVAL_LIMIT = 3;
     private static final String NO_CONTEXT_PROVIDER = "knowledge-base-fallback";
     private static final String NO_CONTEXT_ANSWER_EN = """
@@ -75,6 +78,12 @@ public class AiAskService {
         } catch (RuntimeException ex) {
             long elapsedMs = System.currentTimeMillis() - startTime;
             String modelProvider = llmClientRouter.getConfiguredProvider();
+            log.warn("LLM provider failed, falling back to local mock provider. userId={}, provider={}, chunks={}, elapsedMs={}",
+                    userId,
+                    modelProvider,
+                    chunks.size(),
+                    elapsedMs,
+                    ex);
             askLogService.saveFailureLog(
                     userId,
                     question,
