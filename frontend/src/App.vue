@@ -822,6 +822,9 @@ onMounted(async () => {
                 <span>通过率 {{ Math.round((retrievalEvaluation?.passRate ?? 0) * 100) }}%</span>
                 <span>Hit@{{ retrievalEvaluation?.evaluationK ?? 3 }} {{ Math.round((retrievalEvaluation?.hitAtK ?? 0) * 100) }}%</span>
                 <span>MRR {{ (retrievalEvaluation?.mrr ?? 0).toFixed(3) }}</span>
+                <span>候选池 Top {{ retrievalEvaluation?.retrievalLimit ?? 5 }}</span>
+                <span>策略 {{ retrievalEvaluation?.retrievalStrategy || 'keyword-baseline' }}</span>
+                <span>相关性 {{ retrievalEvaluation?.relevanceMode || 'gold-document-title' }}</span>
               </div>
             </div>
 

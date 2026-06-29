@@ -24,6 +24,10 @@ public class RagEvaluationDatasetService {
 
     private static final int RETRIEVAL_EVALUATION_K = 3;
     private static final int RETRIEVAL_EVALUATION_LIMIT = 5;
+    private static final String RETRIEVAL_STRATEGY = "mysql-fulltext-keyword-v1";
+    private static final String RETRIEVAL_STRATEGY_DESCRIPTION =
+            "MySQL FULLTEXT plus multi-keyword metadata scoring";
+    private static final String RELEVANCE_MODE = "gold-document-title";
 
     private static final List<EvaluationCaseDefinition> CASES = List.of(
             new EvaluationCaseDefinition(
@@ -175,6 +179,10 @@ public class RagEvaluationDatasetService {
                 passRate,
                 positiveCaseCount,
                 RETRIEVAL_EVALUATION_K,
+                RETRIEVAL_EVALUATION_LIMIT,
+                RETRIEVAL_STRATEGY,
+                RETRIEVAL_STRATEGY_DESCRIPTION,
+                RELEVANCE_MODE,
                 hitAtK,
                 mrr,
                 caseResponses

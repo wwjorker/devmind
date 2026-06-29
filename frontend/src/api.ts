@@ -165,6 +165,10 @@ export interface RagRetrievalEvaluation {
   passRate: number;
   positiveCaseCount: number;
   evaluationK: number;
+  retrievalLimit: number;
+  retrievalStrategy: string;
+  retrievalStrategyDescription: string;
+  relevanceMode: string;
   hitAtK: number;
   mrr: number;
   cases: RagRetrievalEvaluationCase[];
