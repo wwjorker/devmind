@@ -34,8 +34,9 @@ This makes the project easier to explain in Java backend interviews because the 
 - Text and Markdown note import with automatic document creation
 - Automatic document chunk generation and rebuild on update
 - Multilingual keyword retrieval for Chinese and English technical questions
-- `RetrievalStrategy` abstraction for keyword baseline and future vector/hybrid retrieval
+- `RetrievalStrategy` abstraction with keyword baseline and hybrid retrieval strategy
 - MySQL FULLTEXT relevance retrieval for chunk content
+- Local embedding-style similarity rerank for hybrid retrieval experiments
 - Metadata-aware retrieval across chunk content, document title, tags, and source type
 - Duplicate chunk downranking to reduce repeated citations from copied notes
 - No-context fallback to avoid unsupported model answers
@@ -251,17 +252,18 @@ The retrieval evaluation API runs the same standard cases against the retrieval 
 
 ## Retrieval Quality V1
 
-The retrieval layer is exposed through a `RetrievalStrategy` interface. The current implementation is `KeywordRetrievalStrategy`, which keeps the first version simple and measurable while leaving the AI ask flow and RAG evaluation pipeline ready for future embedding or hybrid retrieval strategies.
+The retrieval layer is exposed through a `RetrievalStrategy` interface. DevMind currently uses `HybridRetrievalStrategy` as the primary strategy. It keeps the explainable keyword/FULLTEXT baseline, then adds a local embedding-style similarity rerank so the same AI ask and evaluation flow can compare retrieval strategies without changing the rest of the system.
 
-DevMind does not rely on a single raw keyword. The ask flow first resolves multiple retrieval keywords from the user question, including Chinese technical phrases and English tokens. Search then uses three candidate sources:
+DevMind does not rely on a single raw keyword. The ask flow first resolves multiple retrieval keywords from the user question, including Chinese technical phrases and English tokens. Search then uses multiple candidate sources:
 
 ```text
 MySQL FULLTEXT retrieval over chunk content
 keyword LIKE fallback over chunk content
 document metadata: title, tags, source type
+local embedding-style similarity over title, tags, and chunk content
 ```
 
-Scores are explainable:
+Keyword scores are explainable:
 
 ```text
 FULLTEXT relevance: capped BM25-style contribution
@@ -273,9 +275,11 @@ source type match: +1 per occurrence
 
 MySQL InnoDB FULLTEXT provides a lightweight BM25-style relevance signal. DevMind combines that signal with the explicit keyword and metadata scores so the ranking is still easy to inspect during debugging.
 
-After initial ranking, repeated chunk content is downranked. This prevents copied notes from occupying all top citations and gives the prompt more diverse context.
+The local embedding-style rerank is intentionally deterministic: it builds a normalized sparse vector from English tokens and Chinese bigrams, then uses cosine similarity as an additional ranking signal. This is not a production vector database yet; it is a measurable hybrid retrieval skeleton that can later swap the local embedding implementation for a real embedding provider and vector store.
 
-This is still a lightweight retrieval implementation. It is intentionally easy to explain in a Java backend interview, and it leaves a clear upgrade path to hybrid keyword/vector retrieval and reranking.
+After initial ranking, repeated chunk content is downranked in the keyword baseline. This prevents copied notes from occupying all top citations and gives the prompt more diverse context.
+
+This is still a lightweight retrieval implementation. It is intentionally easy to explain in a Java backend interview, and the gold-label Hit@3/MRR evaluation API provides a baseline for future external embedding, vector database, and rerank upgrades.
 
 ## Document Import
 

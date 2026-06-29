@@ -1286,3 +1286,42 @@ RAG 的核心原则是：回答应该基于检索到的知识库上下文。
 ```text
 为了减少幻觉和无效 token 消耗，我在 RAG 编排层加了无召回兜底。如果关键词检索没有召回任何 chunk，系统不会继续调用大模型，而是直接返回“知识库暂无足够信息”的确定性回答，并记录日志。这样可以保证回答边界清晰，也方便后续通过 bad case 或补充文档来优化知识库覆盖率。
 ```
+## 45 为什么这一轮先做 HybridRetrievalStrategy
+
+这一轮不是直接上外部向量数据库，而是先把检索层从业务流程里抽出来，做成可以替换的 `RetrievalStrategy`。
+
+原因是：
+
+- AI Ask 和 RAG Evaluation 不应该直接依赖某一种检索实现。
+- 如果后面接入真实 embedding、向量库或 rerank，不应该大改 `AiAskService`。
+- 先有 gold label 的 Hit@3/MRR，后续换检索策略时才能比较效果。
+
+当前主策略是 `HybridRetrievalStrategy`：
+
+```text
+用户问题
+-> 提取多个检索词
+-> KeywordRetrievalStrategy 做 MySQL FULLTEXT / 关键词 / 元数据召回
+-> LocalEmbeddingClient 把问题和 chunk 转成稀疏向量
+-> 用 cosine similarity 做本地 embedding-style 重排
+-> 合并分数并返回 TopK chunk
+```
+
+这里的 `LocalEmbeddingClient` 不是生产级 embedding 模型，也不是向量数据库。它只是一个本地、确定性、可测试的相似度实现：
+
+- 英文用 token。
+- 中文用相邻汉字 bigram。
+- 向量归一化后用余弦相似度算分。
+
+面试时要诚实讲：
+
+```text
+当前版本已经有 hybrid retrieval 的工程结构和本地 embedding-style rerank，但还没有接外部 embedding API 和向量数据库。这样做的目的是先把策略抽象、评估基线和问答链路稳定下来，下一步可以把本地 embedding 实现替换成真实 embedding provider，并用同一套 Hit@3/MRR 评估集对比提升。
+```
+
+这一步的价值不是“我已经做了生产级向量检索”，而是：
+
+- 检索策略解耦了。
+- 评估集可以复用。
+- 后续接真实向量库时风险更小。
+- 简历上可以讲清楚从关键词检索到混合检索的演进过程。
