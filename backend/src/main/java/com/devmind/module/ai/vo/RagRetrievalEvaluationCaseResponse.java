@@ -16,6 +16,9 @@ public class RagRetrievalEvaluationCaseResponse {
     private Boolean passed;
     private Boolean expectedNoContext;
     private Integer retrievedChunkCount;
+    private Integer firstRelevantRank;
+    private Boolean hitAtK;
+    private Double reciprocalRank;
     private List<Long> topChunkIds;
     private List<String> topDocumentTitles;
     private String note;
@@ -35,6 +38,9 @@ public class RagRetrievalEvaluationCaseResponse {
                                               Boolean passed,
                                               Boolean expectedNoContext,
                                               Integer retrievedChunkCount,
+                                              Integer firstRelevantRank,
+                                              Boolean hitAtK,
+                                              Double reciprocalRank,
                                               List<Long> topChunkIds,
                                               List<String> topDocumentTitles,
                                               String note) {
@@ -50,6 +56,9 @@ public class RagRetrievalEvaluationCaseResponse {
         this.passed = passed;
         this.expectedNoContext = expectedNoContext;
         this.retrievedChunkCount = retrievedChunkCount;
+        this.firstRelevantRank = firstRelevantRank;
+        this.hitAtK = hitAtK;
+        this.reciprocalRank = reciprocalRank;
         this.topChunkIds = topChunkIds;
         this.topDocumentTitles = topDocumentTitles;
         this.note = note;
@@ -149,6 +158,30 @@ public class RagRetrievalEvaluationCaseResponse {
 
     public void setRetrievedChunkCount(Integer retrievedChunkCount) {
         this.retrievedChunkCount = retrievedChunkCount;
+    }
+
+    public Integer getFirstRelevantRank() {
+        return firstRelevantRank;
+    }
+
+    public void setFirstRelevantRank(Integer firstRelevantRank) {
+        this.firstRelevantRank = firstRelevantRank;
+    }
+
+    public Boolean getHitAtK() {
+        return hitAtK;
+    }
+
+    public void setHitAtK(Boolean hitAtK) {
+        this.hitAtK = hitAtK;
+    }
+
+    public Double getReciprocalRank() {
+        return reciprocalRank;
+    }
+
+    public void setReciprocalRank(Double reciprocalRank) {
+        this.reciprocalRank = reciprocalRank;
     }
 
     public List<Long> getTopChunkIds() {

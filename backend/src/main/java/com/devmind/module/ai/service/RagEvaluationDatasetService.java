@@ -22,6 +22,9 @@ import java.util.Set;
 @Service
 public class RagEvaluationDatasetService {
 
+    private static final int RETRIEVAL_EVALUATION_K = 3;
+    private static final int RETRIEVAL_EVALUATION_LIMIT = 5;
+
     private static final List<EvaluationCaseDefinition> CASES = List.of(
             new EvaluationCaseDefinition(
                     "redis-cache-penetration-basic",
@@ -91,7 +94,7 @@ public class RagEvaluationDatasetService {
                     "evaluation",
                     "怎么判断 RAG 回答质量是否足够好？",
                     List.of("RAG", "evaluation", "bad case", "hit rate"),
-                    "应该说明可以用标准问题、期望答案、召回 chunks、bad case feedback 评估链路质量，后续再补 hit rate、MRR 等指标。",
+                    "应该说明可以用标准问题、期望答案、召回 chunks、bad case feedback、Hit@K 和 MRR 评估链路质量。",
                     "证据应该来自 evaluation dataset、bad case 或 RAG 质量分析文档。",
                     "evaluation_reasoning"
             )
@@ -141,11 +144,31 @@ public class RagEvaluationDatasetService {
         double passRate = caseResponses.isEmpty()
                 ? 0.0
                 : roundToFourDecimals((double) passedCaseCount / caseResponses.size());
+        List<RagRetrievalEvaluationCaseResponse> positiveCases = caseResponses.stream()
+                .filter(response -> !Boolean.TRUE.equals(response.getExpectedNoContext()))
+                .toList();
+        int positiveCaseCount = positiveCases.size();
+        int hitCount = (int) positiveCases.stream()
+                .filter(response -> Boolean.TRUE.equals(response.getHitAtK()))
+                .count();
+        double hitAtK = positiveCaseCount == 0
+                ? 0.0
+                : roundToFourDecimals((double) hitCount / positiveCaseCount);
+        double mrr = positiveCaseCount == 0
+                ? 0.0
+                : roundToFourDecimals(positiveCases.stream()
+                        .map(RagRetrievalEvaluationCaseResponse::getReciprocalRank)
+                        .mapToDouble(rank -> rank == null ? 0.0 : rank)
+                        .sum() / positiveCaseCount);
 
         return new RagRetrievalEvaluationResponse(
                 caseResponses.size(),
                 passedCaseCount,
                 passRate,
+                positiveCaseCount,
+                RETRIEVAL_EVALUATION_K,
+                hitAtK,
+                mrr,
                 caseResponses
         );
     }
@@ -193,11 +216,18 @@ public class RagEvaluationDatasetService {
     private RagRetrievalEvaluationCaseResponse evaluateRetrievalCase(Long userId,
                                                                     EvaluationCaseDefinition caseDefinition) {
         List<String> queryKeywords = retrievalKeywordService.resolveKeywords(caseDefinition.question());
-        List<ChunkSearchResponse> chunks = chunkSearchService.searchChunks(userId, queryKeywords, 5);
+        List<ChunkSearchResponse> chunks = chunkSearchService.searchChunks(userId, queryKeywords, RETRIEVAL_EVALUATION_LIMIT);
         boolean expectedNoContext = "no_context_negative_case".equals(caseDefinition.riskType());
         List<String> matchedKeywords = matchedExpectedKeywords(caseDefinition.expectedKeywords(), chunks);
         List<String> missingKeywords = missingExpectedKeywords(caseDefinition.expectedKeywords(), matchedKeywords);
-        boolean passed = expectedNoContext ? chunks.isEmpty() : !chunks.isEmpty();
+        Integer firstRelevantRank = expectedNoContext ? null : firstRelevantRank(caseDefinition.expectedKeywords(), chunks);
+        Boolean hitAtK = expectedNoContext
+                ? chunks.isEmpty()
+                : firstRelevantRank != null && firstRelevantRank <= RETRIEVAL_EVALUATION_K;
+        Double reciprocalRank = expectedNoContext
+                ? null
+                : firstRelevantRank == null ? 0.0 : roundToFourDecimals(1.0 / firstRelevantRank);
+        boolean passed = expectedNoContext ? chunks.isEmpty() : Boolean.TRUE.equals(hitAtK);
 
         return new RagRetrievalEvaluationCaseResponse(
                 caseDefinition.caseId(),
@@ -212,9 +242,12 @@ public class RagEvaluationDatasetService {
                 passed,
                 expectedNoContext,
                 chunks.size(),
+                firstRelevantRank,
+                hitAtK,
+                reciprocalRank,
                 topChunkIds(chunks),
                 topDocumentTitles(chunks),
-                retrievalNote(expectedNoContext, chunks, matchedKeywords)
+                retrievalNote(expectedNoContext, chunks, matchedKeywords, firstRelevantRank, hitAtK)
         );
     }
 
@@ -231,6 +264,22 @@ public class RagEvaluationDatasetService {
             }
         }
         return matched;
+    }
+
+    private Integer firstRelevantRank(List<String> expectedKeywords, List<ChunkSearchResponse> chunks) {
+        for (int index = 0; index < chunks.size(); index++) {
+            if (containsAnyExpectedKeyword(expectedKeywords, chunks.get(index))) {
+                return index + 1;
+            }
+        }
+        return null;
+    }
+
+    private boolean containsAnyExpectedKeyword(List<String> expectedKeywords, ChunkSearchResponse chunk) {
+        String searchableText = searchableText(chunk).toLowerCase(Locale.ROOT);
+        return expectedKeywords.stream()
+                .map(keyword -> keyword.toLowerCase(Locale.ROOT))
+                .anyMatch(searchableText::contains);
     }
 
     private String searchableText(ChunkSearchResponse chunk) {
@@ -264,7 +313,9 @@ public class RagEvaluationDatasetService {
 
     private String retrievalNote(boolean expectedNoContext,
                                  List<ChunkSearchResponse> chunks,
-                                 List<String> matchedKeywords) {
+                                 List<String> matchedKeywords,
+                                 Integer firstRelevantRank,
+                                 Boolean hitAtK) {
         if (expectedNoContext && chunks.isEmpty()) {
             return "Expected no-context fallback: no chunks were retrieved.";
         }
@@ -277,7 +328,10 @@ public class RagEvaluationDatasetService {
         if (matchedKeywords.isEmpty()) {
             return "Retrieved chunks exist, but none of the expected keywords were found in the retrieved context.";
         }
-        return "Retrieved chunks are available and contain expected evidence keywords.";
+        if (Boolean.TRUE.equals(hitAtK)) {
+            return "Hit@" + RETRIEVAL_EVALUATION_K + " passed: the first relevant chunk is ranked #" + firstRelevantRank + ".";
+        }
+        return "Needs review: relevant evidence was found, but it did not enter Top " + RETRIEVAL_EVALUATION_K + ".";
     }
 
     private String safeText(String value) {

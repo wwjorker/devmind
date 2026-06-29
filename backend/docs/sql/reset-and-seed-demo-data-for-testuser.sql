@@ -191,7 +191,7 @@ SELECT
         '# RAG 回答质量评估\n\n',
         'AI 问答系统不能只看有没有回答，还要判断回答是否基于正确上下文、是否召回了相关 chunk、是否覆盖了期望知识点。\n\n',
         'DevMind 通过 ai_ask_log 记录问答日志，通过 ai_ask_feedback 记录 helpful 或 bad case，通过 RAG evaluation dataset 保存标准问题、期望关键词和期望答案。\n\n',
-        '当前版本主要展示覆盖率和 bad case 反馈，后续可以补 hit rate、MRR 等离线评估指标。'
+        '当前版本会展示覆盖率、Hit@3、MRR 和 bad case 反馈，用来判断召回结果是否命中并排在前面。'
     ),
     'interview_review',
     'RAG,evaluation,bad case,hit rate,MRR',
@@ -205,7 +205,7 @@ SELECT
     @evaluation_doc_id,
     @demo_user_id,
     0,
-    '判断 RAG 回答质量不能只看模型有没有输出。DevMind 使用 ai_ask_log 记录召回 chunks、Prompt、token 和耗时，使用 bad case feedback 记录问题原因和期望答案，并通过 RAG evaluation dataset 检查标准问题覆盖率。后续可以补 hit rate、MRR 等指标。',
+    '判断 RAG 回答质量不能只看模型有没有输出。DevMind 使用 ai_ask_log 记录召回 chunks、Prompt、token 和耗时，使用 bad case feedback 记录问题原因和期望答案，并通过 RAG evaluation dataset 检查标准问题覆盖率、Hit@3 和 MRR。',
     115,
     1
 WHERE @demo_user_id IS NOT NULL;
