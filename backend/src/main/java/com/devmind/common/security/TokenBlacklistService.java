@@ -1,5 +1,7 @@
 package com.devmind.common.security;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -13,6 +15,7 @@ import java.util.HexFormat;
 @Service
 public class TokenBlacklistService {
 
+    private static final Logger log = LoggerFactory.getLogger(TokenBlacklistService.class);
     private static final String KEY_PREFIX = "devmind:jwt:blacklist:";
 
     private final StringRedisTemplate stringRedisTemplate;
@@ -27,8 +30,9 @@ public class TokenBlacklistService {
         }
         try {
             stringRedisTemplate.opsForValue().set(toKey(token), "1", Duration.ofSeconds(ttlSeconds));
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException ex) {
             // Keep local development usable when Redis is not running.
+            log.warn("Failed to write JWT logout blacklist entry to Redis. ttlSeconds={}", ttlSeconds, ex);
         }
     }
 
@@ -38,7 +42,8 @@ public class TokenBlacklistService {
         }
         try {
             return Boolean.TRUE.equals(stringRedisTemplate.hasKey(toKey(token)));
-        } catch (RuntimeException ignored) {
+        } catch (RuntimeException ex) {
+            log.warn("Failed to check JWT logout blacklist from Redis", ex);
             return false;
         }
     }

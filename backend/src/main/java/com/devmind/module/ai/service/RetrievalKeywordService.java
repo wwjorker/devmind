@@ -52,7 +52,7 @@ public class RetrievalKeywordService {
             "失败日志",
             "成本统计",
             "知识库",
-            "苍穹外卖",
+            "外卖项目",
             "Redis",
             "MySQL",
             "JWT",

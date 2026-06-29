@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.devmind.common.api.ResultCode;
 import com.devmind.common.exception.BizException;
 import com.devmind.module.ai.config.AiProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -17,6 +19,7 @@ import java.util.Map;
 @Component
 public class DeepSeekLlmClient implements LlmClient {
 
+    private static final Logger log = LoggerFactory.getLogger(DeepSeekLlmClient.class);
     private static final String SYSTEM_PROMPT = """
             You are DevMind, an assistant that answers strictly from retrieved developer knowledge-base context.
             Answer in the same language as the user's question. If the question is in Chinese, answer in Chinese.
@@ -74,12 +77,17 @@ public class DeepSeekLlmClient implements LlmClient {
                     readNullableInt(usage, "total_tokens")
             );
         } catch (RestClientException ex) {
+            log.warn("DeepSeek request failed. model={}, baseUrl={}",
+                    aiProperties.getDeepseekModel(),
+                    aiProperties.getDeepseekBaseUrl(),
+                    ex);
             throw new BizException(ResultCode.INTERNAL_ERROR, "DeepSeek request failed");
         }
     }
 
     private String extractAnswer(JsonNode response) {
         if (response == null) {
+            log.warn("DeepSeek response is empty. model={}", aiProperties.getDeepseekModel());
             throw new BizException(ResultCode.INTERNAL_ERROR, "DeepSeek response is empty");
         }
 
@@ -88,6 +96,7 @@ public class DeepSeekLlmClient implements LlmClient {
                 .path("message")
                 .path("content");
         if (!contentNode.isTextual() || !StringUtils.hasText(contentNode.asText())) {
+            log.warn("DeepSeek response content is empty. model={}", aiProperties.getDeepseekModel());
             throw new BizException(ResultCode.INTERNAL_ERROR, "DeepSeek response content is empty");
         }
         return contentNode.asText();
