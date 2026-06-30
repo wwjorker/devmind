@@ -28,12 +28,17 @@ class RagEvaluationDatasetServiceTest {
 
         RagEvaluationDatasetResponse response = service.dataset(1L);
 
-        assertThat(response.getTotalCaseCount()).isEqualTo(8);
+        assertThat(response.getTotalCaseCount()).isEqualTo(10);
         assertThat(response.getCoveredCaseCount()).isZero();
         assertThat(response.getCoverageRate()).isZero();
         assertThat(response.getCases())
                 .extracting("caseId")
-                .contains("redis-cache-penetration-basic", "unknown-kubernetes-fallback");
+                .contains(
+                        "redis-cache-penetration-basic",
+                        "redis-missing-key-db-pressure",
+                        "token-still-valid-after-logout",
+                        "unknown-kubernetes-fallback"
+                );
     }
 
     @Test
@@ -52,7 +57,7 @@ class RagEvaluationDatasetServiceTest {
         RagEvaluationDatasetResponse response = service.dataset(1L);
 
         assertThat(response.getCoveredCaseCount()).isEqualTo(1);
-        assertThat(response.getCoverageRate()).isEqualTo(0.125);
+        assertThat(response.getCoverageRate()).isEqualTo(0.1);
         assertThat(response.getCases())
                 .filteredOn(caseResponse -> "redis-cache-penetration-basic".equals(caseResponse.getCaseId()))
                 .singleElement()
@@ -90,10 +95,10 @@ class RagEvaluationDatasetServiceTest {
 
         RagRetrievalEvaluationResponse response = service.retrievalEvaluation(1L);
 
-        assertThat(response.getTotalCaseCount()).isEqualTo(8);
-        assertThat(response.getPassedCaseCount()).isEqualTo(8);
+        assertThat(response.getTotalCaseCount()).isEqualTo(10);
+        assertThat(response.getPassedCaseCount()).isEqualTo(10);
         assertThat(response.getPassRate()).isEqualTo(1.0);
-        assertThat(response.getPositiveCaseCount()).isEqualTo(7);
+        assertThat(response.getPositiveCaseCount()).isEqualTo(9);
         assertThat(response.getEvaluationK()).isEqualTo(3);
         assertThat(response.getRetrievalLimit()).isEqualTo(5);
         assertThat(response.getRetrievalStrategy()).isEqualTo("hybrid-keyword-local-sparse-vector-rrf-v1");
@@ -103,7 +108,7 @@ class RagEvaluationDatasetServiceTest {
         assertThat(response.getRelevanceMode()).isEqualTo("gold-document-title");
         assertThat(response.getHitAtK()).isEqualTo(1.0);
         assertThat(response.getMrr()).isEqualTo(1.0);
-        assertThat(response.getBaselinePassedCaseCount()).isEqualTo(8);
+        assertThat(response.getBaselinePassedCaseCount()).isEqualTo(10);
         assertThat(response.getBaselinePassRate()).isEqualTo(1.0);
         assertThat(response.getBaselineHitAtK()).isEqualTo(1.0);
         assertThat(response.getBaselineMrr()).isEqualTo(1.0);
@@ -213,16 +218,16 @@ class RagEvaluationDatasetServiceTest {
         assertThat(response.getHitAtK()).isEqualTo(1.0);
         assertThat(response.getMrr()).isEqualTo(1.0);
         assertThat(response.getBaselineHitAtK()).isZero();
-        assertThat(response.getBaselineMrr()).isEqualTo(0.0714);
+        assertThat(response.getBaselineMrr()).isEqualTo(0.0833);
         assertThat(response.getHitAtKDelta()).isEqualTo(1.0);
-        assertThat(response.getMrrDelta()).isEqualTo(0.9286);
+        assertThat(response.getMrrDelta()).isEqualTo(0.9167);
     }
 
     private List<String> keywordsForQuestion(String question) {
         if (question.contains("Kubernetes")) {
             return List.of("Kubernetes");
         }
-        if (question.contains("JWT")) {
+        if (question.contains("JWT") || question.contains("token") || question.contains("退出后")) {
             return List.of("JWT", "Redis", "黑名单");
         }
         if (question.contains("Flyway")) {
