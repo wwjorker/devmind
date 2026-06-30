@@ -4,6 +4,7 @@ import com.devmind.module.ai.entity.AiAskLog;
 import com.devmind.module.ai.mapper.AiAskLogMapper;
 import com.devmind.module.ai.vo.RagEvaluationDatasetResponse;
 import com.devmind.module.ai.vo.RagRetrievalEvaluationResponse;
+import com.devmind.module.search.strategy.KeywordRetrievalStrategy;
 import com.devmind.module.search.strategy.RetrievalStrategy;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.junit.jupiter.api.Test;
@@ -67,17 +68,23 @@ class RagEvaluationDatasetServiceTest {
     void retrievalEvaluationShouldRunRetrievalAgainstStaticCases() {
         AiAskLogMapper askLogMapper = mock(AiAskLogMapper.class);
         RetrievalStrategy retrievalStrategy = mock(RetrievalStrategy.class);
+        KeywordRetrievalStrategy keywordRetrievalStrategy = mock(KeywordRetrievalStrategy.class);
         RetrievalKeywordService retrievalKeywordService = mock(RetrievalKeywordService.class);
 
         when(retrievalKeywordService.resolveKeywords(any())).thenAnswer(invocation -> keywordsForQuestion(invocation.getArgument(0)));
-        when(retrievalStrategy.strategyName()).thenReturn("mysql-fulltext-keyword-v1");
-        when(retrievalStrategy.description()).thenReturn("MySQL FULLTEXT plus multi-keyword metadata scoring");
+        when(retrievalStrategy.strategyName()).thenReturn("hybrid-keyword-local-sparse-vector-rrf-v1");
+        when(retrievalStrategy.description()).thenReturn("Keyword plus local sparse-vector rerank fused by RRF");
         when(retrievalStrategy.retrieve(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5)))
+                .thenAnswer(invocation -> chunksForKeywords(invocation.getArgument(1)));
+        when(keywordRetrievalStrategy.strategyName()).thenReturn("mysql-fulltext-keyword-v1");
+        when(keywordRetrievalStrategy.description()).thenReturn("MySQL FULLTEXT plus multi-keyword metadata scoring");
+        when(keywordRetrievalStrategy.retrieve(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5)))
                 .thenAnswer(invocation -> chunksForKeywords(invocation.getArgument(1)));
 
         RagEvaluationDatasetService service = new RagEvaluationDatasetService(
                 askLogMapper,
                 retrievalStrategy,
+                keywordRetrievalStrategy,
                 retrievalKeywordService
         );
 
@@ -89,11 +96,19 @@ class RagEvaluationDatasetServiceTest {
         assertThat(response.getPositiveCaseCount()).isEqualTo(7);
         assertThat(response.getEvaluationK()).isEqualTo(3);
         assertThat(response.getRetrievalLimit()).isEqualTo(5);
-        assertThat(response.getRetrievalStrategy()).isEqualTo("mysql-fulltext-keyword-v1");
-        assertThat(response.getRetrievalStrategyDescription()).contains("FULLTEXT");
+        assertThat(response.getRetrievalStrategy()).isEqualTo("hybrid-keyword-local-sparse-vector-rrf-v1");
+        assertThat(response.getRetrievalStrategyDescription()).contains("RRF");
+        assertThat(response.getBaselineRetrievalStrategy()).isEqualTo("mysql-fulltext-keyword-v1");
+        assertThat(response.getBaselineRetrievalStrategyDescription()).contains("FULLTEXT");
         assertThat(response.getRelevanceMode()).isEqualTo("gold-document-title");
         assertThat(response.getHitAtK()).isEqualTo(1.0);
         assertThat(response.getMrr()).isEqualTo(1.0);
+        assertThat(response.getBaselinePassedCaseCount()).isEqualTo(8);
+        assertThat(response.getBaselinePassRate()).isEqualTo(1.0);
+        assertThat(response.getBaselineHitAtK()).isEqualTo(1.0);
+        assertThat(response.getBaselineMrr()).isEqualTo(1.0);
+        assertThat(response.getHitAtKDelta()).isZero();
+        assertThat(response.getMrrDelta()).isZero();
         assertThat(response.getCases())
                 .filteredOn(caseResponse -> "redis-cache-penetration-basic".equals(caseResponse.getCaseId()))
                 .singleElement()
@@ -121,6 +136,7 @@ class RagEvaluationDatasetServiceTest {
     void retrievalEvaluationShouldFailPositiveCaseWhenRelevantChunkIsOutsideTopK() {
         AiAskLogMapper askLogMapper = mock(AiAskLogMapper.class);
         RetrievalStrategy retrievalStrategy = mock(RetrievalStrategy.class);
+        KeywordRetrievalStrategy keywordRetrievalStrategy = mock(KeywordRetrievalStrategy.class);
         RetrievalKeywordService retrievalKeywordService = mock(RetrievalKeywordService.class);
 
         when(retrievalKeywordService.resolveKeywords(any())).thenReturn(List.of("Redis"));
@@ -142,10 +158,15 @@ class RagEvaluationDatasetServiceTest {
                         50
                 )
         ));
+        when(keywordRetrievalStrategy.strategyName()).thenReturn("mysql-fulltext-keyword-v1");
+        when(keywordRetrievalStrategy.description()).thenReturn("MySQL FULLTEXT plus multi-keyword metadata scoring");
+        when(keywordRetrievalStrategy.retrieve(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5)))
+                .thenReturn(List.of());
 
         RagEvaluationDatasetService service = new RagEvaluationDatasetService(
                 askLogMapper,
                 retrievalStrategy,
+                keywordRetrievalStrategy,
                 retrievalKeywordService
         );
 
@@ -161,6 +182,40 @@ class RagEvaluationDatasetServiceTest {
                     assertThat(caseResponse.getReciprocalRank()).isEqualTo(0.25);
                     assertThat(caseResponse.getNote()).contains("rank #4", "Top 3");
                 });
+    }
+
+    @Test
+    void retrievalEvaluationShouldCompareHybridStrategyWithKeywordBaseline() {
+        AiAskLogMapper askLogMapper = mock(AiAskLogMapper.class);
+        RetrievalStrategy retrievalStrategy = mock(RetrievalStrategy.class);
+        KeywordRetrievalStrategy keywordRetrievalStrategy = mock(KeywordRetrievalStrategy.class);
+        RetrievalKeywordService retrievalKeywordService = mock(RetrievalKeywordService.class);
+
+        when(retrievalKeywordService.resolveKeywords(any())).thenAnswer(invocation -> keywordsForQuestion(invocation.getArgument(0)));
+        when(retrievalStrategy.strategyName()).thenReturn("hybrid-keyword-local-sparse-vector-rrf-v1");
+        when(retrievalStrategy.description()).thenReturn("Keyword plus local sparse-vector rerank fused by RRF");
+        when(retrievalStrategy.retrieve(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5)))
+                .thenAnswer(invocation -> chunksForKeywords(invocation.getArgument(1)));
+        when(keywordRetrievalStrategy.strategyName()).thenReturn("mysql-fulltext-keyword-v1");
+        when(keywordRetrievalStrategy.description()).thenReturn("MySQL FULLTEXT plus multi-keyword metadata scoring");
+        when(keywordRetrievalStrategy.retrieve(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5)))
+                .thenAnswer(invocation -> baselineChunksForKeywords(invocation.getArgument(1)));
+
+        RagEvaluationDatasetService service = new RagEvaluationDatasetService(
+                askLogMapper,
+                retrievalStrategy,
+                keywordRetrievalStrategy,
+                retrievalKeywordService
+        );
+
+        RagRetrievalEvaluationResponse response = service.retrievalEvaluation(1L);
+
+        assertThat(response.getHitAtK()).isEqualTo(1.0);
+        assertThat(response.getMrr()).isEqualTo(1.0);
+        assertThat(response.getBaselineHitAtK()).isZero();
+        assertThat(response.getBaselineMrr()).isEqualTo(0.0714);
+        assertThat(response.getHitAtKDelta()).isEqualTo(1.0);
+        assertThat(response.getMrrDelta()).isEqualTo(0.9286);
     }
 
     private List<String> keywordsForQuestion(String question) {
@@ -207,6 +262,18 @@ class RagEvaluationDatasetServiceTest {
         return List.of(chunk(17L, "Redis 缓存穿透复盘", "Redis cache penetration can use empty-value caching and rate limiting."));
     }
 
+    private List<ChunkSearchResponse> baselineChunksForKeywords(List<String> keywords) {
+        if (keywords.contains("Kubernetes")) {
+            return List.of();
+        }
+        return List.of(
+                unrelatedChunk(11L, "unrelated first"),
+                unrelatedChunk(12L, "unrelated second"),
+                unrelatedChunk(13L, "unrelated third"),
+                chunk(14L, "Redis cache penetration review", "Redis cache penetration can use empty-value caching and rate limiting.")
+        );
+    }
+
     private ChunkSearchResponse chunk(Long chunkId, String title, String content) {
         return new ChunkSearchResponse(
                 chunkId,
@@ -239,6 +306,7 @@ class RagEvaluationDatasetServiceTest {
         return new RagEvaluationDatasetService(
                 askLogMapper,
                 mock(RetrievalStrategy.class),
+                mock(KeywordRetrievalStrategy.class),
                 mock(RetrievalKeywordService.class)
         );
     }

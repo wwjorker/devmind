@@ -7,6 +7,7 @@ import com.devmind.module.ai.vo.RagEvaluationCaseResponse;
 import com.devmind.module.ai.vo.RagEvaluationDatasetResponse;
 import com.devmind.module.ai.vo.RagRetrievalEvaluationCaseResponse;
 import com.devmind.module.ai.vo.RagRetrievalEvaluationResponse;
+import com.devmind.module.search.strategy.KeywordRetrievalStrategy;
 import com.devmind.module.search.strategy.RetrievalStrategy;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.springframework.stereotype.Service;
@@ -111,13 +112,16 @@ public class RagEvaluationDatasetService {
 
     private final AiAskLogMapper askLogMapper;
     private final RetrievalStrategy retrievalStrategy;
+    private final KeywordRetrievalStrategy keywordRetrievalStrategy;
     private final RetrievalKeywordService retrievalKeywordService;
 
     public RagEvaluationDatasetService(AiAskLogMapper askLogMapper,
                                        RetrievalStrategy retrievalStrategy,
+                                       KeywordRetrievalStrategy keywordRetrievalStrategy,
                                        RetrievalKeywordService retrievalKeywordService) {
         this.askLogMapper = askLogMapper;
         this.retrievalStrategy = retrievalStrategy;
+        this.keywordRetrievalStrategy = keywordRetrievalStrategy;
         this.retrievalKeywordService = retrievalKeywordService;
     }
 
@@ -143,8 +147,36 @@ public class RagEvaluationDatasetService {
     }
 
     public RagRetrievalEvaluationResponse retrievalEvaluation(Long userId) {
+        EvaluationRun currentRun = evaluateWithStrategy(userId, retrievalStrategy);
+        EvaluationRun baselineRun = evaluateWithStrategy(userId, keywordRetrievalStrategy);
+
+        return new RagRetrievalEvaluationResponse(
+                currentRun.caseResponses().size(),
+                currentRun.passedCaseCount(),
+                currentRun.passRate(),
+                currentRun.positiveCaseCount(),
+                RETRIEVAL_EVALUATION_K,
+                RETRIEVAL_EVALUATION_LIMIT,
+                retrievalStrategy.strategyName(),
+                retrievalStrategy.description(),
+                keywordRetrievalStrategy.strategyName(),
+                keywordRetrievalStrategy.description(),
+                RELEVANCE_MODE,
+                currentRun.hitAtK(),
+                currentRun.mrr(),
+                baselineRun.passedCaseCount(),
+                baselineRun.passRate(),
+                baselineRun.hitAtK(),
+                baselineRun.mrr(),
+                roundToFourDecimals(currentRun.hitAtK() - baselineRun.hitAtK()),
+                roundToFourDecimals(currentRun.mrr() - baselineRun.mrr()),
+                currentRun.caseResponses()
+        );
+    }
+
+    private EvaluationRun evaluateWithStrategy(Long userId, RetrievalStrategy strategy) {
         List<RagRetrievalEvaluationCaseResponse> caseResponses = CASES.stream()
-                .map(caseDefinition -> evaluateRetrievalCase(userId, caseDefinition))
+                .map(caseDefinition -> evaluateRetrievalCase(userId, caseDefinition, strategy))
                 .toList();
 
         int passedCaseCount = (int) caseResponses.stream()
@@ -166,24 +198,11 @@ public class RagEvaluationDatasetService {
         double mrr = positiveCaseCount == 0
                 ? 0.0
                 : roundToFourDecimals(positiveCases.stream()
-                        .map(RagRetrievalEvaluationCaseResponse::getReciprocalRank)
-                        .mapToDouble(rank -> rank == null ? 0.0 : rank)
-                        .sum() / positiveCaseCount);
+                .map(RagRetrievalEvaluationCaseResponse::getReciprocalRank)
+                .mapToDouble(rank -> rank == null ? 0.0 : rank)
+                .sum() / positiveCaseCount);
 
-        return new RagRetrievalEvaluationResponse(
-                caseResponses.size(),
-                passedCaseCount,
-                passRate,
-                positiveCaseCount,
-                RETRIEVAL_EVALUATION_K,
-                RETRIEVAL_EVALUATION_LIMIT,
-                retrievalStrategy.strategyName(),
-                retrievalStrategy.description(),
-                RELEVANCE_MODE,
-                hitAtK,
-                mrr,
-                caseResponses
-        );
+        return new EvaluationRun(caseResponses, passedCaseCount, passRate, positiveCaseCount, hitAtK, mrr);
     }
 
     private Map<String, AiAskLog> loadLatestLogByQuestion(Long userId) {
@@ -227,9 +246,10 @@ public class RagEvaluationDatasetService {
     }
 
     private RagRetrievalEvaluationCaseResponse evaluateRetrievalCase(Long userId,
-                                                                    EvaluationCaseDefinition caseDefinition) {
+                                                                    EvaluationCaseDefinition caseDefinition,
+                                                                    RetrievalStrategy strategy) {
         List<String> queryKeywords = retrievalKeywordService.resolveKeywords(caseDefinition.question());
-        List<ChunkSearchResponse> chunks = retrievalStrategy.retrieve(userId, queryKeywords, RETRIEVAL_EVALUATION_LIMIT);
+        List<ChunkSearchResponse> chunks = strategy.retrieve(userId, queryKeywords, RETRIEVAL_EVALUATION_LIMIT);
         boolean expectedNoContext = "no_context_negative_case".equals(caseDefinition.riskType());
         List<String> matchedKeywords = matchedExpectedKeywords(caseDefinition.expectedKeywords(), chunks);
         List<String> missingKeywords = missingExpectedKeywords(caseDefinition.expectedKeywords(), matchedKeywords);
@@ -372,5 +392,13 @@ public class RagEvaluationDatasetService {
                                             String expectedAnswer,
                                             String expectedEvidence,
                                             String riskType) {
+    }
+
+    private record EvaluationRun(List<RagRetrievalEvaluationCaseResponse> caseResponses,
+                                 int passedCaseCount,
+                                 double passRate,
+                                 int positiveCaseCount,
+                                 double hitAtK,
+                                 double mrr) {
     }
 }

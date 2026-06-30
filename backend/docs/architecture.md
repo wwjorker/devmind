@@ -130,6 +130,7 @@ sequenceDiagram
 - Retrieval uses a `RetrievalStrategy` abstraction so keyword, hybrid, and future vector strategies can share the same ask and evaluation flow.
 - `EmbeddingClient` separates local sparse-vector similarity from retrieval orchestration, so the current deterministic implementation can later be replaced by a real embedding provider or vector store.
 - Chunk vector rows are rebuilt together with document chunks and stored in `knowledge_document_chunk_vector`. The ask path builds only the query vector, then compares it with persisted chunk vectors instead of recomputing every chunk vector on each question.
+- Hybrid retrieval uses RRF to fuse keyword/FULLTEXT ranking with local sparse-vector ranking, avoiding direct addition of scores with different scales.
 - `LlmClient` separates model-provider implementation from RAG orchestration.
 - Ask logs record question, retrieval keyword, chunk ids, answer, provider, token usage, and elapsed time for later bad-case analysis.
 - Ask feedback stores helpfulness labels, reasons, and expected answers so bad cases can become a small evaluation dataset.
@@ -140,6 +141,6 @@ sequenceDiagram
 
 - Add DeepSeek real-call smoke test with environment-only API key.
 - Add external embedding provider and vector-store retrieval.
-- Compare keyword baseline, local hybrid retrieval, and future vector retrieval with the same gold-label evaluation set.
-- Replace the current weighted score merge with RRF or a dedicated rerank stage.
+- Compare keyword baseline, current hybrid/RRF retrieval, and future vector retrieval with the same gold-label evaluation set.
+- Add a dedicated rerank stage or external vector retrieval; keep RRF as the current fusion baseline.
 - Use feedback labels to build retrieval evaluation and bad-case reports.

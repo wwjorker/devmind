@@ -15,7 +15,7 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 ## 一句话项目介绍
 
 ```text
-基于 Spring Boot 和 Vue 3 设计并实现开发学习知识库系统，支持知识文档管理、Markdown/TXT 导入、自动分块、MySQL FULLTEXT 与本地稀疏向量持久化重排、RAG 问答、DeepSeek 模型调用、引用来源追踪、token 成本观测、问答日志、bad case 反馈和标准问题检索评估。
+基于 Spring Boot 和 Vue 3 设计并实现开发学习知识库系统，支持知识文档管理、Markdown/TXT 导入、自动分块、MySQL FULLTEXT 与本地稀疏向量持久化、RRF 融合排序、RAG 问答、DeepSeek 模型调用、引用来源追踪、token 成本观测、问答日志、bad case 反馈和标准问题检索评估。
 ```
 
 ## 当前可投递版本
@@ -23,30 +23,30 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 当前版本适合写进 Java 后端简历，但表述要准确：
 
 ```text
-已完成：认证、文档管理、文件导入、自动分块、MySQL FULLTEXT 检索、多关键词与元数据召回、本地稀疏向量持久化重排、RetrievalStrategy 与 EmbeddingClient 抽象、Prompt 构造、DeepSeek/Mock Provider、Provider fallback、引用来源、token 统计、问答日志、bad case 反馈、检索评估看板、前后端联调和 GitHub Actions CI。
+已完成：认证、文档管理、文件导入、自动分块、MySQL FULLTEXT 检索、多关键词与元数据召回、本地稀疏向量持久化、RRF 融合排序、RetrievalStrategy 与 EmbeddingClient 抽象、Prompt 构造、DeepSeek/Mock Provider、Provider fallback、引用来源、token 统计、问答日志、bad case 反馈、检索评估看板、前后端联调和 GitHub Actions CI。
 
 未完成：外部 embedding API、向量数据库、专业 rerank、PDF/OCR、SSE 流式输出、生产级部署。
 ```
 
-面试时可以主动说“第一版先做 MySQL FULLTEXT 与可解释关键词检索，把完整后端链路和评估闭环跑通；当前已经抽象 RetrievalStrategy 和 EmbeddingClient，并在 chunk 重建时持久化本地稀疏向量，用它做混合检索重排，下一步会接外部 embedding 和向量库做指标对比”。这比把项目包装成生产级 AI Agent 更稳。
+面试时可以主动说“第一版先做 MySQL FULLTEXT 与可解释关键词检索，把完整后端链路和评估闭环跑通；当前已经抽象 RetrievalStrategy 和 EmbeddingClient，并在 chunk 重建时持久化本地稀疏向量，用 RRF 融合关键词排序和稀疏向量排序，下一步会接外部 embedding 和向量库做指标对比”。这比把项目包装成生产级 AI Agent 更稳。
 
 ## 简历 Bullet 版本
 
 - 设计用户级知识库数据模型，实现知识文档 CRUD、软归档、Markdown/TXT 导入、自动 chunk 生成与文档更新后的 chunk 重建机制。
 - 实现 RAG 问答链路，包括问题关键词解析、chunk 检索、Prompt 构造、LLM 调用、答案返回和 citations 引用来源追踪。
-- 抽象 `RetrievalStrategy` 检索策略层与 `EmbeddingClient` 向量表示层，实现 MySQL FULLTEXT + 多关键词 baseline 与持久化本地稀疏向量余弦重排的 hybrid retrieval，并在同一 AI Ask 与 evaluation 流程下支持后续替换外部 embedding/vector store。
+- 抽象 `RetrievalStrategy` 检索策略层与 `EmbeddingClient` 向量表示层，实现 MySQL FULLTEXT + 多关键词 baseline、持久化本地稀疏向量余弦相似度和 RRF 融合排序的 hybrid retrieval，并在同一 AI Ask 与 evaluation 流程下支持后续替换外部 embedding/vector store。
 - 抽象 `LlmClient` 与 `LlmClientRouter`，支持 Mock 与 DeepSeek Provider 切换，降低模型调用与业务编排耦合，便于本地测试和后续扩展其他模型。
 - 实现 Provider fallback：真实模型调用失败时先记录失败日志，再降级到本地 Mock Provider 返回带引用来源的兜底回答，避免接口直接 500。
 - 基于 Spring Security、JWT、BCrypt 和 Redis blacklist 实现认证与退出登录，退出时将 token 写入 Redis 并设置剩余 TTL，避免未过期 token 继续访问。
 - 设计 `ai_ask_log` 问答日志，记录 provider、prompt preview、召回 chunk、token usage、耗时和成功/兜底/失败状态，用于成本观测与问题排查。
-- 设计 `ai_ask_feedback`、RAG evaluation dataset 与检索评估接口，支持 bad case 标注、标准问题覆盖率、基于人工 gold label 的 Hit@3/MRR、首个相关片段排名、关键词诊断和问答日志回放。
+- 设计 `ai_ask_feedback`、RAG evaluation dataset 与检索评估接口，支持 bad case 标注、标准问题覆盖率、基于人工 gold label 的 Hit@3/MRR、首个相关片段排名、关键词诊断、keyword baseline 对比和问答日志回放。
 - 引入 Flyway 管理数据库结构版本，并配置 GitHub Actions 执行后端测试和前端构建，提升项目初始化、协作和持续集成的工程化程度。
 
 ## 更短版本
 
-- 基于 Spring Boot + Vue 3 实现开发学习知识库与 RAG 问答系统，支持文档导入、自动分块、MySQL FULLTEXT + 本地稀疏向量持久化重排、Prompt 构造、DeepSeek 调用和引用来源展示。
+- 基于 Spring Boot + Vue 3 实现开发学习知识库与 RAG 问答系统，支持文档导入、自动分块、MySQL FULLTEXT + 本地稀疏向量持久化 + RRF 融合排序、Prompt 构造、DeepSeek 调用和引用来源展示。
 - 抽象 LLM Provider 层，支持 Mock/DeepSeek 切换，并记录 token usage、耗时、召回 chunk 和模型来源，实现 AI 调用可观测。
-- 设计 bad case feedback、RAG evaluation dataset 和检索评估看板，支持回答质量反馈、期望答案沉淀、基于相关文档标注的 Hit@3/MRR 检索评估和召回质量分析。
+- 设计 bad case feedback、RAG evaluation dataset 和检索评估看板，支持回答质量反馈、期望答案沉淀、基于相关文档标注的 Hit@3/MRR、keyword baseline vs hybrid/RRF 对比和召回质量分析。
 
 ## 面试主线
 
@@ -57,7 +57,7 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 
 用户先录入或导入知识文档，系统自动分块；
 提问时先解析关键词，再检索相关 chunk；
-检索结果会综合内容、标题、标签和类型打分，并对重复片段降权；
+检索结果会综合内容、标题、标签和类型打分，并对重复片段降权；混合策略再用 RRF 融合关键词排序和本地稀疏向量排序；
 随后系统构造 Prompt，路由到 Mock 或 DeepSeek Provider；
 如果真实模型调用失败，会先记录失败日志，再降级到本地 Mock Provider；
 模型回答后返回引用来源、token 用量和耗时；
@@ -130,6 +130,7 @@ helpful / bad case
 reason
 Hit@3
 MRR
+keyword baseline vs hybrid/RRF delta
 first relevant rank
 matched / missing keywords
 ```
@@ -149,8 +150,8 @@ matched / missing keywords
 - 增加 BM25 或全文检索能力。
 - 接入外部 embedding 和向量数据库。
 - 将当前本地稀疏向量混合检索升级为外部 embedding provider 与 vector store。
-- 增加 rerank。
-- 基于当前 Hit@3/MRR 基线，对比外部 embedding、向量库和 rerank 的提升。
+- 增加专业 rerank。
+- 基于当前 keyword baseline 与 hybrid/RRF 的 Hit@3/MRR 基线，对比外部 embedding、向量库和 rerank 的提升。
 
 第三阶段：增强工程深度。
 

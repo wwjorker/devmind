@@ -49,7 +49,6 @@ public class ChunkVectorService {
 
     @Transactional
     public void rebuildVectors(Long userId, Long documentId, List<DocumentChunk> chunks) {
-        archiveByDocument(userId, documentId);
         if (chunks == null || chunks.isEmpty()) {
             return;
         }
