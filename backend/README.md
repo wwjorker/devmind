@@ -69,7 +69,7 @@ DeepSeek API
 
 ## Testing And CI
 
-Run the unit test suite locally:
+Run the backend test suite locally:
 
 ```bash
 mvn test
@@ -83,9 +83,12 @@ Mock LLM responses
 LLM provider routing
 JWT creation and parsing
 Redis-backed token blacklist
+Spring context wiring for mapper scan safety
 ```
 
-GitHub Actions runs the same Maven test command on every push and pull request to `main`.
+The suite also includes a Docker-gated MySQL Testcontainers integration test. When Docker is available, it starts MySQL 5.7, runs Flyway migrations against the real database engine, creates a document through the service layer, verifies chunk vector persistence, exercises hybrid retrieval, and checks the MySQL FULLTEXT mapper behavior. When Docker is not available locally, that integration test is skipped instead of blocking local development.
+
+GitHub Actions runs the same Maven test command on every push and pull request to `main`, so the MySQL integration test is expected to run in CI where Docker is available.
 
 ## Architecture
 
