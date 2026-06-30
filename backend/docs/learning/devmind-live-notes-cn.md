@@ -1303,8 +1303,9 @@ RAG 的核心原则是：回答应该基于检索到的知识库上下文。
 -> 提取多个检索词
 -> KeywordRetrievalStrategy 做 MySQL FULLTEXT / 关键词 / 元数据召回
 -> LocalEmbeddingClient 把问题和 chunk 转成稀疏向量
--> 用 cosine similarity 做本地稀疏向量重排
--> 合并分数并返回 TopK chunk
+-> 用 cosine similarity 得到本地稀疏向量排序
+-> 用 RRF 融合关键词 / FULLTEXT 排名和本地稀疏向量排名
+-> 返回 TopK chunk
 ```
 
 这里的 `LocalEmbeddingClient` 不是生产级 embedding 模型，也不是向量数据库。它只是一个本地、确定性、可测试的相似度实现：
@@ -1316,7 +1317,7 @@ RAG 的核心原则是：回答应该基于检索到的知识库上下文。
 面试时要诚实讲：
 
 ```text
-当前版本已经有 hybrid retrieval 的工程结构和本地稀疏向量 rerank，但还没有接外部 embedding API 和向量数据库。这里的本地稀疏向量不是神经网络 embedding，它只是词袋 + 中文 bigram 的确定性向量空间模型。这样做的目的是先把策略抽象、评估基线和问答链路稳定下来，下一步可以把本地实现替换成真实 embedding provider，并用同一套 Hit@3/MRR 评估集对比提升。
+当前版本已经有 hybrid retrieval 的工程结构、本地稀疏向量排序和 RRF 融合排序，但还没有接外部 embedding API 和向量数据库。这里的本地稀疏向量不是神经网络 embedding，它只是词袋 + 中文 bigram 的确定性向量空间模型。这样做的目的是先把策略抽象、评估基线和问答链路稳定下来，下一步可以把本地实现替换成真实 embedding provider，并用同一套 Hit@3/MRR 评估集对比提升。
 ```
 
 这一步的价值不是“我已经做了生产级向量检索”，而是：
@@ -1409,7 +1410,7 @@ HybridRetrievalStrategy
 -> 只计算 query 向量
 -> 读取已持久化的 active chunk vectors
 -> 计算 cosine similarity
--> 和关键词 / FULLTEXT 结果融合
+-> 用 RRF 和关键词 / FULLTEXT 排名融合
 ```
 
 这一步的含金量不在于“已经有生产级向量数据库”，而在于把 RAG 的索引阶段和查询阶段分开了：
@@ -1426,3 +1427,45 @@ HybridRetrievalStrategy
 ```
 
 这批改动之后，需要让 Claude Code 再审一次，因为它动到了数据库迁移、chunk 重建事务、向量归档和混合检索主链路。
+
+## 48 为什么把分数相加改成 RRF
+
+之前的混合检索已经能把关键词召回和本地稀疏向量相似度结合起来，但如果只是把两个分数直接相加，会有一个隐藏问题：两路分数不是同一种东西。
+
+- 关键词 / FULLTEXT 分数来自内容、标题、标签、类型等字段的命中权重。
+- 本地稀疏向量分数来自 cosine similarity。
+- 如果直接相加，某一路分数范围更大，就可能长期主导最终排序。
+
+RRF（Reciprocal Rank Fusion）的思路是不直接相信原始分数，而是使用“排名”来融合：
+
+```text
+finalScore += 1 / (k + rank)
+```
+
+这样做的好处是：
+
+- 不需要强行把关键词分数和向量相似度调到同一个量纲。
+- 两路召回都排得靠前的 chunk 会被自然提升。
+- 后续接外部 embedding、向量库或 rerank 时，可以继续用同一套融合思路做对比。
+
+这一轮还把评估接口升级成 keyword baseline 与当前 hybrid/RRF 策略对比：
+
+```text
+keyword baseline Hit@3 / MRR
+hybrid RRF Hit@3 / MRR
+delta
+```
+
+面试时可以这样讲：
+
+```text
+我没有直接把关键词分数和向量相似度相加，因为它们不是同一类分数。当前版本用 RRF 按排名融合关键词 / FULLTEXT 召回和本地稀疏向量排序，并用同一套 gold-label evaluation dataset 输出 keyword baseline 与 hybrid/RRF 的 Hit@3、MRR 和 delta。这样后续接真实 embedding 或向量库时，可以用同一把尺子比较是否真的提升。
+```
+
+诚实边界：
+
+- 现在仍然是本地稀疏向量，不是外部 embedding 模型。
+- 现在仍然不是生产级向量数据库。
+- RRF 是排序融合 baseline，后续还可以继续接专业 rerank。
+
+这批改动之后，需要让 Claude Code 专门审一次“RRF 融合排序 + keyword baseline 对比 + Hit@3/MRR 指标”，因为它会影响简历里最核心的检索质量说法。

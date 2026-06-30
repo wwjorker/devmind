@@ -20,10 +20,12 @@ DevMind 设计了三层质量反馈：
 
 - Hit@3：正向 case 的 Top 3 召回片段中是否命中人工标注的相关文档。
 - MRR：第一个命中 gold 文档的片段排名倒数，用来判断相关证据是否足够靠前。
+- Baseline Hit@3 / Baseline MRR：同一批 gold-label case 在关键词 baseline 下的指标。
+- Delta：当前 hybrid/RRF 检索策略相对 keyword baseline 的指标变化，用来判断融合排序是否真的带来提升。
 - 检索基线元信息：接口会返回 `retrievalStrategy`、`retrievalLimit` 和 `relevanceMode`，说明当前分数来自哪套检索策略和哪种相关性判定。
 - bad case rate：用户标记为坏例子的比例。
 - no-context case：对知识库没有资料的问题，检查系统是否正确返回无上下文兜底。
 
 ## 面试表达
 
-我没有只看模型有没有输出，而是通过问答日志、bad case feedback、evaluation dataset、Hit@3 和 MRR 建立质量闭环。相关性由人工标注的 gold 文档判定，关键词命中只作为诊断信息。这样后续接入 embedding 或混合检索时，可以用同一批标准问题对比检索质量是否真的提升。
+我没有只看模型有没有输出，而是通过问答日志、bad case feedback、evaluation dataset、Hit@3 和 MRR 建立质量闭环。相关性由人工标注的 gold 文档判定，关键词命中只作为诊断信息。评估接口会同时返回 keyword baseline 和当前 hybrid/RRF 策略的指标及 delta；这样后续接入外部 embedding、向量库或专业 rerank 时，可以用同一批标准问题对比检索质量是否真的提升。

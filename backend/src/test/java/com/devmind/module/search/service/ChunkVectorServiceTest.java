@@ -38,7 +38,6 @@ class ChunkVectorServiceTest {
         service.rebuildVectors(1L, 100L, List.of(chunk(10L, 100L)));
 
         ArgumentCaptor<DocumentChunkVector> captor = ArgumentCaptor.forClass(DocumentChunkVector.class);
-        verify(vectorMapper).update(any());
         verify(vectorMapper).insert(captor.capture());
         DocumentChunkVector savedVector = captor.getValue();
         assertThat(savedVector.getChunkId()).isEqualTo(10L);
@@ -47,6 +46,22 @@ class ChunkVectorServiceTest {
         assertThat(savedVector.getProviderName()).isEqualTo("local-sparse-vector");
         assertThat(savedVector.getVectorJson()).contains("redis");
         assertThat(savedVector.getStatus()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldArchiveVectorsByDocument() {
+        DocumentChunkVectorMapper vectorMapper = mock(DocumentChunkVectorMapper.class);
+        ChunkVectorService service = new ChunkVectorService(
+                vectorMapper,
+                mock(KnowledgeDocumentMapper.class),
+                new LocalEmbeddingClient(),
+                new EmbeddingTextBuilder(),
+                new ObjectMapper()
+        );
+
+        service.archiveByDocument(1L, 100L);
+
+        verify(vectorMapper).update(any());
     }
 
     @Test

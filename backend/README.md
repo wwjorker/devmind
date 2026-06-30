@@ -36,7 +36,7 @@ This makes the project easier to explain in Java backend interviews because the 
 - Multilingual keyword retrieval for Chinese and English technical questions
 - `RetrievalStrategy` abstraction with keyword baseline and hybrid retrieval strategy
 - MySQL FULLTEXT relevance retrieval for chunk content
-- `EmbeddingClient` abstraction with persisted local sparse-vector rerank for hybrid retrieval experiments
+- `EmbeddingClient` abstraction with persisted local sparse vectors and RRF-fused hybrid retrieval experiments
 - Metadata-aware retrieval across chunk content, document title, tags, and source type
 - Duplicate chunk downranking to reduce repeated citations from copied notes
 - No-context fallback to avoid unsupported model answers
@@ -248,11 +248,11 @@ covered status
 latest ask log id and retrieved chunk count
 ```
 
-The retrieval evaluation API runs the same standard cases against the retrieval layer and judges relevance by manually labeled gold document titles. It reports pass rate, positive case count, Hit@K, MRR, first relevant rank, matched keywords, and missing keywords. Matched keywords are diagnostic only; they are not used as the relevance judge. Negative no-context cases are treated separately: they pass only when no chunk is retrieved.
+The retrieval evaluation API runs the same standard cases against the retrieval layer and judges relevance by manually labeled gold document titles. It reports pass rate, positive case count, Hit@K, MRR, first relevant rank, matched keywords, and missing keywords. It also reports keyword-baseline Hit@K/MRR and the delta from the current hybrid strategy, so retrieval changes can be compared with the same gold-label dataset. Matched keywords are diagnostic only; they are not used as the relevance judge. Negative no-context cases are treated separately: they pass only when no chunk is retrieved.
 
 ## Retrieval Quality V1
 
-The retrieval layer is exposed through a `RetrievalStrategy` interface, while vector representation is isolated behind an `EmbeddingClient` interface. DevMind currently uses `HybridRetrievalStrategy` as the primary strategy. It keeps the explainable keyword/FULLTEXT baseline, then adds a persisted local sparse-vector rerank so the same AI ask and evaluation flow can compare retrieval strategies without changing the rest of the system.
+The retrieval layer is exposed through a `RetrievalStrategy` interface, while vector representation is isolated behind an `EmbeddingClient` interface. DevMind currently uses `HybridRetrievalStrategy` as the primary strategy. It keeps the explainable keyword/FULLTEXT baseline, then adds a persisted local sparse-vector rank and fuses both rankings with RRF. The same AI ask and evaluation flow can compare retrieval strategies without changing the rest of the system.
 
 DevMind does not rely on a single raw keyword. The ask flow first resolves multiple retrieval keywords from the user question, including Chinese technical phrases and English tokens. Search then uses multiple candidate sources:
 
@@ -260,7 +260,7 @@ DevMind does not rely on a single raw keyword. The ask flow first resolves multi
 MySQL FULLTEXT retrieval over chunk content
 keyword LIKE fallback over chunk content
 document metadata: title, tags, source type
-Persisted local sparse-vector similarity over title, tags, and chunk content
+Persisted local sparse-vector similarity over title, tags, and chunk content, fused with keyword ranks by RRF
 ```
 
 Keyword scores are explainable:
@@ -275,11 +275,11 @@ source type match: +1 per occurrence
 
 MySQL InnoDB FULLTEXT provides a lightweight BM25-style relevance signal. DevMind combines that signal with the explicit keyword and metadata scores so the ranking is still easy to inspect during debugging.
 
-The local sparse-vector rerank is intentionally deterministic: the current `EmbeddingClient` builds a normalized sparse vector from English tokens and Chinese bigrams, then uses cosine similarity as an additional ranking signal. Chunk vectors are generated when chunks are rebuilt and stored in `knowledge_document_chunk_vector`, so the query path only has to build the query vector and compare it with persisted chunk vectors. This is not a neural-network embedding model or production vector database yet; it is a measurable hybrid retrieval skeleton that can later swap the local sparse-vector implementation for a real embedding provider and vector store without rewriting the RAG orchestration.
+The local sparse-vector rerank is intentionally deterministic: the current `EmbeddingClient` builds a normalized sparse vector from English tokens and Chinese bigrams, then uses cosine similarity as an additional ranking signal. Chunk vectors are generated when chunks are rebuilt and stored in `knowledge_document_chunk_vector`, so the query path only has to build the query vector and compare it with persisted chunk vectors. Hybrid retrieval uses reciprocal rank fusion (RRF) to combine keyword/FULLTEXT ranks with sparse-vector ranks, avoiding direct addition of scores with different scales. This is not a neural-network embedding model or production vector database yet; it is a measurable hybrid retrieval skeleton that can later swap the local sparse-vector implementation for a real embedding provider and vector store without rewriting the RAG orchestration.
 
 After initial ranking, repeated chunk content is downranked in the keyword baseline. This prevents copied notes from occupying all top citations and gives the prompt more diverse context.
 
-This is still a lightweight retrieval implementation. It is intentionally easy to explain in a Java backend interview, and the gold-label Hit@3/MRR evaluation API provides a baseline for future external embedding, vector database, and rerank upgrades.
+This is still a lightweight retrieval implementation. It is intentionally easy to explain in a Java backend interview, and the gold-label Hit@3/MRR evaluation API provides keyword-baseline versus hybrid/RRF comparison for future external embedding, vector database, and rerank upgrades.
 
 ## Document Import
 

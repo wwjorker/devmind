@@ -498,6 +498,16 @@ function formatDate(value: string | null) {
   return value.replace('T', ' ').slice(0, 16);
 }
 
+function formatSignedPercent(value: number | null | undefined) {
+  const numberValue = value ?? 0;
+  return `${numberValue >= 0 ? '+' : ''}${Math.round(numberValue * 100)}%`;
+}
+
+function formatSignedNumber(value: number | null | undefined) {
+  const numberValue = value ?? 0;
+  return `${numberValue >= 0 ? '+' : ''}${numberValue.toFixed(3)}`;
+}
+
 onMounted(async () => {
   if (!token.value) {
     return;
@@ -822,8 +832,13 @@ onMounted(async () => {
                 <span>通过率 {{ Math.round((retrievalEvaluation?.passRate ?? 0) * 100) }}%</span>
                 <span>Hit@{{ retrievalEvaluation?.evaluationK ?? 3 }} {{ Math.round((retrievalEvaluation?.hitAtK ?? 0) * 100) }}%</span>
                 <span>MRR {{ (retrievalEvaluation?.mrr ?? 0).toFixed(3) }}</span>
+                <span>基线 Hit@{{ retrievalEvaluation?.evaluationK ?? 3 }} {{ Math.round((retrievalEvaluation?.baselineHitAtK ?? 0) * 100) }}%</span>
+                <span>ΔHit {{ formatSignedPercent(retrievalEvaluation?.hitAtKDelta) }}</span>
+                <span>基线 MRR {{ (retrievalEvaluation?.baselineMrr ?? 0).toFixed(3) }}</span>
+                <span>ΔMRR {{ formatSignedNumber(retrievalEvaluation?.mrrDelta) }}</span>
                 <span>候选池 Top {{ retrievalEvaluation?.retrievalLimit ?? 5 }}</span>
                 <span>策略 {{ retrievalEvaluation?.retrievalStrategy || 'keyword-baseline' }}</span>
+                <span>基线 {{ retrievalEvaluation?.baselineRetrievalStrategy || 'mysql-fulltext-keyword-v1' }}</span>
                 <span>相关性 {{ retrievalEvaluation?.relevanceMode || 'gold-document-title' }}</span>
               </div>
             </div>

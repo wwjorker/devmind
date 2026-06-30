@@ -28,13 +28,15 @@ import java.util.stream.Collectors;
 @Service
 public class HybridRetrievalStrategy implements RetrievalStrategy {
 
-    private static final String STRATEGY_NAME = "hybrid-keyword-local-embedding-v1";
-    private static final String DESCRIPTION = "Keyword/FULLTEXT baseline plus persisted local sparse-vector rerank";
+    private static final String STRATEGY_NAME = "hybrid-keyword-local-sparse-vector-rrf-v1";
+    private static final String DESCRIPTION = "Keyword/FULLTEXT baseline plus persisted local sparse-vector rerank fused by RRF";
     private static final int STATUS_ACTIVE = 1;
     private static final int DEFAULT_LIMIT = 5;
     private static final int MAX_LIMIT = 20;
     private static final int VECTOR_CANDIDATE_LIMIT = 120;
     private static final int VECTOR_SCORE_WEIGHT = 100;
+    private static final int RRF_K = 60;
+    private static final int RRF_SCORE_WEIGHT = 10_000;
 
     private final KeywordRetrievalStrategy keywordRetrievalStrategy;
     private final DocumentChunkMapper chunkMapper;
@@ -83,21 +85,12 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
         List<ChunkSearchResponse> vectorResults = retrieveByLocalEmbedding(userId, normalizedKeywords);
 
         Map<Long, ChunkSearchResponse> merged = new HashMap<>();
-        for (ChunkSearchResponse result : keywordResults) {
-            merged.put(result.getChunkId(), copyWithScore(result, safeScore(result.getScore())));
-        }
-        for (ChunkSearchResponse result : vectorResults) {
-            merged.merge(
-                    result.getChunkId(),
-                    result,
-                    (left, right) -> {
-                        left.setScore(safeScore(left.getScore()) + safeScore(right.getScore()));
-                        return left;
-                    }
-            );
-        }
+        Map<Long, Double> rrfScores = new HashMap<>();
+        accumulateRrfScores(keywordResults, merged, rrfScores);
+        accumulateRrfScores(vectorResults, merged, rrfScores);
 
         return merged.values().stream()
+                .map(result -> copyWithScore(result, toRrfScore(rrfScores.get(result.getChunkId()))))
                 .sorted(Comparator.comparing(ChunkSearchResponse::getScore).reversed()
                         .thenComparing(ChunkSearchResponse::getChunkId))
                 .limit(safeLimit)
@@ -149,7 +142,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
             responses.add(toVectorResponse(chunk, document, similarity));
         }
 
-        return responses;
+        return sortByVectorScore(responses);
     }
 
     private List<ChunkSearchResponse> retrieveByOnTheFlySparseVector(Long userId, Map<String, Double> queryVector) {
@@ -184,6 +177,11 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
             responses.add(toVectorResponse(chunk, document, similarity));
         }
 
+        return sortByVectorScore(responses);
+    }
+
+    private List<ChunkSearchResponse> sortByVectorScore(List<ChunkSearchResponse> responses) {
+        responses.sort(Comparator.comparingInt(ChunkSearchResponse::getScore).reversed());
         return responses;
     }
 
@@ -225,6 +223,24 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                 chunk.getTokenCount(),
                 Math.max(1, (int) Math.round(similarity * VECTOR_SCORE_WEIGHT))
         );
+    }
+
+    private void accumulateRrfScores(List<ChunkSearchResponse> results,
+                                     Map<Long, ChunkSearchResponse> merged,
+                                     Map<Long, Double> rrfScores) {
+        for (int index = 0; index < results.size(); index++) {
+            ChunkSearchResponse result = results.get(index);
+            merged.putIfAbsent(result.getChunkId(), copyWithScore(result, safeScore(result.getScore())));
+            rrfScores.merge(result.getChunkId(), reciprocalRank(index), Double::sum);
+        }
+    }
+
+    private double reciprocalRank(int zeroBasedRank) {
+        return 1.0 / (RRF_K + zeroBasedRank + 1);
+    }
+
+    private int toRrfScore(Double score) {
+        return Math.max(1, (int) Math.round((score == null ? 0.0 : score) * RRF_SCORE_WEIGHT));
     }
 
     private ChunkSearchResponse copyWithScore(ChunkSearchResponse source, int score) {

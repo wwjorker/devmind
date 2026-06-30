@@ -12,9 +12,17 @@ public class RagRetrievalEvaluationResponse {
     private int retrievalLimit;
     private String retrievalStrategy;
     private String retrievalStrategyDescription;
+    private String baselineRetrievalStrategy;
+    private String baselineRetrievalStrategyDescription;
     private String relevanceMode;
     private double hitAtK;
     private double mrr;
+    private int baselinePassedCaseCount;
+    private double baselinePassRate;
+    private double baselineHitAtK;
+    private double baselineMrr;
+    private double hitAtKDelta;
+    private double mrrDelta;
     private List<RagRetrievalEvaluationCaseResponse> cases;
 
     public RagRetrievalEvaluationResponse() {
@@ -28,9 +36,17 @@ public class RagRetrievalEvaluationResponse {
                                           int retrievalLimit,
                                           String retrievalStrategy,
                                           String retrievalStrategyDescription,
+                                          String baselineRetrievalStrategy,
+                                          String baselineRetrievalStrategyDescription,
                                           String relevanceMode,
                                           double hitAtK,
                                           double mrr,
+                                          int baselinePassedCaseCount,
+                                          double baselinePassRate,
+                                          double baselineHitAtK,
+                                          double baselineMrr,
+                                          double hitAtKDelta,
+                                          double mrrDelta,
                                           List<RagRetrievalEvaluationCaseResponse> cases) {
         this.totalCaseCount = totalCaseCount;
         this.passedCaseCount = passedCaseCount;
@@ -40,9 +56,17 @@ public class RagRetrievalEvaluationResponse {
         this.retrievalLimit = retrievalLimit;
         this.retrievalStrategy = retrievalStrategy;
         this.retrievalStrategyDescription = retrievalStrategyDescription;
+        this.baselineRetrievalStrategy = baselineRetrievalStrategy;
+        this.baselineRetrievalStrategyDescription = baselineRetrievalStrategyDescription;
         this.relevanceMode = relevanceMode;
         this.hitAtK = hitAtK;
         this.mrr = mrr;
+        this.baselinePassedCaseCount = baselinePassedCaseCount;
+        this.baselinePassRate = baselinePassRate;
+        this.baselineHitAtK = baselineHitAtK;
+        this.baselineMrr = baselineMrr;
+        this.hitAtKDelta = hitAtKDelta;
+        this.mrrDelta = mrrDelta;
         this.cases = cases;
     }
 
@@ -110,6 +134,22 @@ public class RagRetrievalEvaluationResponse {
         this.retrievalStrategyDescription = retrievalStrategyDescription;
     }
 
+    public String getBaselineRetrievalStrategy() {
+        return baselineRetrievalStrategy;
+    }
+
+    public void setBaselineRetrievalStrategy(String baselineRetrievalStrategy) {
+        this.baselineRetrievalStrategy = baselineRetrievalStrategy;
+    }
+
+    public String getBaselineRetrievalStrategyDescription() {
+        return baselineRetrievalStrategyDescription;
+    }
+
+    public void setBaselineRetrievalStrategyDescription(String baselineRetrievalStrategyDescription) {
+        this.baselineRetrievalStrategyDescription = baselineRetrievalStrategyDescription;
+    }
+
     public String getRelevanceMode() {
         return relevanceMode;
     }
@@ -132,6 +172,54 @@ public class RagRetrievalEvaluationResponse {
 
     public void setMrr(double mrr) {
         this.mrr = mrr;
+    }
+
+    public int getBaselinePassedCaseCount() {
+        return baselinePassedCaseCount;
+    }
+
+    public void setBaselinePassedCaseCount(int baselinePassedCaseCount) {
+        this.baselinePassedCaseCount = baselinePassedCaseCount;
+    }
+
+    public double getBaselinePassRate() {
+        return baselinePassRate;
+    }
+
+    public void setBaselinePassRate(double baselinePassRate) {
+        this.baselinePassRate = baselinePassRate;
+    }
+
+    public double getBaselineHitAtK() {
+        return baselineHitAtK;
+    }
+
+    public void setBaselineHitAtK(double baselineHitAtK) {
+        this.baselineHitAtK = baselineHitAtK;
+    }
+
+    public double getBaselineMrr() {
+        return baselineMrr;
+    }
+
+    public void setBaselineMrr(double baselineMrr) {
+        this.baselineMrr = baselineMrr;
+    }
+
+    public double getHitAtKDelta() {
+        return hitAtKDelta;
+    }
+
+    public void setHitAtKDelta(double hitAtKDelta) {
+        this.hitAtKDelta = hitAtKDelta;
+    }
+
+    public double getMrrDelta() {
+        return mrrDelta;
+    }
+
+    public void setMrrDelta(double mrrDelta) {
+        this.mrrDelta = mrrDelta;
     }
 
     public List<RagRetrievalEvaluationCaseResponse> getCases() {

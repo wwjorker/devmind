@@ -168,9 +168,17 @@ export interface RagRetrievalEvaluation {
   retrievalLimit: number;
   retrievalStrategy: string;
   retrievalStrategyDescription: string;
+  baselineRetrievalStrategy: string;
+  baselineRetrievalStrategyDescription: string;
   relevanceMode: string;
   hitAtK: number;
   mrr: number;
+  baselinePassedCaseCount: number;
+  baselinePassRate: number;
+  baselineHitAtK: number;
+  baselineMrr: number;
+  hitAtKDelta: number;
+  mrrDelta: number;
   cases: RagRetrievalEvaluationCase[];
 }
 
