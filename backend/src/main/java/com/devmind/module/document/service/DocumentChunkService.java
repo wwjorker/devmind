@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.vo.DocumentChunkResponse;
+import com.devmind.module.search.service.ChunkVectorService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -21,9 +22,12 @@ public class DocumentChunkService {
     private static final int CHUNK_OVERLAP_CHARS = 120;
 
     private final DocumentChunkMapper chunkMapper;
+    private final ChunkVectorService chunkVectorService;
 
-    public DocumentChunkService(DocumentChunkMapper chunkMapper) {
+    public DocumentChunkService(DocumentChunkMapper chunkMapper,
+                                ChunkVectorService chunkVectorService) {
         this.chunkMapper = chunkMapper;
+        this.chunkVectorService = chunkVectorService;
     }
 
     @Transactional
@@ -31,6 +35,7 @@ public class DocumentChunkService {
         archiveByDocument(userId, documentId);
 
         List<String> chunks = splitContent(content);
+        List<DocumentChunk> insertedChunks = new ArrayList<>();
         for (int i = 0; i < chunks.size(); i++) {
             DocumentChunk chunk = new DocumentChunk();
             chunk.setUserId(userId);
@@ -40,7 +45,9 @@ public class DocumentChunkService {
             chunk.setTokenCount(estimateTokenCount(chunks.get(i)));
             chunk.setStatus(STATUS_ACTIVE);
             chunkMapper.insert(chunk);
+            insertedChunks.add(chunk);
         }
+        chunkVectorService.rebuildVectors(userId, documentId, insertedChunks);
     }
 
     public List<DocumentChunkResponse> listActiveChunks(Long userId, Long documentId) {
@@ -64,6 +71,7 @@ public class DocumentChunkService {
                 .eq(DocumentChunk::getStatus, STATUS_ACTIVE)
                 .set(DocumentChunk::getStatus, STATUS_ARCHIVED);
         chunkMapper.update(updateWrapper);
+        chunkVectorService.archiveByDocument(userId, documentId);
     }
 
     private List<String> splitContent(String content) {

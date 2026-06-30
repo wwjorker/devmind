@@ -26,6 +26,10 @@ DELETE l
 FROM ai_ask_log l
 WHERE l.user_id = @demo_user_id;
 
+DELETE v
+FROM knowledge_document_chunk_vector v
+WHERE v.user_id = @demo_user_id;
+
 DELETE c
 FROM knowledge_document_chunk c
 WHERE c.user_id = @demo_user_id;

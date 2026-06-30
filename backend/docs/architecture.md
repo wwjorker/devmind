@@ -26,7 +26,10 @@ flowchart TB
 erDiagram
     user_account ||--o{ knowledge_document : owns
     user_account ||--o{ knowledge_document_chunk : owns
+    user_account ||--o{ knowledge_document_chunk_vector : owns
     knowledge_document ||--o{ knowledge_document_chunk : contains
+    knowledge_document ||--o{ knowledge_document_chunk_vector : indexes
+    knowledge_document_chunk ||--o{ knowledge_document_chunk_vector : has
     user_account ||--o{ ai_ask_log : creates
     user_account ||--o{ ai_ask_feedback : creates
     ai_ask_log ||--o{ ai_ask_feedback : receives
@@ -57,6 +60,16 @@ erDiagram
         int chunk_index
         text content
         int token_count
+        tinyint status
+    }
+
+    knowledge_document_chunk_vector {
+        bigint id
+        bigint chunk_id
+        bigint document_id
+        bigint user_id
+        varchar provider_name
+        mediumtext vector_json
         tinyint status
     }
 
@@ -116,6 +129,7 @@ sequenceDiagram
 - Chunks are rebuilt after document updates to keep retrieval results aligned with the latest content.
 - Retrieval uses a `RetrievalStrategy` abstraction so keyword, hybrid, and future vector strategies can share the same ask and evaluation flow.
 - `EmbeddingClient` separates local sparse-vector similarity from retrieval orchestration, so the current deterministic implementation can later be replaced by a real embedding provider or vector store.
+- Chunk vector rows are rebuilt together with document chunks and stored in `knowledge_document_chunk_vector`. The ask path builds only the query vector, then compares it with persisted chunk vectors instead of recomputing every chunk vector on each question.
 - `LlmClient` separates model-provider implementation from RAG orchestration.
 - Ask logs record question, retrieval keyword, chunk ids, answer, provider, token usage, and elapsed time for later bad-case analysis.
 - Ask feedback stores helpfulness labels, reasons, and expected answers so bad cases can become a small evaluation dataset.
@@ -127,5 +141,5 @@ sequenceDiagram
 - Add DeepSeek real-call smoke test with environment-only API key.
 - Add external embedding provider and vector-store retrieval.
 - Compare keyword baseline, local hybrid retrieval, and future vector retrieval with the same gold-label evaluation set.
-- Add reranking.
+- Replace the current weighted score merge with RRF or a dedicated rerank stage.
 - Use feedback labels to build retrieval evaluation and bad-case reports.

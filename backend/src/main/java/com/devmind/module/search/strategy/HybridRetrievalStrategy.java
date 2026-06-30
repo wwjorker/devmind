@@ -7,6 +7,8 @@ import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
 import com.devmind.module.search.embedding.EmbeddingClient;
 import com.devmind.module.search.embedding.EmbeddingTextBuilder;
+import com.devmind.module.search.entity.DocumentChunkVector;
+import com.devmind.module.search.service.ChunkVectorService;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
@@ -27,7 +29,7 @@ import java.util.stream.Collectors;
 public class HybridRetrievalStrategy implements RetrievalStrategy {
 
     private static final String STRATEGY_NAME = "hybrid-keyword-local-embedding-v1";
-    private static final String DESCRIPTION = "Keyword/FULLTEXT baseline plus local embedding similarity rerank";
+    private static final String DESCRIPTION = "Keyword/FULLTEXT baseline plus persisted local sparse-vector rerank";
     private static final int STATUS_ACTIVE = 1;
     private static final int DEFAULT_LIMIT = 5;
     private static final int MAX_LIMIT = 20;
@@ -39,17 +41,20 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
     private final KnowledgeDocumentMapper documentMapper;
     private final EmbeddingClient embeddingClient;
     private final EmbeddingTextBuilder embeddingTextBuilder;
+    private final ChunkVectorService chunkVectorService;
 
     public HybridRetrievalStrategy(KeywordRetrievalStrategy keywordRetrievalStrategy,
                                    DocumentChunkMapper chunkMapper,
                                    KnowledgeDocumentMapper documentMapper,
                                    EmbeddingClient embeddingClient,
-                                   EmbeddingTextBuilder embeddingTextBuilder) {
+                                   EmbeddingTextBuilder embeddingTextBuilder,
+                                   ChunkVectorService chunkVectorService) {
         this.keywordRetrievalStrategy = keywordRetrievalStrategy;
         this.chunkMapper = chunkMapper;
         this.documentMapper = documentMapper;
         this.embeddingClient = embeddingClient;
         this.embeddingTextBuilder = embeddingTextBuilder;
+        this.chunkVectorService = chunkVectorService;
     }
 
     @Override
@@ -105,6 +110,49 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
             return List.of();
         }
 
+        List<DocumentChunkVector> persistedVectors = chunkVectorService.listActiveVectors(userId, VECTOR_CANDIDATE_LIMIT);
+        if (!persistedVectors.isEmpty()) {
+            return retrieveByPersistedSparseVector(userId, queryVector, persistedVectors);
+        }
+        return retrieveByOnTheFlySparseVector(userId, queryVector);
+    }
+
+    private List<ChunkSearchResponse> retrieveByPersistedSparseVector(Long userId,
+                                                                      Map<String, Double> queryVector,
+                                                                      List<DocumentChunkVector> persistedVectors) {
+        Set<Long> chunkIds = persistedVectors.stream()
+                .map(DocumentChunkVector::getChunkId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<Long, DocumentChunk> chunks = findActiveChunks(userId, chunkIds);
+        Set<Long> documentIds = chunks.values().stream()
+                .map(DocumentChunk::getDocumentId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<Long, KnowledgeDocument> documents = findActiveDocuments(userId, documentIds);
+
+        List<ChunkSearchResponse> responses = new ArrayList<>();
+        for (DocumentChunkVector persistedVector : persistedVectors) {
+            DocumentChunk chunk = chunks.get(persistedVector.getChunkId());
+            if (chunk == null) {
+                continue;
+            }
+            KnowledgeDocument document = documents.get(chunk.getDocumentId());
+            if (document == null) {
+                continue;
+            }
+            double similarity = embeddingClient.cosineSimilarity(
+                    queryVector,
+                    chunkVectorService.decodeVector(persistedVector.getVectorJson())
+            );
+            if (similarity <= 0.0) {
+                continue;
+            }
+            responses.add(toVectorResponse(chunk, document, similarity));
+        }
+
+        return responses;
+    }
+
+    private List<ChunkSearchResponse> retrieveByOnTheFlySparseVector(Long userId, Map<String, Double> queryVector) {
         LambdaQueryWrapper<DocumentChunk> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(DocumentChunk::getUserId, userId)
                 .eq(DocumentChunk::getStatus, STATUS_ACTIVE)
@@ -133,20 +181,22 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
             if (similarity <= 0.0) {
                 continue;
             }
-            responses.add(new ChunkSearchResponse(
-                    chunk.getId(),
-                    chunk.getDocumentId(),
-                    document.getTitle(),
-                    document.getSourceType(),
-                    document.getTags(),
-                    chunk.getChunkIndex(),
-                    chunk.getContent(),
-                    chunk.getTokenCount(),
-                    Math.max(1, (int) Math.round(similarity * VECTOR_SCORE_WEIGHT))
-            ));
+            responses.add(toVectorResponse(chunk, document, similarity));
         }
 
         return responses;
+    }
+
+    private Map<Long, DocumentChunk> findActiveChunks(Long userId, Set<Long> chunkIds) {
+        if (chunkIds.isEmpty()) {
+            return Map.of();
+        }
+        LambdaQueryWrapper<DocumentChunk> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(DocumentChunk::getUserId, userId)
+                .eq(DocumentChunk::getStatus, STATUS_ACTIVE)
+                .in(DocumentChunk::getId, chunkIds);
+        return chunkMapper.selectList(queryWrapper).stream()
+                .collect(Collectors.toMap(DocumentChunk::getId, Function.identity()));
     }
 
     private Map<Long, KnowledgeDocument> findActiveDocuments(Long userId, Set<Long> documentIds) {
@@ -159,6 +209,22 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                 .in(KnowledgeDocument::getId, documentIds);
         return documentMapper.selectList(queryWrapper).stream()
                 .collect(Collectors.toMap(KnowledgeDocument::getId, Function.identity()));
+    }
+
+    private ChunkSearchResponse toVectorResponse(DocumentChunk chunk,
+                                                 KnowledgeDocument document,
+                                                 double similarity) {
+        return new ChunkSearchResponse(
+                chunk.getId(),
+                chunk.getDocumentId(),
+                document.getTitle(),
+                document.getSourceType(),
+                document.getTags(),
+                chunk.getChunkIndex(),
+                chunk.getContent(),
+                chunk.getTokenCount(),
+                Math.max(1, (int) Math.round(similarity * VECTOR_SCORE_WEIGHT))
+        );
     }
 
     private ChunkSearchResponse copyWithScore(ChunkSearchResponse source, int score) {
