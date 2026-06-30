@@ -1355,7 +1355,7 @@ HybridRetrievalStrategy
 
 - `HybridRetrievalStrategy` 是否真的走进 AI Ask 和 RAG Evaluation 主链路。
 - `EmbeddingClient` 抽象是否合理，是否有过度设计。
-- README / resume / interview guide 有没有把 local embedding 过度包装成生产级向量库。
+- README / resume / interview guide 有没有把本地稀疏向量过度包装成生产级向量库。
 # 2026-06-30
 
 ## 统一 embedding 输入文本
@@ -1380,3 +1380,49 @@ HybridRetrievalStrategy
 ```text
 我把 embedding 输入文本单独抽成 EmbeddingTextBuilder，而不是散落在检索代码里手拼字符串。这样后续无论是本地向量、外部 embedding API 还是向量库持久化，都能保证索引和检索用的是同一套字段。
 ```
+
+## 47 为什么要持久化 chunk 稀疏向量
+
+之前的混合检索已经能做本地稀疏向量余弦重排，但有一个工程问题：每次提问时都会临时取一批 chunk，然后现场给每个 chunk 计算向量。
+
+对现在的 `LocalEmbeddingClient` 来说，这个成本很低，因为它只是词袋 + 中文 bigram 的本地计算。但如果以后换成真实 embedding API，这种写法就会变成：
+
+```text
+一次提问
+-> 取 120 个候选 chunk
+-> 给 120 个 chunk 逐个调用 embedding API
+-> 再给 query 调一次 embedding API
+```
+
+这会很慢、很贵，也不符合真实 RAG 系统的做法。真实系统通常是在文档入库或 chunk 重建时就把 chunk 向量算好并存起来，提问时只计算 query 向量。
+
+现在 DevMind 做了这一步：
+
+```text
+导入或更新文档
+-> DocumentChunkService 重建 chunks
+-> EmbeddingTextBuilder 统一拼接标题、类型、标签、chunk 内容
+-> EmbeddingClient 生成本地稀疏向量
+-> 写入 knowledge_document_chunk_vector
+
+用户提问
+-> 只计算 query 向量
+-> 读取已持久化的 active chunk vectors
+-> 计算 cosine similarity
+-> 和关键词 / FULLTEXT 结果融合
+```
+
+这一步的含金量不在于“已经有生产级向量数据库”，而在于把 RAG 的索引阶段和查询阶段分开了：
+
+- 索引阶段：文档变化时生成 chunk 向量。
+- 查询阶段：问题来时只算 query 向量。
+- 数据层：有独立的 `knowledge_document_chunk_vector` 表保存向量和 provider。
+- 扩展点：以后可以把本地稀疏向量替换成真实 embedding provider 或向量库。
+
+面试时可以这样讲：
+
+```text
+我没有在每次提问时重新计算所有 chunk 向量，而是在 chunk 重建时同步生成并持久化本地稀疏向量。这样 query path 只需要计算问题向量，再和已存储的 chunk 向量做相似度比较。当前实现仍然是本地稀疏向量，不是外部 embedding 或向量数据库，但它已经把索引和检索的工程边界拆开了，后续接真实 embedding provider 时不会重写主链路。
+```
+
+这批改动之后，需要让 Claude Code 再审一次，因为它动到了数据库迁移、chunk 重建事务、向量归档和混合检索主链路。
