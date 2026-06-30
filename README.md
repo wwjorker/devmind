@@ -160,8 +160,9 @@ DevMind 的核心设计围绕 RAG 链路和后端工程化展开：
 10. bad case feedback 和 RAG evaluation dataset 用于记录问题样例、期望答案和覆盖情况，形成持续优化闭环。
 11. retrieval evaluation 会批量执行标准问题检索，用人工标注的相关文档作为 gold label 计算 Hit@3、MRR 和首个相关片段排名；命中关键词只作为诊断信息展示，不作为相关性裁判。
 12. retrieval evaluation 会显式返回 keyword baseline 与当前 hybrid/RRF 策略的 Hit@3、MRR 和 delta，便于后续把外部 embedding / vector store 与当前版本做同集对比。
-13. embedding 输入文本由 `EmbeddingTextBuilder` 统一从标题、来源类型、标签和 chunk 内容构造，避免索引、重排和后续向量化使用不同字段。
-14. 第一版优先支持 TXT / Markdown 导入，保证核心链路稳定后再扩展 PDF、Word、OCR 等解析能力。
+13. 评估集中包含 Redis/JWT 的轻度改写问题，用来观察关键词 baseline 与 hybrid/RRF 在词法失配场景下的差异；当前本地稀疏向量只能覆盖有限的词面相近改写，真正语义改写仍需外部 embedding。
+14. embedding 输入文本由 `EmbeddingTextBuilder` 统一从标题、来源类型、标签和 chunk 内容构造，避免索引、重排和后续向量化使用不同字段。
+15. 第一版优先支持 TXT / Markdown 导入，保证核心链路稳定后再扩展 PDF、Word、OCR 等解析能力。
 
 ## 项目定位
 

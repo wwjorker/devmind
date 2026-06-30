@@ -59,6 +59,26 @@ public class RagEvaluationDatasetService {
                     "backend_design"
             ),
             new EvaluationCaseDefinition(
+                    "redis-missing-key-db-pressure",
+                    "redis",
+                    "查不存在的 key 一直打到 MySQL，怎么避免数据库被打穿？",
+                    List.of("Redis 缓存穿透复盘", "Redis cache penetration review", "Redis cache penetration review updated", "redis-cache-penetration"),
+                    List.of("key", "MySQL", "TTL", "限流"),
+                    "应该识别这是缓存穿透场景：请求查询不存在的数据，缓存无法命中并反复打到数据库；解决方案包括缓存空值并设置较短 TTL、参数校验、布隆过滤器和接口限流。",
+                    "证据应该来自 Redis 缓存穿透复盘或后端缓存设计笔记；这个 case 故意不用“缓存穿透”作为问题主表达，用来检查改写问题下的召回能力。",
+                    "lexical_mismatch_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "token-still-valid-after-logout",
+                    "security",
+                    "用户退出后旧 token 还没过期，后端怎么拦截？",
+                    List.of("JWT 退出登录与 Redis 黑名单"),
+                    List.of("token", "Redis", "TTL", "黑名单"),
+                    "应该说明 JWT 是无状态的，服务端默认不会保存会话；退出登录后需要把旧 token 放入 Redis 黑名单，并设置为 token 剩余有效期 TTL，认证过滤器发现黑名单命中后拒绝请求。",
+                    "证据应该来自 JWT 退出登录与 Redis 黑名单文档；这个 case 故意不直接问“JWT 黑名单”，用于检查登录退出问题的轻度改写召回。",
+                    "lexical_mismatch_retrieval"
+            ),
+            new EvaluationCaseDefinition(
                     "flyway-migration",
                     "database",
                     "这个项目里 Flyway migration 解决了什么问题？",
