@@ -15,6 +15,7 @@ import com.devmind.module.ai.vo.AskResponse;
 import com.devmind.module.ai.vo.EvaluationSummaryResponse;
 import com.devmind.module.ai.vo.RagEvaluationDatasetResponse;
 import com.devmind.module.ai.vo.RagRetrievalEvaluationResponse;
+import com.devmind.module.search.service.ChunkVectorService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -33,15 +34,18 @@ public class AiAskController {
     private final AiAskLogService askLogService;
     private final AiAskFeedbackService feedbackService;
     private final RagEvaluationDatasetService evaluationDatasetService;
+    private final ChunkVectorService chunkVectorService;
 
     public AiAskController(AiAskService aiAskService,
                            AiAskLogService askLogService,
                            AiAskFeedbackService feedbackService,
-                           RagEvaluationDatasetService evaluationDatasetService) {
+                           RagEvaluationDatasetService evaluationDatasetService,
+                           ChunkVectorService chunkVectorService) {
         this.aiAskService = aiAskService;
         this.askLogService = askLogService;
         this.feedbackService = feedbackService;
         this.evaluationDatasetService = evaluationDatasetService;
+        this.chunkVectorService = chunkVectorService;
     }
 
     @PostMapping("/ask")
@@ -87,5 +91,12 @@ public class AiAskController {
     @GetMapping("/evaluation/retrieval")
     public Result<RagRetrievalEvaluationResponse> retrievalEvaluation(@AuthenticationPrincipal AuthenticatedUser user) {
         return Result.success(evaluationDatasetService.retrievalEvaluation(user.userId()));
+    }
+
+    @PostMapping("/embedding/backfill")
+    public Result<Void> backfillEmbedding(@AuthenticationPrincipal AuthenticatedUser user,
+                                          @RequestParam String provider) {
+        chunkVectorService.backfillVectors(user.userId(), provider);
+        return Result.success();
     }
 }

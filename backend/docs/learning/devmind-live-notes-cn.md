@@ -1532,3 +1532,10 @@ delta
 ```text
 我没有只用关键词命中来证明检索效果，因为那样容易自己评自己。项目里加了 gold-label evaluation dataset，并且故意加入一些轻度改写问题，例如不直接问“缓存穿透”，而是问“不存在 key 一直打到 MySQL 怎么办”。这样可以用同一套 Hit@3/MRR 指标比较 keyword baseline、当前 hybrid/RRF，以及后续真实 embedding 的效果差异。
 ```
+
+## 54 为什么评估要同时输出 keyword / sparse-hybrid / dense-hybrid
+
+- 为什么：同一套 gold-label case 同时跑 keyword baseline、显式 `local-sparse-vector` hybrid、显式 `remote-dense` hybrid，才能把 Stage B 的提升讲成可复现的 Hit@3/MRR 对比，而不是只看单次问答体感。面试可能追问：三条链路是否共用同一批 case、同一个 TopK、同一种 gold-label 判定。
+- 为什么：dense-hybrid 在 remote provider 未配置或调用失败时标记为 `unavailable`，不影响 keyword 和 sparse 评估返回，避免默认无 key 环境 500 或产生费用。面试可能追问：如何证明默认无 key 不会联网，以及失败是否会污染其它指标。
+- 为什么：回填入口只接 `POST /api/v1/ai/embedding/backfill?provider=...` 并使用当前认证用户的 `userId`，具体幂等与 provider 守卫仍放在 `ChunkVectorService`。面试可能追问：为什么 controller 不直接操作 mapper，以及如何保证不同用户的数据 scope。
+- 为什么：旧的评估字段继续表示 sparse-hybrid 相对 keyword baseline 的结果，同时新增 `strategyResults` 承载三方指标，降低既有调用方迁移成本。面试可能追问：API 演进时如何做到向后兼容。

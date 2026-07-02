@@ -4,8 +4,11 @@ import com.devmind.module.ai.entity.AiAskLog;
 import com.devmind.module.ai.mapper.AiAskLogMapper;
 import com.devmind.module.ai.vo.RagEvaluationDatasetResponse;
 import com.devmind.module.ai.vo.RagRetrievalEvaluationResponse;
+import com.devmind.module.ai.vo.RagRetrievalStrategyEvaluationResponse;
+import com.devmind.common.api.ResultCode;
+import com.devmind.common.exception.BizException;
+import com.devmind.module.search.strategy.HybridRetrievalStrategy;
 import com.devmind.module.search.strategy.KeywordRetrievalStrategy;
-import com.devmind.module.search.strategy.RetrievalStrategy;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.junit.jupiter.api.Test;
 
@@ -16,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class RagEvaluationDatasetServiceTest {
@@ -72,14 +77,16 @@ class RagEvaluationDatasetServiceTest {
     @Test
     void retrievalEvaluationShouldRunRetrievalAgainstStaticCases() {
         AiAskLogMapper askLogMapper = mock(AiAskLogMapper.class);
-        RetrievalStrategy retrievalStrategy = mock(RetrievalStrategy.class);
+        HybridRetrievalStrategy retrievalStrategy = mock(HybridRetrievalStrategy.class);
         KeywordRetrievalStrategy keywordRetrievalStrategy = mock(KeywordRetrievalStrategy.class);
         RetrievalKeywordService retrievalKeywordService = mock(RetrievalKeywordService.class);
 
         when(retrievalKeywordService.resolveKeywords(any())).thenAnswer(invocation -> keywordsForQuestion(invocation.getArgument(0)));
         when(retrievalStrategy.strategyName()).thenReturn("hybrid-keyword-local-sparse-vector-rrf-v1");
         when(retrievalStrategy.description()).thenReturn("Keyword plus local sparse-vector rerank fused by RRF");
-        when(retrievalStrategy.retrieve(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5)))
+        when(retrievalStrategy.retrieveWithEmbeddingProvider(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5), eq("local-sparse-vector")))
+                .thenAnswer(invocation -> chunksForKeywords(invocation.getArgument(1)));
+        when(retrievalStrategy.retrieveWithEmbeddingProvider(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5), eq("remote-dense")))
                 .thenAnswer(invocation -> chunksForKeywords(invocation.getArgument(1)));
         when(keywordRetrievalStrategy.strategyName()).thenReturn("mysql-fulltext-keyword-v1");
         when(keywordRetrievalStrategy.description()).thenReturn("MySQL FULLTEXT plus multi-keyword metadata scoring");
@@ -114,6 +121,18 @@ class RagEvaluationDatasetServiceTest {
         assertThat(response.getBaselineMrr()).isEqualTo(1.0);
         assertThat(response.getHitAtKDelta()).isZero();
         assertThat(response.getMrrDelta()).isZero();
+        assertThat(response.getStrategyResults())
+                .extracting(RagRetrievalStrategyEvaluationResponse::getStrategyKey)
+                .containsExactly("keyword-baseline", "sparse-hybrid", "dense-hybrid");
+        assertThat(response.getStrategyResults())
+                .filteredOn(result -> "dense-hybrid".equals(result.getStrategyKey()))
+                .singleElement()
+                .satisfies(result -> {
+                    assertThat(result.getStatus()).isEqualTo("available");
+                    assertThat(result.getEmbeddingProvider()).isEqualTo("remote-dense");
+                    assertThat(result.getHitAtK()).isEqualTo(1.0);
+                    assertThat(result.getMrr()).isEqualTo(1.0);
+                });
         assertThat(response.getCases())
                 .filteredOn(caseResponse -> "redis-cache-penetration-basic".equals(caseResponse.getCaseId()))
                 .singleElement()
@@ -140,14 +159,14 @@ class RagEvaluationDatasetServiceTest {
     @Test
     void retrievalEvaluationShouldFailPositiveCaseWhenRelevantChunkIsOutsideTopK() {
         AiAskLogMapper askLogMapper = mock(AiAskLogMapper.class);
-        RetrievalStrategy retrievalStrategy = mock(RetrievalStrategy.class);
+        HybridRetrievalStrategy retrievalStrategy = mock(HybridRetrievalStrategy.class);
         KeywordRetrievalStrategy keywordRetrievalStrategy = mock(KeywordRetrievalStrategy.class);
         RetrievalKeywordService retrievalKeywordService = mock(RetrievalKeywordService.class);
 
         when(retrievalKeywordService.resolveKeywords(any())).thenReturn(List.of("Redis"));
         when(retrievalStrategy.strategyName()).thenReturn("mysql-fulltext-keyword-v1");
         when(retrievalStrategy.description()).thenReturn("MySQL FULLTEXT plus multi-keyword metadata scoring");
-        when(retrievalStrategy.retrieve(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5))).thenReturn(List.of(
+        when(retrievalStrategy.retrieveWithEmbeddingProvider(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5), eq("local-sparse-vector"))).thenReturn(List.of(
                 unrelatedChunk(11L, "unrelated first"),
                 unrelatedChunk(12L, "unrelated second"),
                 unrelatedChunk(13L, "unrelated third"),
@@ -163,6 +182,8 @@ class RagEvaluationDatasetServiceTest {
                         50
                 )
         ));
+        when(retrievalStrategy.retrieveWithEmbeddingProvider(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5), eq("remote-dense")))
+                .thenReturn(List.of());
         when(keywordRetrievalStrategy.strategyName()).thenReturn("mysql-fulltext-keyword-v1");
         when(keywordRetrievalStrategy.description()).thenReturn("MySQL FULLTEXT plus multi-keyword metadata scoring");
         when(keywordRetrievalStrategy.retrieve(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5)))
@@ -192,14 +213,16 @@ class RagEvaluationDatasetServiceTest {
     @Test
     void retrievalEvaluationShouldCompareHybridStrategyWithKeywordBaseline() {
         AiAskLogMapper askLogMapper = mock(AiAskLogMapper.class);
-        RetrievalStrategy retrievalStrategy = mock(RetrievalStrategy.class);
+        HybridRetrievalStrategy retrievalStrategy = mock(HybridRetrievalStrategy.class);
         KeywordRetrievalStrategy keywordRetrievalStrategy = mock(KeywordRetrievalStrategy.class);
         RetrievalKeywordService retrievalKeywordService = mock(RetrievalKeywordService.class);
 
         when(retrievalKeywordService.resolveKeywords(any())).thenAnswer(invocation -> keywordsForQuestion(invocation.getArgument(0)));
         when(retrievalStrategy.strategyName()).thenReturn("hybrid-keyword-local-sparse-vector-rrf-v1");
         when(retrievalStrategy.description()).thenReturn("Keyword plus local sparse-vector rerank fused by RRF");
-        when(retrievalStrategy.retrieve(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5)))
+        when(retrievalStrategy.retrieveWithEmbeddingProvider(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5), eq("local-sparse-vector")))
+                .thenAnswer(invocation -> chunksForKeywords(invocation.getArgument(1)));
+        when(retrievalStrategy.retrieveWithEmbeddingProvider(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5), eq("remote-dense")))
                 .thenAnswer(invocation -> chunksForKeywords(invocation.getArgument(1)));
         when(keywordRetrievalStrategy.strategyName()).thenReturn("mysql-fulltext-keyword-v1");
         when(keywordRetrievalStrategy.description()).thenReturn("MySQL FULLTEXT plus multi-keyword metadata scoring");
@@ -221,6 +244,49 @@ class RagEvaluationDatasetServiceTest {
         assertThat(response.getBaselineMrr()).isEqualTo(0.0833);
         assertThat(response.getHitAtKDelta()).isEqualTo(1.0);
         assertThat(response.getMrrDelta()).isEqualTo(0.9167);
+    }
+
+    @Test
+    void retrievalEvaluationShouldMarkDenseHybridUnavailableWhenRemoteProviderIsNotConfigured() {
+        AiAskLogMapper askLogMapper = mock(AiAskLogMapper.class);
+        HybridRetrievalStrategy retrievalStrategy = mock(HybridRetrievalStrategy.class);
+        KeywordRetrievalStrategy keywordRetrievalStrategy = mock(KeywordRetrievalStrategy.class);
+        RetrievalKeywordService retrievalKeywordService = mock(RetrievalKeywordService.class);
+
+        when(retrievalKeywordService.resolveKeywords(any())).thenAnswer(invocation -> keywordsForQuestion(invocation.getArgument(0)));
+        when(retrievalStrategy.strategyName()).thenReturn("hybrid-keyword-local-sparse-vector-rrf-v1");
+        when(retrievalStrategy.description()).thenReturn("Keyword plus local sparse-vector rerank fused by RRF");
+        when(retrievalStrategy.retrieveWithEmbeddingProvider(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5), eq("local-sparse-vector")))
+                .thenAnswer(invocation -> chunksForKeywords(invocation.getArgument(1)));
+        when(retrievalStrategy.retrieveWithEmbeddingProvider(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5), eq("remote-dense")))
+                .thenThrow(new BizException(ResultCode.INTERNAL_ERROR, "external embedding provider is not configured"));
+        when(keywordRetrievalStrategy.strategyName()).thenReturn("mysql-fulltext-keyword-v1");
+        when(keywordRetrievalStrategy.description()).thenReturn("MySQL FULLTEXT plus multi-keyword metadata scoring");
+        when(keywordRetrievalStrategy.retrieve(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5)))
+                .thenAnswer(invocation -> chunksForKeywords(invocation.getArgument(1)));
+
+        RagEvaluationDatasetService service = new RagEvaluationDatasetService(
+                askLogMapper,
+                retrievalStrategy,
+                keywordRetrievalStrategy,
+                retrievalKeywordService
+        );
+
+        RagRetrievalEvaluationResponse response = service.retrievalEvaluation(1L);
+
+        assertThat(response.getHitAtK()).isEqualTo(1.0);
+        assertThat(response.getBaselineHitAtK()).isEqualTo(1.0);
+        assertThat(response.getStrategyResults())
+                .filteredOn(result -> "dense-hybrid".equals(result.getStrategyKey()))
+                .singleElement()
+                .satisfies(result -> {
+                    assertThat(result.getStatus()).isEqualTo("unavailable");
+                    assertThat(result.getUnavailableReason()).contains("external embedding provider is not configured");
+                    assertThat(result.getHitAtK()).isNull();
+                    assertThat(result.getMrr()).isNull();
+                    assertThat(result.getCases()).isEmpty();
+                });
+        verify(retrievalStrategy, never()).retrieve(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5));
     }
 
     private List<String> keywordsForQuestion(String question) {
@@ -310,7 +376,7 @@ class RagEvaluationDatasetServiceTest {
     private RagEvaluationDatasetService newService(AiAskLogMapper askLogMapper) {
         return new RagEvaluationDatasetService(
                 askLogMapper,
-                mock(RetrievalStrategy.class),
+                mock(HybridRetrievalStrategy.class),
                 mock(KeywordRetrievalStrategy.class),
                 mock(RetrievalKeywordService.class)
         );
