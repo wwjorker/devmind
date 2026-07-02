@@ -53,7 +53,8 @@ class HybridRetrievalStrategyTest {
                         20,
                         30
                 )));
-        when(chunkVectorService.listActiveVectors(eq(1L), eq(120))).thenReturn(List.of(vector(10L, 100L)));
+        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(120)))
+                .thenReturn(List.of(vector(10L, 100L)));
         when(chunkVectorService.decodeVector(any())).thenReturn(embeddingClient.embed("Redis cache penetration MySQL"));
         when(chunkMapper.selectList(any())).thenReturn(List.of(
                 chunk(10L, 100L, "Redis cache penetration can repeatedly hit MySQL for missing keys.")
@@ -110,7 +111,8 @@ class HybridRetrievalStrategyTest {
                         50
                 )
         ));
-        when(chunkVectorService.listActiveVectors(eq(1L), eq(120))).thenReturn(List.of(vector(20L, 200L)));
+        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(120)))
+                .thenReturn(List.of(vector(20L, 200L)));
         when(chunkVectorService.decodeVector(any())).thenReturn(embeddingClient.embed("Redis cache penetration MySQL"));
         when(chunkMapper.selectList(any())).thenReturn(List.of(
                 chunk(20L, 200L, "Redis cache penetration can repeatedly hit MySQL for missing keys.")
@@ -142,7 +144,7 @@ class HybridRetrievalStrategyTest {
         );
 
         when(keywordStrategy.retrieve(eq(1L), eq(List.of("penetration")), eq(3))).thenReturn(List.of());
-        when(chunkVectorService.listActiveVectors(eq(1L), eq(120))).thenReturn(List.of());
+        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(120))).thenReturn(List.of());
         when(chunkMapper.selectList(any())).thenReturn(List.of(
                 chunk(20L, 200L, "Cache penetration should cache empty values and limit abnormal traffic.")
         ));
@@ -174,7 +176,7 @@ class HybridRetrievalStrategyTest {
         );
 
         when(keywordStrategy.retrieve(eq(1L), eq(List.of("cache", "penetration")), eq(6))).thenReturn(List.of());
-        when(chunkVectorService.listActiveVectors(eq(1L), eq(120))).thenReturn(List.of(
+        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(120))).thenReturn(List.of(
                 vector(10L, 100L, "generic-vector"),
                 vector(20L, 200L, "penetration-vector")
         ));
@@ -197,6 +199,58 @@ class HybridRetrievalStrategyTest {
         assertThat(responses.get(0).getChunkId()).isEqualTo(20L);
         assertThat(responses.get(1).getChunkId()).isEqualTo(10L);
         assertThat(responses.get(0).getScore()).isGreaterThan(responses.get(1).getScore());
+    }
+
+    @Test
+    void explicitLocalSparseProviderShouldMatchDefaultRetrievalWhenProviderIsSame() {
+        KeywordRetrievalStrategy keywordStrategy = mock(KeywordRetrievalStrategy.class);
+        DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        EmbeddingClient embeddingClient = new LocalEmbeddingClient();
+        ChunkVectorService chunkVectorService = mock(ChunkVectorService.class);
+        HybridRetrievalStrategy strategy = new HybridRetrievalStrategy(
+                keywordStrategy,
+                chunkMapper,
+                documentMapper,
+                localRouter(),
+                new EmbeddingTextBuilder(),
+                chunkVectorService
+        );
+
+        when(keywordStrategy.retrieve(eq(1L), eq(List.of("Redis", "cache")), eq(6)))
+                .thenReturn(List.of(new ChunkSearchResponse(
+                        10L,
+                        100L,
+                        "Redis cache penetration review",
+                        "bug_review",
+                        "redis,cache",
+                        0,
+                        "Redis cache penetration protects MySQL from repeated misses.",
+                        20,
+                        30
+                )));
+        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(120)))
+                .thenReturn(List.of(vector(10L, 100L, "local-vector")));
+        when(chunkVectorService.decodeVector(eq("local-vector")))
+                .thenReturn(embeddingClient.embed("Redis cache penetration MySQL"));
+        when(chunkMapper.selectList(any())).thenReturn(List.of(
+                chunk(10L, 100L, "Redis cache penetration can repeatedly hit MySQL for missing keys.")
+        ));
+        when(documentMapper.selectList(any())).thenReturn(List.of(
+                document(100L, "Redis cache penetration review", "redis,cache")
+        ));
+
+        List<ChunkSearchResponse> defaultResponses = strategy.retrieve(1L, List.of("Redis", "cache"), 2);
+        List<ChunkSearchResponse> explicitResponses = strategy.retrieveWithEmbeddingProvider(
+                1L,
+                List.of("Redis", "cache"),
+                2,
+                "local-sparse-vector"
+        );
+
+        assertThat(explicitResponses)
+                .usingRecursiveFieldByFieldElementComparator()
+                .containsExactlyElementsOf(defaultResponses);
     }
 
     private DocumentChunkVector vector(Long chunkId, Long documentId) {

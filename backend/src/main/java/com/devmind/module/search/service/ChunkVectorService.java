@@ -129,9 +129,13 @@ public class ChunkVectorService {
     }
 
     public List<DocumentChunkVector> listActiveVectors(Long userId, int limit) {
+        return listActiveVectors(userId, embeddingClientRouter.providerName(), limit);
+    }
+
+    public List<DocumentChunkVector> listActiveVectors(Long userId, String provider, int limit) {
         QueryWrapper<DocumentChunkVector> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_id", userId)
-                .eq("provider_name", embeddingClientRouter.providerName())
+                .eq("provider_name", provider)
                 .eq("status", STATUS_ACTIVE)
                 .orderByDesc("updated_at")
                 .orderByDesc("id")

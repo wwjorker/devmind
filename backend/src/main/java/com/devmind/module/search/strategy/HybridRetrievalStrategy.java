@@ -5,6 +5,7 @@ import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
+import com.devmind.module.search.embedding.EmbeddingClient;
 import com.devmind.module.search.embedding.EmbeddingClientRouter;
 import com.devmind.module.search.embedding.EmbeddingTextBuilder;
 import com.devmind.module.search.entity.DocumentChunkVector;
@@ -71,6 +72,21 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
 
     @Override
     public List<ChunkSearchResponse> retrieve(Long userId, List<String> keywords, Integer limit) {
+        return retrieveInternal(userId, keywords, limit, embeddingClientRouter.currentClient(), true);
+    }
+
+    public List<ChunkSearchResponse> retrieveWithEmbeddingProvider(Long userId,
+                                                                   List<String> keywords,
+                                                                   Integer limit,
+                                                                   String provider) {
+        return retrieveInternal(userId, keywords, limit, embeddingClientRouter.clientFor(provider), false);
+    }
+
+    private List<ChunkSearchResponse> retrieveInternal(Long userId,
+                                                       List<String> keywords,
+                                                       Integer limit,
+                                                       EmbeddingClient embeddingClient,
+                                                       boolean allowOnTheFlyFallback) {
         int safeLimit = resolveLimit(limit);
         List<String> normalizedKeywords = normalizeKeywords(keywords);
         if (normalizedKeywords.isEmpty()) {
@@ -82,7 +98,12 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                 normalizedKeywords,
                 Math.min(safeLimit * 3, MAX_LIMIT)
         );
-        List<ChunkSearchResponse> vectorResults = retrieveByLocalEmbedding(userId, normalizedKeywords);
+        List<ChunkSearchResponse> vectorResults = retrieveByEmbedding(
+                userId,
+                normalizedKeywords,
+                embeddingClient,
+                allowOnTheFlyFallback
+        );
 
         Map<Long, ChunkSearchResponse> merged = new HashMap<>();
         Map<Long, Double> rrfScores = new HashMap<>();
@@ -97,22 +118,33 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                 .toList();
     }
 
-    private List<ChunkSearchResponse> retrieveByLocalEmbedding(Long userId, List<String> keywords) {
-        Map<String, Double> queryVector = embeddingClientRouter.embed(embeddingTextBuilder.buildForQuery(keywords));
+    private List<ChunkSearchResponse> retrieveByEmbedding(Long userId,
+                                                          List<String> keywords,
+                                                          EmbeddingClient embeddingClient,
+                                                          boolean allowOnTheFlyFallback) {
+        Map<String, Double> queryVector = embeddingClient.embed(embeddingTextBuilder.buildForQuery(keywords));
         if (queryVector.isEmpty()) {
             return List.of();
         }
 
-        List<DocumentChunkVector> persistedVectors = chunkVectorService.listActiveVectors(userId, VECTOR_CANDIDATE_LIMIT);
+        List<DocumentChunkVector> persistedVectors = chunkVectorService.listActiveVectors(
+                userId,
+                embeddingClient.providerName(),
+                VECTOR_CANDIDATE_LIMIT
+        );
         if (!persistedVectors.isEmpty()) {
-            return retrieveByPersistedSparseVector(userId, queryVector, persistedVectors);
+            return retrieveByPersistedVector(userId, queryVector, persistedVectors, embeddingClient);
         }
-        return retrieveByOnTheFlySparseVector(userId, queryVector);
+        if (allowOnTheFlyFallback) {
+            return retrieveByOnTheFlyVector(userId, queryVector, embeddingClient);
+        }
+        return List.of();
     }
 
-    private List<ChunkSearchResponse> retrieveByPersistedSparseVector(Long userId,
-                                                                      Map<String, Double> queryVector,
-                                                                      List<DocumentChunkVector> persistedVectors) {
+    private List<ChunkSearchResponse> retrieveByPersistedVector(Long userId,
+                                                                Map<String, Double> queryVector,
+                                                                List<DocumentChunkVector> persistedVectors,
+                                                                EmbeddingClient embeddingClient) {
         Set<Long> chunkIds = persistedVectors.stream()
                 .map(DocumentChunkVector::getChunkId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -132,7 +164,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
             if (document == null) {
                 continue;
             }
-            double similarity = embeddingClientRouter.cosineSimilarity(
+            double similarity = embeddingClient.cosineSimilarity(
                     queryVector,
                     chunkVectorService.decodeVector(persistedVector.getVectorJson())
             );
@@ -145,7 +177,9 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
         return sortByVectorScore(responses);
     }
 
-    private List<ChunkSearchResponse> retrieveByOnTheFlySparseVector(Long userId, Map<String, Double> queryVector) {
+    private List<ChunkSearchResponse> retrieveByOnTheFlyVector(Long userId,
+                                                               Map<String, Double> queryVector,
+                                                               EmbeddingClient embeddingClient) {
         LambdaQueryWrapper<DocumentChunk> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(DocumentChunk::getUserId, userId)
                 .eq(DocumentChunk::getStatus, STATUS_ACTIVE)
@@ -170,7 +204,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                 continue;
             }
             String embeddingText = embeddingTextBuilder.buildForChunk(document, chunk);
-            double similarity = embeddingClientRouter.cosineSimilarity(queryVector, embeddingClientRouter.embed(embeddingText));
+            double similarity = embeddingClient.cosineSimilarity(queryVector, embeddingClient.embed(embeddingText));
             if (similarity <= 0.0) {
                 continue;
             }
