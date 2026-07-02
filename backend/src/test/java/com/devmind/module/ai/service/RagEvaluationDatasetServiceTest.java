@@ -33,7 +33,7 @@ class RagEvaluationDatasetServiceTest {
 
         RagEvaluationDatasetResponse response = service.dataset(1L);
 
-        assertThat(response.getTotalCaseCount()).isEqualTo(28);
+        assertThat(response.getTotalCaseCount()).isEqualTo(40);
         assertThat(response.getCoveredCaseCount()).isZero();
         assertThat(response.getCoverageRate()).isZero();
         assertThat(response.getCases())
@@ -62,7 +62,7 @@ class RagEvaluationDatasetServiceTest {
         RagEvaluationDatasetResponse response = service.dataset(1L);
 
         assertThat(response.getCoveredCaseCount()).isEqualTo(1);
-        assertThat(response.getCoverageRate()).isEqualTo(0.0357);
+        assertThat(response.getCoverageRate()).isEqualTo(0.025);
         assertThat(response.getCases())
                 .filteredOn(caseResponse -> "redis-cache-penetration-basic".equals(caseResponse.getCaseId()))
                 .singleElement()
@@ -102,10 +102,10 @@ class RagEvaluationDatasetServiceTest {
 
         RagRetrievalEvaluationResponse response = service.retrievalEvaluation(1L);
 
-        assertThat(response.getTotalCaseCount()).isEqualTo(28);
-        assertThat(response.getPassedCaseCount()).isEqualTo(28);
+        assertThat(response.getTotalCaseCount()).isEqualTo(40);
+        assertThat(response.getPassedCaseCount()).isEqualTo(40);
         assertThat(response.getPassRate()).isEqualTo(1.0);
-        assertThat(response.getPositiveCaseCount()).isEqualTo(23);
+        assertThat(response.getPositiveCaseCount()).isEqualTo(35);
         assertThat(response.getEvaluationK()).isEqualTo(3);
         assertThat(response.getRetrievalLimit()).isEqualTo(5);
         assertThat(response.getRetrievalStrategy()).isEqualTo("hybrid-keyword-local-sparse-vector-rrf-v1");
@@ -115,7 +115,7 @@ class RagEvaluationDatasetServiceTest {
         assertThat(response.getRelevanceMode()).isEqualTo("gold-document-title");
         assertThat(response.getHitAtK()).isEqualTo(1.0);
         assertThat(response.getMrr()).isEqualTo(1.0);
-        assertThat(response.getBaselinePassedCaseCount()).isEqualTo(28);
+        assertThat(response.getBaselinePassedCaseCount()).isEqualTo(40);
         assertThat(response.getBaselinePassRate()).isEqualTo(1.0);
         assertThat(response.getBaselineHitAtK()).isEqualTo(1.0);
         assertThat(response.getBaselineMrr()).isEqualTo(1.0);
@@ -305,6 +305,45 @@ class RagEvaluationDatasetServiceTest {
         if (question.contains("Spring Cloud Gateway")) {
             return List.of("Spring Cloud Gateway");
         }
+        if (question.contains("联合索引")
+                || question.contains("覆盖索引")
+                || question.contains("索引优化")) {
+            return List.of("MYSQL_INDEX");
+        }
+        if (question.contains("可重复读")
+                || question.contains("事务隔离")
+                || question.contains("并发更新")) {
+            return List.of("MYSQL_TRANSACTION");
+        }
+        if (question.contains("线程池")
+                || question.contains("拒绝策略")) {
+            return List.of("THREAD_POOL");
+        }
+        if (question.contains("Bean")
+                || question.contains("IoC")
+                || question.contains("后置处理器")) {
+            return List.of("SPRING_BEAN");
+        }
+        if (question.contains("慢 SQL")
+                || question.contains("explain")
+                || question.contains("执行计划")) {
+            return List.of("MYSQL_SLOW_QUERY");
+        }
+        if (question.contains("RDB")
+                || question.contains("AOF")
+                || question.contains("持久化")) {
+            return List.of("REDIS_PERSISTENCE");
+        }
+        if (question.contains("分布式锁")
+                || question.contains("扣库存")
+                || question.contains("锁自动过期")) {
+            return List.of("REDIS_LOCK");
+        }
+        if (question.contains("HTTP")
+                || question.contains("HTTPS")
+                || question.contains("TCP")) {
+            return List.of("HTTP_TCP");
+        }
         if (question.contains("JWT")
                 || question.contains("token")
                 || question.contains("令牌")
@@ -374,6 +413,30 @@ class RagEvaluationDatasetServiceTest {
         }
         if (keywords.contains("JWT")) {
             return List.of(chunk(18L, "JWT 退出登录与 Redis 黑名单", "JWT logout uses a Redis blacklist."));
+        }
+        if (keywords.contains("MYSQL_INDEX")) {
+            return List.of(chunk(23L, "MySQL 索引优化", "Composite and covering indexes reduce scanned rows."));
+        }
+        if (keywords.contains("MYSQL_TRANSACTION")) {
+            return List.of(chunk(24L, "MySQL 事务隔离级别", "Repeatable read uses MVCC snapshots and next-key locks."));
+        }
+        if (keywords.contains("THREAD_POOL")) {
+            return List.of(chunk(25L, "线程池核心参数与拒绝策略", "Thread pool sizing depends on core threads, queue capacity, and rejection policy."));
+        }
+        if (keywords.contains("SPRING_BEAN")) {
+            return List.of(chunk(26L, "Spring Bean 生命周期与 IoC", "Spring creates beans through instantiation, dependency injection, and post processors."));
+        }
+        if (keywords.contains("MYSQL_SLOW_QUERY")) {
+            return List.of(chunk(27L, "MySQL 慢查询与 explain", "Slow SQL analysis starts from slow logs and explain plans."));
+        }
+        if (keywords.contains("REDIS_PERSISTENCE")) {
+            return List.of(chunk(28L, "Redis 持久化 RDB/AOF", "RDB snapshots and AOF logs trade recovery time for write overhead."));
+        }
+        if (keywords.contains("REDIS_LOCK")) {
+            return List.of(chunk(29L, "Redis 分布式锁", "Redis distributed locks need unique tokens and atomic release scripts."));
+        }
+        if (keywords.contains("HTTP_TCP")) {
+            return List.of(chunk(30L, "HTTP 与 TCP 基础", "HTTP is an application protocol that commonly runs over TCP."));
         }
         if (keywords.contains("Flyway")) {
             return List.of(chunk(19L, "Flyway migration 数据库迁移", "Flyway manages database migration scripts."));

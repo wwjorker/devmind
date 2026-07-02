@@ -214,6 +214,230 @@ SELECT
     1
 WHERE @demo_user_id IS NOT NULL;
 
+-- 7. MySQL index optimization
+INSERT INTO knowledge_document (user_id, title, content, source_type, tags, summary, status)
+SELECT
+    @demo_user_id,
+    'MySQL 索引优化',
+    CONCAT(
+        '# MySQL 索引优化\n\n',
+        'MySQL 索引用来减少扫描行数。设计索引时要结合 where、order by、join 和数据区分度，优先让高频查询走合适的联合索引。\n\n',
+        '常见原则包括最左前缀、覆盖索引、避免在索引列上使用函数、避免低选择性字段单独建索引。执行计划中 type、key、rows、Extra 可以帮助判断是否走到了预期索引。\n\n',
+        '索引不是越多越好，过多索引会增加写入和维护成本，业务查询变化后也需要定期复盘索引收益。'
+    ),
+    'db_note',
+    'MySQL,index,索引优化,联合索引,explain',
+    '用于演示 MySQL 索引设计、覆盖索引和执行计划分析。',
+    1
+WHERE @demo_user_id IS NOT NULL;
+SET @mysql_index_doc_id := LAST_INSERT_ID();
+
+INSERT INTO knowledge_document_chunk (document_id, user_id, chunk_index, content, token_count, status)
+SELECT
+    @mysql_index_doc_id,
+    @demo_user_id,
+    0,
+    'MySQL 索引优化的核心是减少扫描行数并稳定查询路径。常用做法包括按高频查询设计联合索引、遵守最左前缀、尽量使用覆盖索引、避免在索引列上做函数计算，并通过 explain 查看 type、key、rows 和 Extra。索引过多会增加写入成本，需要结合业务查询收益取舍。',
+    115,
+    1
+WHERE @demo_user_id IS NOT NULL;
+
+-- 8. MySQL transaction isolation
+INSERT INTO knowledge_document (user_id, title, content, source_type, tags, summary, status)
+SELECT
+    @demo_user_id,
+    'MySQL 事务隔离级别',
+    CONCAT(
+        '# MySQL 事务隔离级别\n\n',
+        'MySQL 事务隔离级别用于在并发读写之间平衡一致性和性能，常见级别包括 Read Uncommitted、Read Committed、Repeatable Read 和 Serializable。\n\n',
+        '在 InnoDB 中，默认 Repeatable Read 通过 MVCC 保证同一事务内多次一致读结果稳定，并通过 next-key lock 等机制减少幻读问题。\n\n',
+        '面试中要能区分脏读、不可重复读、幻读，以及快照读和当前读的行为差异。'
+    ),
+    'db_note',
+    'MySQL,transaction,isolation,MVCC,Repeatable Read',
+    '用于演示 MySQL 事务隔离、MVCC 和并发一致性问题。',
+    1
+WHERE @demo_user_id IS NOT NULL;
+SET @mysql_tx_doc_id := LAST_INSERT_ID();
+
+INSERT INTO knowledge_document_chunk (document_id, user_id, chunk_index, content, token_count, status)
+SELECT
+    @mysql_tx_doc_id,
+    @demo_user_id,
+    0,
+    'MySQL 事务隔离级别包括 Read Uncommitted、Read Committed、Repeatable Read 和 Serializable。InnoDB 默认 Repeatable Read，依赖 MVCC 提供一致性快照读，并通过 next-key lock 等机制减少幻读。理解脏读、不可重复读、幻读、快照读和当前读，是分析并发事务问题的基础。',
+    120,
+    1
+WHERE @demo_user_id IS NOT NULL;
+
+-- 9. Java thread pool parameters
+INSERT INTO knowledge_document (user_id, title, content, source_type, tags, summary, status)
+SELECT
+    @demo_user_id,
+    '线程池核心参数与拒绝策略',
+    CONCAT(
+        '# 线程池核心参数与拒绝策略\n\n',
+        'Java 线程池通过 corePoolSize、maximumPoolSize、keepAliveTime、workQueue、threadFactory 和 rejectedExecutionHandler 控制任务执行。\n\n',
+        '任务提交后先使用核心线程，再进入队列，队列满后才扩容到最大线程数，继续满载时触发拒绝策略。\n\n',
+        '拒绝策略常见有 AbortPolicy、CallerRunsPolicy、DiscardPolicy 和 DiscardOldestPolicy。实际项目要结合任务类型、队列容量和降级策略设置参数。'
+    ),
+    'java_note',
+    'Java,线程池,ThreadPoolExecutor,拒绝策略,并发',
+    '用于演示线程池参数、任务队列和拒绝策略。',
+    1
+WHERE @demo_user_id IS NOT NULL;
+SET @thread_pool_doc_id := LAST_INSERT_ID();
+
+INSERT INTO knowledge_document_chunk (document_id, user_id, chunk_index, content, token_count, status)
+SELECT
+    @thread_pool_doc_id,
+    @demo_user_id,
+    0,
+    '线程池核心参数包括 corePoolSize、maximumPoolSize、keepAliveTime、workQueue、threadFactory 和 rejectedExecutionHandler。任务会优先使用核心线程，队列满后扩容到最大线程数，再满则触发拒绝策略。常见拒绝策略包括 AbortPolicy、CallerRunsPolicy、DiscardPolicy 和 DiscardOldestPolicy。',
+    110,
+    1
+WHERE @demo_user_id IS NOT NULL;
+
+-- 10. Spring Bean lifecycle
+INSERT INTO knowledge_document (user_id, title, content, source_type, tags, summary, status)
+SELECT
+    @demo_user_id,
+    'Spring Bean 生命周期与 IoC',
+    CONCAT(
+        '# Spring Bean 生命周期与 IoC\n\n',
+        'Spring IoC 容器负责 Bean 的创建、依赖注入、初始化和销毁。常见流程包括实例化、属性填充、Aware 回调、BeanPostProcessor 前后置处理、初始化方法和销毁方法。\n\n',
+        'BeanPostProcessor 是框架扩展点，AOP 代理等能力常在初始化前后织入。理解生命周期有助于排查依赖注入、代理失效和初始化顺序问题。\n\n',
+        'IoC 的核心价值是把对象创建和依赖管理交给容器，让业务代码面向接口和组件协作。'
+    ),
+    'java_note',
+    'Spring,Bean,IoC,生命周期,BeanPostProcessor',
+    '用于演示 Spring Bean 生命周期、IoC 和扩展点。',
+    1
+WHERE @demo_user_id IS NOT NULL;
+SET @spring_bean_doc_id := LAST_INSERT_ID();
+
+INSERT INTO knowledge_document_chunk (document_id, user_id, chunk_index, content, token_count, status)
+SELECT
+    @spring_bean_doc_id,
+    @demo_user_id,
+    0,
+    'Spring Bean 生命周期包括实例化、属性填充、Aware 回调、BeanPostProcessor 前后置处理、初始化方法和销毁方法。IoC 容器负责对象创建和依赖管理，BeanPostProcessor 是 AOP 代理和框架扩展的重要入口。理解这些流程有助于排查代理失效和初始化顺序问题。',
+    115,
+    1
+WHERE @demo_user_id IS NOT NULL;
+
+-- 11. MySQL slow query explain
+INSERT INTO knowledge_document (user_id, title, content, source_type, tags, summary, status)
+SELECT
+    @demo_user_id,
+    'MySQL 慢查询与 explain',
+    CONCAT(
+        '# MySQL 慢查询与 explain\n\n',
+        '慢查询排查通常从慢查询日志、SQL 频率、数据量和执行计划入手。explain 可以展示访问类型、使用索引、扫描行数和额外信息。\n\n',
+        '重点关注 type 是否退化为 ALL、key 是否为空、rows 是否过大、Extra 是否出现 Using filesort 或 Using temporary。\n\n',
+        '优化思路包括补充合适索引、改写 SQL、减少返回列、分页优化和避免不必要的排序或临时表。'
+    ),
+    'db_note',
+    'MySQL,slow query,explain,SQL优化,索引',
+    '用于演示 MySQL 慢查询排查和 explain 执行计划分析。',
+    1
+WHERE @demo_user_id IS NOT NULL;
+SET @mysql_slow_doc_id := LAST_INSERT_ID();
+
+INSERT INTO knowledge_document_chunk (document_id, user_id, chunk_index, content, token_count, status)
+SELECT
+    @mysql_slow_doc_id,
+    @demo_user_id,
+    0,
+    'MySQL 慢查询排查可以从慢查询日志和 explain 执行计划开始。重点看 type、key、rows、Extra 等字段，识别全表扫描、未命中索引、Using filesort、Using temporary 等问题。优化方向包括补索引、改写 SQL、减少返回列、优化分页和避免不必要排序。',
+    115,
+    1
+WHERE @demo_user_id IS NOT NULL;
+
+-- 12. Redis persistence RDB/AOF
+INSERT INTO knowledge_document (user_id, title, content, source_type, tags, summary, status)
+SELECT
+    @demo_user_id,
+    'Redis 持久化 RDB/AOF',
+    CONCAT(
+        '# Redis 持久化 RDB/AOF\n\n',
+        'Redis 持久化主要有 RDB 和 AOF。RDB 是某个时间点的数据快照，恢复快但可能丢失最近一次快照后的数据。\n\n',
+        'AOF 记录写命令日志，数据安全性更高，但文件可能更大，需要 rewrite 压缩。实际生产会根据恢复速度、数据丢失窗口和写入开销选择方案。\n\n',
+        '这个主题和缓存穿透同属 Redis，但关注点是数据恢复和持久化可靠性，不是缓存 miss。'
+    ),
+    'redis_note',
+    'Redis,RDB,AOF,持久化,rewrite',
+    '用于演示 Redis RDB/AOF 持久化机制和取舍。',
+    1
+WHERE @demo_user_id IS NOT NULL;
+SET @redis_persistence_doc_id := LAST_INSERT_ID();
+
+INSERT INTO knowledge_document_chunk (document_id, user_id, chunk_index, content, token_count, status)
+SELECT
+    @redis_persistence_doc_id,
+    @demo_user_id,
+    0,
+    'Redis 持久化包括 RDB 和 AOF。RDB 是快照，恢复速度快但可能丢失最近数据；AOF 记录写命令，数据安全性更高但文件更大，需要 rewrite。选择方案时要权衡恢复速度、可接受的数据丢失窗口和写入开销。它关注数据恢复，不是缓存穿透。',
+    115,
+    1
+WHERE @demo_user_id IS NOT NULL;
+
+-- 13. Redis distributed lock
+INSERT INTO knowledge_document (user_id, title, content, source_type, tags, summary, status)
+SELECT
+    @demo_user_id,
+    'Redis 分布式锁',
+    CONCAT(
+        '# Redis 分布式锁\n\n',
+        'Redis 分布式锁常用 SET key value NX PX timeout 实现，要求加锁具备互斥性、过期时间和唯一 value，释放锁时要校验 value 再删除，避免误删别人的锁。\n\n',
+        '锁过期时间要覆盖业务执行时间，长任务需要续期。高可用场景还要考虑 Redis 主从切换、锁丢失和 Redlock 等方案的取舍。\n\n',
+        '这个主题和缓存穿透同属 Redis，但关注并发互斥，不是缓存空值或 miss。'
+    ),
+    'redis_note',
+    'Redis,分布式锁,SET NX PX,Redlock,并发',
+    '用于演示 Redis 分布式锁、过期时间和安全释放。',
+    1
+WHERE @demo_user_id IS NOT NULL;
+SET @redis_lock_doc_id := LAST_INSERT_ID();
+
+INSERT INTO knowledge_document_chunk (document_id, user_id, chunk_index, content, token_count, status)
+SELECT
+    @redis_lock_doc_id,
+    @demo_user_id,
+    0,
+    'Redis 分布式锁常用 SET key value NX PX timeout 实现。加锁要设置过期时间和唯一 value，释放锁时通过 Lua 脚本校验 value 后删除，避免误删其他客户端的锁。长任务需要考虑续期，高可用场景要评估主从切换和 Redlock 取舍。',
+    115,
+    1
+WHERE @demo_user_id IS NOT NULL;
+
+-- 14. HTTP and TCP basics
+INSERT INTO knowledge_document (user_id, title, content, source_type, tags, summary, status)
+SELECT
+    @demo_user_id,
+    'HTTP 与 TCP 基础',
+    CONCAT(
+        '# HTTP 与 TCP 基础\n\n',
+        'TCP 是传输层协议，提供可靠、有序、面向连接的字节流，核心机制包括三次握手、四次挥手、重传、拥塞控制和流量控制。\n\n',
+        'HTTP 是应用层协议，基于请求响应模型描述资源访问。HTTP/1.1 支持长连接，HTTP/2 支持多路复用，HTTPS 在 HTTP 与 TCP 之间加入 TLS。\n\n',
+        '面试中要能区分连接建立、报文语义、状态码、幂等性和连接复用等概念。'
+    ),
+    'network_note',
+    'HTTP,TCP,HTTPS,三次握手,长连接',
+    '用于演示 HTTP 与 TCP 的分层关系和基础概念。',
+    1
+WHERE @demo_user_id IS NOT NULL;
+SET @http_tcp_doc_id := LAST_INSERT_ID();
+
+INSERT INTO knowledge_document_chunk (document_id, user_id, chunk_index, content, token_count, status)
+SELECT
+    @http_tcp_doc_id,
+    @demo_user_id,
+    0,
+    'TCP 是传输层协议，负责可靠、有序、面向连接的字节流，涉及三次握手、四次挥手、重传、拥塞控制和流量控制。HTTP 是应用层协议，基于请求响应模型描述资源访问；HTTPS 则在 HTTP 与 TCP 之间加入 TLS。HTTP/1.1 长连接和 HTTP/2 多路复用是常见面试点。',
+    120,
+    1
+WHERE @demo_user_id IS NOT NULL;
+
 SELECT
     COUNT(*) AS demo_document_count
 FROM knowledge_document

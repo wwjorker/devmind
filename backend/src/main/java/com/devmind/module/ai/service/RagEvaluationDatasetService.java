@@ -317,6 +317,126 @@ public class RagEvaluationDatasetService {
                     "问题带有 provider/Router 干扰词，但 gold 应该是 Flyway migration 数据库迁移。",
                     "证据应该来自 Flyway migration 数据库迁移文档；这个 case 用 provider 干扰 LlmClient 文档。",
                     "hard_negative_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "mysql-index-covering-query",
+                    "database",
+                    "联合索引和覆盖索引怎么减少 MySQL 扫描行数？",
+                    List.of("MySQL 索引优化"),
+                    List.of("MySQL", "索引", "联合索引", "覆盖索引"),
+                    "应该说明按查询条件设计联合索引、遵守最左前缀、使用覆盖索引，并通过 explain 验证扫描行数和 key。",
+                    "证据应该来自 MySQL 索引优化文档。",
+                    "synonym_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "mysql-transaction-repeatable-read",
+                    "database",
+                    "可重复读为什么能让同一事务里多次查询结果稳定？",
+                    List.of("MySQL 事务隔离级别"),
+                    List.of("MySQL", "Repeatable Read", "MVCC", "事务"),
+                    "应该说明 InnoDB 默认 Repeatable Read 通过 MVCC 提供一致性快照读，并区分脏读、不可重复读和幻读。",
+                    "证据应该来自 MySQL 事务隔离级别文档。",
+                    "synonym_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "thread-pool-reject-policy",
+                    "java_concurrency",
+                    "线程池队列满了以后任务会怎么处理？",
+                    List.of("线程池核心参数与拒绝策略"),
+                    List.of("线程池", "workQueue", "maximumPoolSize", "拒绝策略"),
+                    "应该说明任务先用核心线程、再进队列、再扩容到最大线程数，继续满载时触发拒绝策略。",
+                    "证据应该来自 线程池核心参数与拒绝策略 文档。",
+                    "synonym_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "spring-bean-post-processor",
+                    "spring",
+                    "Spring 里 AOP 代理通常是在 Bean 生命周期哪个扩展点织入的？",
+                    List.of("Spring Bean 生命周期与 IoC"),
+                    List.of("Spring", "Bean", "BeanPostProcessor", "AOP"),
+                    "应该说明 Bean 生命周期包含实例化、属性填充、Aware 回调、BeanPostProcessor 和初始化，AOP 常通过后置处理器织入代理。",
+                    "证据应该来自 Spring Bean 生命周期与 IoC 文档。",
+                    "synonym_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "mysql-slow-query-explain-fields",
+                    "database",
+                    "慢 SQL 排查时 explain 里 type、key、rows、Extra 分别看什么？",
+                    List.of("MySQL 慢查询与 explain"),
+                    List.of("MySQL", "explain", "type", "rows", "Extra"),
+                    "应该说明通过 explain 观察访问类型、命中索引、扫描行数和 filesort/temporary 等额外信息。",
+                    "证据应该来自 MySQL 慢查询与 explain 文档。",
+                    "synonym_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "redis-persistence-rdb-aof",
+                    "redis",
+                    "Redis 既想恢复快又想少丢数据，RDB 和 AOF 怎么取舍？",
+                    List.of("Redis 持久化 RDB/AOF"),
+                    List.of("Redis", "RDB", "AOF", "rewrite"),
+                    "应该说明 RDB 是快照、恢复快但可能丢最近数据，AOF 记录写命令、更安全但文件更大，需要 rewrite。",
+                    "证据应该来自 Redis 持久化 RDB/AOF 文档。",
+                    "synonym_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "redis-lock-safe-release",
+                    "redis",
+                    "Redis 分布式锁释放时为什么要校验 value？",
+                    List.of("Redis 分布式锁"),
+                    List.of("Redis", "分布式锁", "SET NX PX", "Lua"),
+                    "应该说明加锁用唯一 value，释放时校验 value 后删除，避免误删其他客户端持有的锁。",
+                    "证据应该来自 Redis 分布式锁文档。",
+                    "synonym_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "http-tcp-layering",
+                    "network",
+                    "HTTP 和 TCP 分别属于哪一层，HTTPS 又多了什么？",
+                    List.of("HTTP 与 TCP 基础"),
+                    List.of("HTTP", "TCP", "HTTPS", "TLS"),
+                    "应该说明 TCP 是传输层可靠字节流，HTTP 是应用层请求响应协议，HTTPS 在 HTTP 与 TCP 之间加入 TLS。",
+                    "证据应该来自 HTTP 与 TCP 基础文档。",
+                    "synonym_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "hard-negative-redis-persistence-vs-cache",
+                    "redis",
+                    "Redis 缓存数据怕宕机丢失时，是看缓存穿透还是 RDB/AOF？",
+                    List.of("Redis 持久化 RDB/AOF"),
+                    List.of("Redis", "缓存", "RDB", "AOF"),
+                    "问题里有缓存干扰词，但 gold 应该是 Redis 持久化 RDB/AOF，因为关注点是宕机后的数据恢复。",
+                    "证据应该来自 Redis 持久化 RDB/AOF 文档；这个 case 用缓存干扰 Redis 缓存穿透复盘。",
+                    "hard_negative_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "hard-negative-redis-lock-vs-cache",
+                    "redis",
+                    "Redis 里为了防止并发重复扣库存,应该看缓存穿透还是分布式锁？",
+                    List.of("Redis 分布式锁"),
+                    List.of("Redis", "并发", "缓存", "分布式锁"),
+                    "问题里有缓存干扰词，但 gold 应该是 Redis 分布式锁，因为关注点是并发互斥。",
+                    "证据应该来自 Redis 分布式锁文档；这个 case 用缓存干扰 Redis 缓存穿透复盘。",
+                    "hard_negative_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "hard-negative-mysql-slow-vs-index",
+                    "database",
+                    "SQL 很慢但我已经有索引了，下一步应该看索引设计还是 explain 执行计划？",
+                    List.of("MySQL 慢查询与 explain"),
+                    List.of("MySQL", "索引", "explain", "慢查询"),
+                    "问题带有索引干扰词，但 gold 应该是 MySQL 慢查询与 explain，因为重点是慢 SQL 排查路径。",
+                    "证据应该来自 MySQL 慢查询与 explain 文档；这个 case 用索引干扰 MySQL 索引优化文档。",
+                    "hard_negative_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "hard-negative-mysql-transaction-vs-index",
+                    "database",
+                    "并发更新时读到的数据前后不一致，这是索引问题还是事务隔离问题？",
+                    List.of("MySQL 事务隔离级别"),
+                    List.of("MySQL", "索引", "事务", "隔离级别"),
+                    "问题带有索引干扰词，但 gold 应该是 MySQL 事务隔离级别，因为关注并发一致性。",
+                    "证据应该来自 MySQL 事务隔离级别文档；这个 case 用索引干扰 MySQL 索引优化文档。",
+                    "hard_negative_retrieval"
             )
     );
 
