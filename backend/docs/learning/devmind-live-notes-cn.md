@@ -30,6 +30,14 @@ embedding endpoint 用 `base-url` 去掉末尾 `/` 后显式拼 `/embeddings`，
 
 回填逻辑只为缺失 active 向量的 chunk 生成向量，已有 active 向量会跳过。为什么：回填要幂等，重复执行不应该重复计费或撞唯一键；面试可能追问：如果同 chunk/provider 只有 archived 记录怎么办？回答是代码会复用这条记录并更新为 active，尊重 `uk_chunk_provider`，避免重复插入。
 
+## 53 为什么混合检索要支持显式 embedding provider
+
+本轮给 `HybridRetrievalStrategy` 增加了 `retrieveWithEmbeddingProvider`，可以指定 `local-sparse-vector` 或 `remote-dense` 来跑同一套关键词召回 + 向量臂 + RRF 融合。为什么：后续要做 keyword baseline / sparse hybrid / dense hybrid 三方对比，必须能在同一语料上切换向量 provider，而不是只依赖全局配置；面试可能追问：默认问答会不会受影响？回答是默认 `retrieve()` 仍走 configured provider，AiAskService 没接新入口。
+
+显式 provider 检索只读取该 provider 的持久化向量，并用同一个 provider 生成 query 向量。为什么：dense hybrid 对比应该基于已回填的 dense chunk vectors，不能在检索时临时给大量 chunk 调外部 embedding；面试可能追问：没有持久化向量怎么办？回答是向量臂返回空，只保留关键词臂结果，需要先跑 provider backfill。
+
+默认 `retrieve()` 保留原来的本地 sparse on-the-fly fallback。为什么：这是已有默认行为，不能因为增加 dense 对比能力影响当前问答链路；面试可能追问：显式 local 和默认 local 是否一致？回答是当使用同一 provider 且已有同一批持久化向量时，测试验证两条路径结果一致。
+
 这份笔记用于记录我们一边开发 DevMind，一边需要真正理解的后端和 AI 应用知识点。
 
 ## 01 为什么 documentId 从 1 变成 2
