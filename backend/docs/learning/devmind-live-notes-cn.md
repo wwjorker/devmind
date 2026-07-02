@@ -22,6 +22,14 @@ remote embedding 的 HTTP 客户端用可注入的 `RestClient.Builder`，测试
 
 embedding endpoint 用 `base-url` 去掉末尾 `/` 后显式拼 `/embeddings`，而不是依赖 `RestClient.uri("/embeddings")`。为什么：很多兼容 API 的 base-url 会配置成 `/v1`，显式拼接可以保证最终请求是 `/v1/embeddings`；面试可能追问：怎么证明不会丢 base path？回答是单测用 `MockRestServiceServer` 断言完整 URL 为 `https://embedding.example/v1/embeddings`。
 
+## 52 为什么 sparse 和 dense 向量要按 provider 共存
+
+本轮让同一个 active chunk 可以同时拥有 `local-sparse-vector` 和 `remote-dense` 两套向量，依靠 `knowledge_document_chunk_vector.provider_name` 和 `uk_chunk_provider(chunk_id, provider_name)` 区分。为什么：后续要用同一批 gold-label case 对比 keyword baseline、本地 sparse hybrid、dense hybrid，必须先让两套向量能并存；面试可能追问：为什么不直接覆盖原向量？回答是覆盖会丢掉 baseline，无法做同数据集、同 chunk 粒度的公平对比。
+
+文档内容重建时，旧 chunk 的所有 provider 向量都会一起归档，但新 chunk 只会按当前 configured provider 立即重算。为什么：内容变了以后旧向量全都失效，不论 sparse 还是 dense 都不能继续参与召回；但默认路径不能因为文档更新而偷偷调用外部 dense API。面试可能追问：那 remote-dense 新向量什么时候补？回答是通过显式 `backfillVectors(userId, "remote-dense")` 回填，配置不完整时 fail-fast，不会在没 key 时联网。
+
+回填逻辑只为缺失 active 向量的 chunk 生成向量，已有 active 向量会跳过。为什么：回填要幂等，重复执行不应该重复计费或撞唯一键；面试可能追问：如果同 chunk/provider 只有 archived 记录怎么办？回答是代码会复用这条记录并更新为 active，尊重 `uk_chunk_provider`，避免重复插入。
+
 这份笔记用于记录我们一边开发 DevMind，一边需要真正理解的后端和 AI 应用知识点。
 
 ## 01 为什么 documentId 从 1 变成 2

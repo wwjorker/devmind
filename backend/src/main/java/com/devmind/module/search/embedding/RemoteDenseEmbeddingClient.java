@@ -50,10 +50,6 @@ public class RemoteDenseEmbeddingClient implements EmbeddingClient {
         if (!StringUtils.hasText(remote.getBaseUrl()) || !StringUtils.hasText(remote.getModel())) {
             throw new BizException(ResultCode.INTERNAL_ERROR, "external embedding provider is not configured");
         }
-        if (!providerName().equalsIgnoreCase(embedding.getProvider())) {
-            throw new BizException(ResultCode.INTERNAL_ERROR, "external embedding provider is not enabled");
-        }
-
         RestClient restClient = restClientBuilder.clone()
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + remote.getApiKey())
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)

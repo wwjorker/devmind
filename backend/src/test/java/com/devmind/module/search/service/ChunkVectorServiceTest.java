@@ -2,6 +2,7 @@ package com.devmind.module.search.service;
 
 import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.entity.KnowledgeDocument;
+import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
 import com.devmind.module.ai.config.AiProperties;
 import com.devmind.module.search.embedding.EmbeddingClientRouter;
@@ -18,8 +19,11 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,6 +35,7 @@ class ChunkVectorServiceTest {
         KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
         ChunkVectorService service = new ChunkVectorService(
                 vectorMapper,
+                mock(DocumentChunkMapper.class),
                 documentMapper,
                 localRouter(),
                 new EmbeddingTextBuilder(),
@@ -52,25 +57,37 @@ class ChunkVectorServiceTest {
     }
 
     @Test
-    void shouldArchiveVectorsByDocument() {
+    void shouldArchiveVectorsForAllProvidersByDocument() {
         DocumentChunkVectorMapper vectorMapper = mock(DocumentChunkVectorMapper.class);
+        DocumentChunkVector localVector = vector(10L, 100L, "local-sparse-vector");
+        DocumentChunkVector remoteVector = vector(10L, 100L, "remote-dense");
         ChunkVectorService service = new ChunkVectorService(
                 vectorMapper,
+                mock(DocumentChunkMapper.class),
                 mock(KnowledgeDocumentMapper.class),
                 localRouter(),
                 new EmbeddingTextBuilder(),
                 new ObjectMapper()
         );
+        when(vectorMapper.selectList(any())).thenReturn(List.of(localVector, remoteVector));
 
         service.archiveByDocument(1L, 100L);
 
-        verify(vectorMapper).update(any());
+        ArgumentCaptor<DocumentChunkVector> captor = ArgumentCaptor.forClass(DocumentChunkVector.class);
+        verify(vectorMapper, times(2)).updateById(captor.capture());
+        assertThat(captor.getAllValues())
+                .extracting(DocumentChunkVector::getProviderName)
+                .containsExactlyInAnyOrder("local-sparse-vector", "remote-dense");
+        assertThat(captor.getAllValues())
+                .extracting(DocumentChunkVector::getStatus)
+                .containsOnly(0);
     }
 
     @Test
     void shouldDecodeVectorJson() {
         ChunkVectorService service = new ChunkVectorService(
                 mock(DocumentChunkVectorMapper.class),
+                mock(DocumentChunkMapper.class),
                 mock(KnowledgeDocumentMapper.class),
                 localRouter(),
                 new EmbeddingTextBuilder(),
@@ -81,6 +98,61 @@ class ChunkVectorServiceTest {
 
         assertThat(vector).containsEntry("redis", 0.8);
         assertThat(vector).containsEntry("cache", 0.6);
+    }
+
+    @Test
+    void shouldBackfillMissingLocalSparseVectorsAndSkipExistingOnes() {
+        DocumentChunkVectorMapper vectorMapper = mock(DocumentChunkVectorMapper.class);
+        DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        ChunkVectorService service = new ChunkVectorService(
+                vectorMapper,
+                chunkMapper,
+                documentMapper,
+                localRouter(),
+                new EmbeddingTextBuilder(),
+                new ObjectMapper()
+        );
+        when(chunkMapper.selectList(any())).thenReturn(List.of(
+                chunk(10L, 100L),
+                chunk(20L, 100L)
+        ));
+        when(vectorMapper.selectList(any())).thenReturn(List.of(vector(10L, 100L, "local-sparse-vector")));
+        when(documentMapper.selectList(any())).thenReturn(List.of(document(100L)));
+        when(vectorMapper.selectOne(any())).thenReturn(null);
+
+        service.backfillVectors(1L, "local-sparse-vector");
+
+        ArgumentCaptor<DocumentChunkVector> captor = ArgumentCaptor.forClass(DocumentChunkVector.class);
+        verify(vectorMapper).insert(captor.capture());
+        DocumentChunkVector savedVector = captor.getValue();
+        assertThat(savedVector.getChunkId()).isEqualTo(20L);
+        assertThat(savedVector.getProviderName()).isEqualTo("local-sparse-vector");
+        assertThat(savedVector.getVectorJson()).contains("redis");
+    }
+
+    @Test
+    void shouldFailFastWhenBackfillingRemoteDenseWithoutApiKey() {
+        DocumentChunkVectorMapper vectorMapper = mock(DocumentChunkVectorMapper.class);
+        DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        ChunkVectorService service = new ChunkVectorService(
+                vectorMapper,
+                chunkMapper,
+                documentMapper,
+                localRouter(),
+                new EmbeddingTextBuilder(),
+                new ObjectMapper()
+        );
+        when(chunkMapper.selectList(any())).thenReturn(List.of(chunk(10L, 100L)));
+        when(vectorMapper.selectList(any())).thenReturn(List.of());
+        when(documentMapper.selectList(any())).thenReturn(List.of(document(100L)));
+
+        assertThatThrownBy(() -> service.backfillVectors(1L, "remote-dense"))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("external embedding provider is not configured");
+        verify(vectorMapper, never()).insert(any(DocumentChunkVector.class));
+        verify(vectorMapper, never()).updateById(any(DocumentChunkVector.class));
     }
 
     private KnowledgeDocument document(Long id) {
@@ -104,6 +176,18 @@ class ChunkVectorServiceTest {
         chunk.setTokenCount(20);
         chunk.setStatus(1);
         return chunk;
+    }
+
+    private DocumentChunkVector vector(Long chunkId, Long documentId, String providerName) {
+        DocumentChunkVector vector = new DocumentChunkVector();
+        vector.setId(chunkId + Math.abs(providerName.hashCode()));
+        vector.setUserId(1L);
+        vector.setDocumentId(documentId);
+        vector.setChunkId(chunkId);
+        vector.setProviderName(providerName);
+        vector.setVectorJson("{}");
+        vector.setStatus(1);
+        return vector;
     }
 
     private EmbeddingClientRouter localRouter() {
