@@ -10,6 +10,18 @@
 
 本轮不改 `EmbeddingClient` 的 `Map<String, Double>` 签名，dense 向量后续会临时用 `"0".."n-1"` 作为 key 复用现有 JSON 存储和 cosineSimilarity。为什么：这是 Stage B 过渡方案，能最小化对现有稀疏向量、RRF、评估链路的冲击；它不是最终向量存储设计，也不是向量数据库。面试可能追问：什么时候要换接口或 pgvector？回答是当 dense embedding 真正进入回填、查询和规模化检索时，再独立设计维度校验、批量回填、向量索引和数据库方案。
 
+## 51 为什么 remote dense embedding 先接 OpenAI 兼容接口
+
+本轮 `RemoteDenseEmbeddingClient` 使用 OpenAI 兼容的 `POST /embeddings` 协议：`model` 和 `input` 放 JSON body，`Authorization: Bearer <api-key>` 放 header。为什么：硅基流动、DashScope 兼容模式等便宜 embedding 服务大多支持这个格式，代码可以保持 provider 无关；面试可能追问：如果某家 API 字段不兼容怎么办？回答是先稳定通用协议，后续再按 provider 增加 adapter，而不是把厂商分支写进检索主链路。
+
+remote embedding 的 HTTP 客户端用可注入的 `RestClient.Builder`，测试用 `MockRestServiceServer` 拦截请求。为什么：CI 没有真实 key，也不能因为单测产生费用；面试可能追问：怎么证明测试没联网？回答是测试请求被 mock server 接管，并断言 URL、header 和 body，未配置 key 的路径会在发请求前抛异常。
+
+返回的 dense float 数组仍然转成 `Map<String, Double>`，key 是 `"0".."n-1"`。为什么：这是为了兼容现有 `EmbeddingClient` 接口、JSON 存储和 cosineSimilarity 的过渡表示；面试可能追问：这是不是最终向量设计？回答是不是，真正的向量维度、索引和 pgvector 会在后续独立任务里处理。
+
+`dimension` 配置只做 warn，不在本轮强制报错。为什么：不同供应商或模型切换时，先记录维度异常可以帮助定位配置问题，同时避免任务二改变检索链路语义；面试可能追问：生产上会不会应该拦截？回答是回填和持久化阶段应该强校验，否则不同维度的向量混存会污染召回结果。
+
+embedding endpoint 用 `base-url` 去掉末尾 `/` 后显式拼 `/embeddings`，而不是依赖 `RestClient.uri("/embeddings")`。为什么：很多兼容 API 的 base-url 会配置成 `/v1`，显式拼接可以保证最终请求是 `/v1/embeddings`；面试可能追问：怎么证明不会丢 base path？回答是单测用 `MockRestServiceServer` 断言完整 URL 为 `https://embedding.example/v1/embeddings`。
+
 这份笔记用于记录我们一边开发 DevMind，一边需要真正理解的后端和 AI 应用知识点。
 
 ## 01 为什么 documentId 从 1 变成 2
