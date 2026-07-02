@@ -23,11 +23,17 @@ public class EmbeddingClientRouter {
     }
 
     public EmbeddingClient currentClient() {
-        String provider = configuredProvider();
+        return clientFor(configuredProvider());
+    }
+
+    public EmbeddingClient clientFor(String provider) {
         return clients.stream()
                 .filter(client -> client.providerName().equalsIgnoreCase(provider))
                 .findFirst()
-                .orElseThrow(() -> new BizException(ResultCode.INTERNAL_ERROR, "unsupported embedding provider: " + provider));
+                .orElseThrow(() -> new BizException(
+                        ResultCode.INTERNAL_ERROR,
+                        "unsupported embedding provider: " + provider
+                ));
     }
 
     public String providerName() {

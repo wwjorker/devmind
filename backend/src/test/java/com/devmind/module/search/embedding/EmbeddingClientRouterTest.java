@@ -59,17 +59,17 @@ class EmbeddingClientRouterTest {
     }
 
     @Test
-    void remoteDenseEmbeddingClientShouldNotRequestWhenProviderIsNotEnabled() {
+    void clientForShouldResolveRemoteDenseWithoutChangingDefaultProvider() {
         AiProperties aiProperties = remoteEmbeddingProperties();
         aiProperties.getEmbedding().setProvider("local-sparse-vector");
-        RestClient.Builder restClientBuilder = RestClient.builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
-        RemoteDenseEmbeddingClient client = new RemoteDenseEmbeddingClient(aiProperties, restClientBuilder);
+        RemoteDenseEmbeddingClient remoteClient = new RemoteDenseEmbeddingClient(aiProperties);
+        EmbeddingClientRouter router = new EmbeddingClientRouter(
+                aiProperties,
+                List.of(new LocalEmbeddingClient(), remoteClient)
+        );
 
-        assertThatThrownBy(() -> client.embed("Redis cache penetration"))
-                .isInstanceOf(BizException.class)
-                .hasMessageContaining("external embedding provider is not enabled");
-        server.verify();
+        assertThat(router.currentClient()).isInstanceOf(LocalEmbeddingClient.class);
+        assertThat(router.clientFor("remote-dense")).isSameAs(remoteClient);
     }
 
     @Test
