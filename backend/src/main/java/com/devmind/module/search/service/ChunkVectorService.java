@@ -5,7 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
-import com.devmind.module.search.embedding.EmbeddingClient;
+import com.devmind.module.search.embedding.EmbeddingClientRouter;
 import com.devmind.module.search.embedding.EmbeddingTextBuilder;
 import com.devmind.module.search.entity.DocumentChunkVector;
 import com.devmind.module.search.mapper.DocumentChunkVectorMapper;
@@ -31,18 +31,18 @@ public class ChunkVectorService {
 
     private final DocumentChunkVectorMapper vectorMapper;
     private final KnowledgeDocumentMapper documentMapper;
-    private final EmbeddingClient embeddingClient;
+    private final EmbeddingClientRouter embeddingClientRouter;
     private final EmbeddingTextBuilder embeddingTextBuilder;
     private final ObjectMapper objectMapper;
 
     public ChunkVectorService(DocumentChunkVectorMapper vectorMapper,
                               KnowledgeDocumentMapper documentMapper,
-                              EmbeddingClient embeddingClient,
+                              EmbeddingClientRouter embeddingClientRouter,
                               EmbeddingTextBuilder embeddingTextBuilder,
                               ObjectMapper objectMapper) {
         this.vectorMapper = vectorMapper;
         this.documentMapper = documentMapper;
-        this.embeddingClient = embeddingClient;
+        this.embeddingClientRouter = embeddingClientRouter;
         this.embeddingTextBuilder = embeddingTextBuilder;
         this.objectMapper = objectMapper;
     }
@@ -60,7 +60,7 @@ public class ChunkVectorService {
         }
 
         for (DocumentChunk chunk : chunks) {
-            Map<String, Double> vector = embeddingClient.embed(embeddingTextBuilder.buildForChunk(document, chunk));
+            Map<String, Double> vector = embeddingClientRouter.embed(embeddingTextBuilder.buildForChunk(document, chunk));
             if (vector.isEmpty()) {
                 continue;
             }
@@ -68,7 +68,7 @@ public class ChunkVectorService {
             chunkVector.setUserId(userId);
             chunkVector.setDocumentId(documentId);
             chunkVector.setChunkId(chunk.getId());
-            chunkVector.setProviderName(embeddingClient.providerName());
+            chunkVector.setProviderName(embeddingClientRouter.providerName());
             chunkVector.setVectorJson(encodeVector(vector));
             chunkVector.setStatus(STATUS_ACTIVE);
             vectorMapper.insert(chunkVector);
@@ -80,7 +80,7 @@ public class ChunkVectorService {
         UpdateWrapper<DocumentChunkVector> updateWrapper = new UpdateWrapper<>();
         updateWrapper.eq("user_id", userId)
                 .eq("document_id", documentId)
-                .eq("provider_name", embeddingClient.providerName())
+                .eq("provider_name", embeddingClientRouter.providerName())
                 .eq("status", STATUS_ACTIVE)
                 .set("status", STATUS_ARCHIVED);
         vectorMapper.update(updateWrapper);
@@ -89,7 +89,7 @@ public class ChunkVectorService {
     public List<DocumentChunkVector> listActiveVectors(Long userId, int limit) {
         QueryWrapper<DocumentChunkVector> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_id", userId)
-                .eq("provider_name", embeddingClient.providerName())
+                .eq("provider_name", embeddingClientRouter.providerName())
                 .eq("status", STATUS_ACTIVE)
                 .orderByDesc("updated_at")
                 .orderByDesc("id")
@@ -101,7 +101,7 @@ public class ChunkVectorService {
         try {
             return objectMapper.readValue(vectorJson, VECTOR_TYPE);
         } catch (JsonProcessingException ex) {
-            log.warn("Failed to decode chunk vector, provider={}", embeddingClient.providerName(), ex);
+            log.warn("Failed to decode chunk vector, provider={}", embeddingClientRouter.providerName(), ex);
             return Map.of();
         }
     }

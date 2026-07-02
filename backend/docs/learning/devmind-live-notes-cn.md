@@ -1,5 +1,15 @@
 # DevMind 实时学习笔记
 
+## 50 为什么 Stage B 先做可选 remote dense embedding 骨架
+
+本轮只引入 `EmbeddingClientRouter` 和 `RemoteDenseEmbeddingClient` 骨架，默认 provider 仍然是 `local-sparse-vector`。为什么：真实外部 embedding 会带来费用、网络失败和回填复杂度，先把 provider 选择边界拆出来，可以保证默认路径和已有 RRF 混合检索完全不变。面试可能追问：如果线上切 provider 怎么避免误调用外部 API？回答是配置默认本地，remote client 在 api-key 为空时直接抛 `external embedding provider is not configured`，不会发 HTTP。
+
+新增第二个 `EmbeddingClient` 后，`ChunkVectorService` 和 `HybridRetrievalStrategy` 不再裸注入单个接口，而是依赖 `EmbeddingClientRouter`。为什么：Spring 容器里会同时存在 local 和 remote 两个实现，裸按类型注入会产生歧义；router 把选择逻辑集中到一个组件里，也保留了“业务代码只关心 embed/cosine”的调用方式。面试可能追问：为什么不用 `@Primary`？回答是 `@Primary` 会把默认选择藏在 Bean 优先级里，router 更显式，后续做评估对比或按配置切换更清楚。
+
+`RemoteDenseEmbeddingClient.providerName()` 固定返回 `remote-dense`，不包含 model 名。为什么：provider_name 是向量归档和评估分组的稳定维度，同一 remote provider 换模型不应该产生一堆 provider_name，否则后续回填、归档和对比会复杂化；模型名应该放在配置和日志里。面试可能追问：那怎么区分不同模型效果？回答是评估报告可以记录 model 配置，但存储 provider 先保持稳定，真正的模型版本维度后续再单独设计。
+
+本轮不改 `EmbeddingClient` 的 `Map<String, Double>` 签名，dense 向量后续会临时用 `"0".."n-1"` 作为 key 复用现有 JSON 存储和 cosineSimilarity。为什么：这是 Stage B 过渡方案，能最小化对现有稀疏向量、RRF、评估链路的冲击；它不是最终向量存储设计，也不是向量数据库。面试可能追问：什么时候要换接口或 pgvector？回答是当 dense embedding 真正进入回填、查询和规模化检索时，再独立设计维度校验、批量回填、向量索引和数据库方案。
+
 这份笔记用于记录我们一边开发 DevMind，一边需要真正理解的后端和 AI 应用知识点。
 
 ## 01 为什么 documentId 从 1 变成 2

@@ -3,8 +3,11 @@ package com.devmind.module.search.service;
 import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
+import com.devmind.module.ai.config.AiProperties;
+import com.devmind.module.search.embedding.EmbeddingClientRouter;
 import com.devmind.module.search.embedding.EmbeddingTextBuilder;
 import com.devmind.module.search.embedding.LocalEmbeddingClient;
+import com.devmind.module.search.embedding.RemoteDenseEmbeddingClient;
 import com.devmind.module.search.entity.DocumentChunkVector;
 import com.devmind.module.search.mapper.DocumentChunkVectorMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,7 +32,7 @@ class ChunkVectorServiceTest {
         ChunkVectorService service = new ChunkVectorService(
                 vectorMapper,
                 documentMapper,
-                new LocalEmbeddingClient(),
+                localRouter(),
                 new EmbeddingTextBuilder(),
                 new ObjectMapper()
         );
@@ -54,7 +57,7 @@ class ChunkVectorServiceTest {
         ChunkVectorService service = new ChunkVectorService(
                 vectorMapper,
                 mock(KnowledgeDocumentMapper.class),
-                new LocalEmbeddingClient(),
+                localRouter(),
                 new EmbeddingTextBuilder(),
                 new ObjectMapper()
         );
@@ -69,7 +72,7 @@ class ChunkVectorServiceTest {
         ChunkVectorService service = new ChunkVectorService(
                 mock(DocumentChunkVectorMapper.class),
                 mock(KnowledgeDocumentMapper.class),
-                new LocalEmbeddingClient(),
+                localRouter(),
                 new EmbeddingTextBuilder(),
                 new ObjectMapper()
         );
@@ -101,5 +104,13 @@ class ChunkVectorServiceTest {
         chunk.setTokenCount(20);
         chunk.setStatus(1);
         return chunk;
+    }
+
+    private EmbeddingClientRouter localRouter() {
+        AiProperties aiProperties = new AiProperties();
+        return new EmbeddingClientRouter(
+                aiProperties,
+                List.of(new LocalEmbeddingClient(), new RemoteDenseEmbeddingClient(aiProperties))
+        );
     }
 }

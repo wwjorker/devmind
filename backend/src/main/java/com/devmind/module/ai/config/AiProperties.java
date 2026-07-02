@@ -12,6 +12,7 @@ public class AiProperties {
     private String deepseekBaseUrl = "https://api.deepseek.com";
     private String deepseekModel = "deepseek-v4-flash";
     private Double deepseekTemperature = 0.2;
+    private EmbeddingProperties embedding = new EmbeddingProperties();
 
     public String getProvider() {
         return provider;
@@ -51,5 +52,75 @@ public class AiProperties {
 
     public void setDeepseekTemperature(Double deepseekTemperature) {
         this.deepseekTemperature = deepseekTemperature;
+    }
+
+    public EmbeddingProperties getEmbedding() {
+        return embedding;
+    }
+
+    public void setEmbedding(EmbeddingProperties embedding) {
+        this.embedding = embedding;
+    }
+
+    public static class EmbeddingProperties {
+
+        private String provider = "local-sparse-vector";
+        private RemoteProperties remote = new RemoteProperties();
+
+        public String getProvider() {
+            return provider;
+        }
+
+        public void setProvider(String provider) {
+            this.provider = provider;
+        }
+
+        public RemoteProperties getRemote() {
+            return remote;
+        }
+
+        public void setRemote(RemoteProperties remote) {
+            this.remote = remote;
+        }
+    }
+
+    public static class RemoteProperties {
+
+        private String baseUrl = "";
+        private String apiKey = "";
+        private String model = "";
+        private Integer dimension = 0;
+
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        public void setBaseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
+
+        public String getModel() {
+            return model;
+        }
+
+        public void setModel(String model) {
+            this.model = model;
+        }
+
+        public Integer getDimension() {
+            return dimension;
+        }
+
+        public void setDimension(Integer dimension) {
+            this.dimension = dimension;
+        }
     }
 }
