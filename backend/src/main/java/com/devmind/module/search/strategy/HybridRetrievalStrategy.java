@@ -5,7 +5,7 @@ import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
-import com.devmind.module.search.embedding.EmbeddingClient;
+import com.devmind.module.search.embedding.EmbeddingClientRouter;
 import com.devmind.module.search.embedding.EmbeddingTextBuilder;
 import com.devmind.module.search.entity.DocumentChunkVector;
 import com.devmind.module.search.service.ChunkVectorService;
@@ -41,20 +41,20 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
     private final KeywordRetrievalStrategy keywordRetrievalStrategy;
     private final DocumentChunkMapper chunkMapper;
     private final KnowledgeDocumentMapper documentMapper;
-    private final EmbeddingClient embeddingClient;
+    private final EmbeddingClientRouter embeddingClientRouter;
     private final EmbeddingTextBuilder embeddingTextBuilder;
     private final ChunkVectorService chunkVectorService;
 
     public HybridRetrievalStrategy(KeywordRetrievalStrategy keywordRetrievalStrategy,
                                    DocumentChunkMapper chunkMapper,
                                    KnowledgeDocumentMapper documentMapper,
-                                   EmbeddingClient embeddingClient,
+                                   EmbeddingClientRouter embeddingClientRouter,
                                    EmbeddingTextBuilder embeddingTextBuilder,
                                    ChunkVectorService chunkVectorService) {
         this.keywordRetrievalStrategy = keywordRetrievalStrategy;
         this.chunkMapper = chunkMapper;
         this.documentMapper = documentMapper;
-        this.embeddingClient = embeddingClient;
+        this.embeddingClientRouter = embeddingClientRouter;
         this.embeddingTextBuilder = embeddingTextBuilder;
         this.chunkVectorService = chunkVectorService;
     }
@@ -98,7 +98,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
     }
 
     private List<ChunkSearchResponse> retrieveByLocalEmbedding(Long userId, List<String> keywords) {
-        Map<String, Double> queryVector = embeddingClient.embed(embeddingTextBuilder.buildForQuery(keywords));
+        Map<String, Double> queryVector = embeddingClientRouter.embed(embeddingTextBuilder.buildForQuery(keywords));
         if (queryVector.isEmpty()) {
             return List.of();
         }
@@ -132,7 +132,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
             if (document == null) {
                 continue;
             }
-            double similarity = embeddingClient.cosineSimilarity(
+            double similarity = embeddingClientRouter.cosineSimilarity(
                     queryVector,
                     chunkVectorService.decodeVector(persistedVector.getVectorJson())
             );
@@ -170,7 +170,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                 continue;
             }
             String embeddingText = embeddingTextBuilder.buildForChunk(document, chunk);
-            double similarity = embeddingClient.cosineSimilarity(queryVector, embeddingClient.embed(embeddingText));
+            double similarity = embeddingClientRouter.cosineSimilarity(queryVector, embeddingClientRouter.embed(embeddingText));
             if (similarity <= 0.0) {
                 continue;
             }

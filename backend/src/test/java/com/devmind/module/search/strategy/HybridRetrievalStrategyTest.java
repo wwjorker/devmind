@@ -4,9 +4,12 @@ import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
+import com.devmind.module.ai.config.AiProperties;
 import com.devmind.module.search.embedding.EmbeddingClient;
+import com.devmind.module.search.embedding.EmbeddingClientRouter;
 import com.devmind.module.search.embedding.EmbeddingTextBuilder;
 import com.devmind.module.search.embedding.LocalEmbeddingClient;
+import com.devmind.module.search.embedding.RemoteDenseEmbeddingClient;
 import com.devmind.module.search.entity.DocumentChunkVector;
 import com.devmind.module.search.service.ChunkVectorService;
 import com.devmind.module.search.vo.ChunkSearchResponse;
@@ -33,7 +36,7 @@ class HybridRetrievalStrategyTest {
                 keywordStrategy,
                 chunkMapper,
                 documentMapper,
-                embeddingClient,
+                localRouter(),
                 new EmbeddingTextBuilder(),
                 chunkVectorService
         );
@@ -78,7 +81,7 @@ class HybridRetrievalStrategyTest {
                 keywordStrategy,
                 chunkMapper,
                 documentMapper,
-                embeddingClient,
+                localRouter(),
                 new EmbeddingTextBuilder(),
                 chunkVectorService
         );
@@ -133,7 +136,7 @@ class HybridRetrievalStrategyTest {
                 keywordStrategy,
                 chunkMapper,
                 documentMapper,
-                new LocalEmbeddingClient(),
+                localRouter(),
                 new EmbeddingTextBuilder(),
                 chunkVectorService
         );
@@ -165,7 +168,7 @@ class HybridRetrievalStrategyTest {
                 keywordStrategy,
                 chunkMapper,
                 documentMapper,
-                embeddingClient,
+                localRouter(),
                 new EmbeddingTextBuilder(),
                 chunkVectorService
         );
@@ -233,5 +236,13 @@ class HybridRetrievalStrategyTest {
         document.setTags(tags);
         document.setStatus(1);
         return document;
+    }
+
+    private EmbeddingClientRouter localRouter() {
+        AiProperties aiProperties = new AiProperties();
+        return new EmbeddingClientRouter(
+                aiProperties,
+                List.of(new LocalEmbeddingClient(), new RemoteDenseEmbeddingClient(aiProperties))
+        );
     }
 }

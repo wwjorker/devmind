@@ -44,3 +44,10 @@ devmind:
     deepseek-base-url: ${DEVMIND_DEEPSEEK_BASE_URL:https://api.deepseek.com}
     deepseek-model: ${DEVMIND_DEEPSEEK_MODEL:deepseek-v4-flash}
     deepseek-temperature: ${DEVMIND_DEEPSEEK_TEMPERATURE:0.2}
+    embedding:
+      provider: ${DEVMIND_AI_EMBEDDING_PROVIDER:local-sparse-vector}
+      remote:
+        base-url: ${DEVMIND_AI_EMBEDDING_REMOTE_BASE_URL:}
+        api-key: ${DEVMIND_AI_EMBEDDING_REMOTE_API_KEY:}
+        model: ${DEVMIND_AI_EMBEDDING_REMOTE_MODEL:}
+        dimension: ${DEVMIND_AI_EMBEDDING_REMOTE_DIMENSION:0}
