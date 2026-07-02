@@ -137,6 +137,186 @@ public class RagEvaluationDatasetService {
                     "应该说明可以用标准问题、期望答案、召回 chunks、bad case feedback、Hit@K 和 MRR 评估链路质量。",
                     "证据应该来自 evaluation dataset、bad case 或 RAG 质量分析文档。",
                     "evaluation_reasoning"
+            ),
+            new EvaluationCaseDefinition(
+                    "redis-empty-value-cache-plain",
+                    "redis",
+                    "查不存在的数据时怎样别让请求每次都落到数据库？",
+                    List.of("Redis 缓存穿透复盘", "Redis cache penetration review", "Redis cache penetration review updated", "redis-cache-penetration"),
+                    List.of("Redis", "空值缓存", "数据库", "限流"),
+                    "应该识别这是缓存穿透场景，说明空值缓存、短 TTL、参数校验、限流或布隆过滤器等做法。",
+                    "证据应该来自 Redis 缓存穿透复盘文档；这个 case 不直接出现“缓存穿透”，用于检验口语化改写下的召回。",
+                    "lexical_mismatch_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "jwt-old-token-block-plain",
+                    "security",
+                    "退出后旧令牌还能访问接口，服务端要怎么拦？",
+                    List.of("JWT 退出登录与 Redis 黑名单"),
+                    List.of("JWT", "token", "Redis", "TTL"),
+                    "应该说明 JWT 无状态，退出后需要把旧 token 写入 Redis 黑名单，并用剩余有效期作为 TTL。",
+                    "证据应该来自 JWT 退出登录与 Redis 黑名单文档；这个 case 用“旧令牌”替代 JWT 黑名单直问。",
+                    "lexical_mismatch_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "flyway-manual-sql-drift",
+                    "database",
+                    "每个环境手动改表结构容易不一致，这个项目怎么避免？",
+                    List.of("Flyway migration 数据库迁移"),
+                    List.of("Flyway", "migration", "schema", "version"),
+                    "应该说明用 Flyway migration 管理表结构版本，应用启动时自动执行未运行的迁移脚本，减少环境漂移。",
+                    "证据应该来自 Flyway migration 数据库迁移文档；这个 case 不直接问 Flyway，而是描述手动 SQL 的痛点。",
+                    "lexical_mismatch_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "llm-mock-provider-local-test",
+                    "ai_engineering",
+                    "为什么本地测试时不用真的请求 DeepSeek，也能跑通 AI 问答流程？",
+                    List.of("LlmClient 与 LLM Provider 抽象"),
+                    List.of("LlmClient", "Mock", "DeepSeek", "provider"),
+                    "应该说明 LlmClient 抽象隔离了模型供应商，本地可以走 Mock provider，真实环境再切到 DeepSeek。",
+                    "证据应该来自 LlmClient 与 LLM Provider 抽象文档；这个 case 从测试成本角度追问 provider 抽象。",
+                    "lexical_mismatch_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "rag-no-evidence-dont-answer",
+                    "rag",
+                    "知识库里没资料时系统为什么不应该硬编答案？",
+                    List.of("RAG 无上下文兜底"),
+                    List.of("RAG", "fallback", "hallucination", "chunks"),
+                    "应该说明没有检索到有效 chunk 时应返回无上下文兜底，避免幻觉和无效 token 成本。",
+                    "证据应该来自 RAG 无上下文兜底文档；这个 case 用“硬编答案”描述幻觉风险。",
+                    "lexical_mismatch_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "redis-bloom-filter-wording",
+                    "redis",
+                    "布隆过滤器在缓存查询链路里能挡住哪类异常流量？",
+                    List.of("Redis 缓存穿透复盘", "Redis cache penetration review", "Redis cache penetration review updated", "redis-cache-penetration"),
+                    List.of("Redis", "布隆过滤器", "非法参数", "miss"),
+                    "应该说明布隆过滤器可提前拦截明显不存在或高风险的查询，减少缓存 miss 和数据库压力。",
+                    "证据应该来自 Redis 缓存穿透复盘文档；这个 case 是同一主题的另一种表达。",
+                    "synonym_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "jwt-blacklist-ttl-wording",
+                    "security",
+                    "退出登录时黑名单里的 token 应该保存多久？",
+                    List.of("JWT 退出登录与 Redis 黑名单"),
+                    List.of("JWT", "blacklist", "TTL", "logout"),
+                    "应该说明黑名单 entry 的 TTL 应等于 token 剩余有效期，过期后无需继续保存。",
+                    "证据应该来自 JWT 退出登录与 Redis 黑名单文档；这个 case 聚焦 TTL 细节。",
+                    "synonym_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "flyway-versioned-script-wording",
+                    "database",
+                    "数据库变更脚本为什么要带版本号并随应用启动执行？",
+                    List.of("Flyway migration 数据库迁移"),
+                    List.of("Flyway", "version", "migration", "script"),
+                    "应该说明版本化迁移脚本可以记录已执行版本，启动时自动补齐未执行的数据库结构变更。",
+                    "证据应该来自 Flyway migration 数据库迁移文档；这个 case 从脚本版本化角度追问。",
+                    "synonym_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "llm-provider-switch-wording",
+                    "ai_engineering",
+                    "如果以后模型供应商从 DeepSeek 换成别家，业务代码为什么不用大改？",
+                    List.of("LlmClient 与 LLM Provider 抽象"),
+                    List.of("LlmClient", "provider", "DeepSeek", "Mock"),
+                    "应该说明业务依赖 LlmClient 接口和 Router，供应商差异留在具体 client 实现中。",
+                    "证据应该来自 LlmClient 与 LLM Provider 抽象文档；这个 case 检查供应商切换能力。",
+                    "synonym_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "rag-quality-metric-wording",
+                    "evaluation",
+                    "除了看回答顺不顺，还能用哪些离线指标判断 RAG 检索质量？",
+                    List.of("RAG 回答质量评估"),
+                    List.of("RAG", "Hit@K", "MRR", "gold label"),
+                    "应该说明可以用标准问题、gold label、召回 chunks、Hit@K、MRR 和 bad case feedback 评估质量。",
+                    "证据应该来自 RAG 回答质量评估文档；这个 case 是评估主题的另一种问法。",
+                    "synonym_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "unknown-kafka-consumer-rebalance",
+                    "negative_case",
+                    "Kafka consumer rebalance 为什么会变慢？",
+                    List.of(),
+                    List.of("Kafka", "consumer", "rebalance"),
+                    "如果知识库没有 Kafka 笔记，期望行为是返回无上下文兜底，而不是把 Redis、JWT 或 RAG 文档硬套过来。",
+                    "除非已经添加 Kafka 文档，否则期望证据是召回 chunk 数为 0。",
+                    "no_context_negative_case"
+            ),
+            new EvaluationCaseDefinition(
+                    "unknown-elasticsearch-inverted-index",
+                    "negative_case",
+                    "Elasticsearch 倒排索引怎么做相关性排序？",
+                    List.of(),
+                    List.of("Elasticsearch", "inverted index", "ranking"),
+                    "如果知识库没有 Elasticsearch 笔记，期望行为是返回无上下文兜底。",
+                    "除非已经添加 Elasticsearch 文档，否则期望证据是召回 chunk 数为 0。",
+                    "no_context_negative_case"
+            ),
+            new EvaluationCaseDefinition(
+                    "unknown-docker-layer-cache",
+                    "negative_case",
+                    "Docker 镜像层缓存为什么能加速构建？",
+                    List.of(),
+                    List.of("Docker", "image", "layer cache"),
+                    "如果知识库没有 Docker 笔记，期望行为是返回无上下文兜底。",
+                    "除非已经添加 Docker 文档，否则期望证据是召回 chunk 数为 0。",
+                    "no_context_negative_case"
+            ),
+            new EvaluationCaseDefinition(
+                    "unknown-spring-cloud-gateway",
+                    "negative_case",
+                    "Spring Cloud Gateway 的全局过滤器链怎么排序？",
+                    List.of(),
+                    List.of("Spring Cloud Gateway", "filter", "order"),
+                    "如果知识库没有 Spring Cloud Gateway 笔记，期望行为是返回无上下文兜底。",
+                    "除非已经添加 Spring Cloud Gateway 文档，否则期望证据是召回 chunk 数为 0。",
+                    "no_context_negative_case"
+            ),
+            new EvaluationCaseDefinition(
+                    "hard-negative-redis-vs-flyway-database-pressure",
+                    "redis",
+                    "数据库压力很大但根因是缓存 miss 反复穿透时，该看哪篇笔记？",
+                    List.of("Redis 缓存穿透复盘", "Redis cache penetration review", "Redis cache penetration review updated", "redis-cache-penetration"),
+                    List.of("Redis", "database", "miss", "TTL"),
+                    "虽然问题包含数据库，但 gold 应该是 Redis 缓存穿透复盘，因为根因是缓存 miss 反复打到数据库。",
+                    "证据应该来自 Redis 缓存穿透复盘文档；这个 case 用 database 干扰 Flyway 文档。",
+                    "hard_negative_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "hard-negative-jwt-vs-rag-fallback",
+                    "security",
+                    "用户退出后访问接口被拒绝，这是 fallback 兜底还是 token 黑名单？",
+                    List.of("JWT 退出登录与 Redis 黑名单"),
+                    List.of("JWT", "token", "blacklist", "fallback"),
+                    "问题里有 fallback 干扰词，但正确证据应是 JWT 退出登录与 Redis 黑名单。",
+                    "证据应该来自 JWT 退出登录与 Redis 黑名单文档；这个 case 用 fallback 干扰 RAG 兜底文档。",
+                    "hard_negative_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "hard-negative-rag-evaluation-vs-llm-provider",
+                    "evaluation",
+                    "不是换 DeepSeek provider，而是想知道回答质量怎么量化，应该看哪块？",
+                    List.of("RAG 回答质量评估"),
+                    List.of("RAG", "evaluation", "DeepSeek", "provider"),
+                    "问题带有 DeepSeek/provider 干扰词，但 gold 应该是 RAG 回答质量评估。",
+                    "证据应该来自 RAG 回答质量评估文档；这个 case 用 provider 干扰 LlmClient 文档。",
+                    "hard_negative_retrieval"
+            ),
+            new EvaluationCaseDefinition(
+                    "hard-negative-flyway-vs-llm-router",
+                    "database",
+                    "Router 能切 provider 不是重点，数据库表结构版本漂移要靠什么管？",
+                    List.of("Flyway migration 数据库迁移"),
+                    List.of("Flyway", "migration", "provider", "version"),
+                    "问题带有 provider/Router 干扰词，但 gold 应该是 Flyway migration 数据库迁移。",
+                    "证据应该来自 Flyway migration 数据库迁移文档；这个 case 用 provider 干扰 LlmClient 文档。",
+                    "hard_negative_retrieval"
             )
     );
 
