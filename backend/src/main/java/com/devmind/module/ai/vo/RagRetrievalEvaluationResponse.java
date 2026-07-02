@@ -23,6 +23,7 @@ public class RagRetrievalEvaluationResponse {
     private double baselineMrr;
     private double hitAtKDelta;
     private double mrrDelta;
+    private List<RagRetrievalStrategyEvaluationResponse> strategyResults;
     private List<RagRetrievalEvaluationCaseResponse> cases;
 
     public RagRetrievalEvaluationResponse() {
@@ -47,6 +48,7 @@ public class RagRetrievalEvaluationResponse {
                                           double baselineMrr,
                                           double hitAtKDelta,
                                           double mrrDelta,
+                                          List<RagRetrievalStrategyEvaluationResponse> strategyResults,
                                           List<RagRetrievalEvaluationCaseResponse> cases) {
         this.totalCaseCount = totalCaseCount;
         this.passedCaseCount = passedCaseCount;
@@ -67,6 +69,7 @@ public class RagRetrievalEvaluationResponse {
         this.baselineMrr = baselineMrr;
         this.hitAtKDelta = hitAtKDelta;
         this.mrrDelta = mrrDelta;
+        this.strategyResults = strategyResults;
         this.cases = cases;
     }
 
@@ -220,6 +223,14 @@ public class RagRetrievalEvaluationResponse {
 
     public void setMrrDelta(double mrrDelta) {
         this.mrrDelta = mrrDelta;
+    }
+
+    public List<RagRetrievalStrategyEvaluationResponse> getStrategyResults() {
+        return strategyResults;
+    }
+
+    public void setStrategyResults(List<RagRetrievalStrategyEvaluationResponse> strategyResults) {
+        this.strategyResults = strategyResults;
     }
 
     public List<RagRetrievalEvaluationCaseResponse> getCases() {

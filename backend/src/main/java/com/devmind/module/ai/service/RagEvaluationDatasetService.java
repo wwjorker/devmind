@@ -7,9 +7,13 @@ import com.devmind.module.ai.vo.RagEvaluationCaseResponse;
 import com.devmind.module.ai.vo.RagEvaluationDatasetResponse;
 import com.devmind.module.ai.vo.RagRetrievalEvaluationCaseResponse;
 import com.devmind.module.ai.vo.RagRetrievalEvaluationResponse;
+import com.devmind.module.ai.vo.RagRetrievalStrategyEvaluationResponse;
+import com.devmind.module.search.strategy.HybridRetrievalStrategy;
 import com.devmind.module.search.strategy.KeywordRetrievalStrategy;
 import com.devmind.module.search.strategy.RetrievalStrategy;
 import com.devmind.module.search.vo.ChunkSearchResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -23,9 +27,15 @@ import java.util.Set;
 @Service
 public class RagEvaluationDatasetService {
 
+    private static final Logger log = LoggerFactory.getLogger(RagEvaluationDatasetService.class);
+
     private static final int RETRIEVAL_EVALUATION_K = 3;
     private static final int RETRIEVAL_EVALUATION_LIMIT = 5;
     private static final String RELEVANCE_MODE = "gold-document-title";
+    private static final String LOCAL_SPARSE_PROVIDER = "local-sparse-vector";
+    private static final String REMOTE_DENSE_PROVIDER = "remote-dense";
+    private static final String STATUS_AVAILABLE = "available";
+    private static final String STATUS_UNAVAILABLE = "unavailable";
 
     private static final List<EvaluationCaseDefinition> CASES = List.of(
             new EvaluationCaseDefinition(
@@ -131,16 +141,16 @@ public class RagEvaluationDatasetService {
     );
 
     private final AiAskLogMapper askLogMapper;
-    private final RetrievalStrategy retrievalStrategy;
+    private final HybridRetrievalStrategy hybridRetrievalStrategy;
     private final KeywordRetrievalStrategy keywordRetrievalStrategy;
     private final RetrievalKeywordService retrievalKeywordService;
 
     public RagEvaluationDatasetService(AiAskLogMapper askLogMapper,
-                                       RetrievalStrategy retrievalStrategy,
+                                       HybridRetrievalStrategy hybridRetrievalStrategy,
                                        KeywordRetrievalStrategy keywordRetrievalStrategy,
                                        RetrievalKeywordService retrievalKeywordService) {
         this.askLogMapper = askLogMapper;
-        this.retrievalStrategy = retrievalStrategy;
+        this.hybridRetrievalStrategy = hybridRetrievalStrategy;
         this.keywordRetrievalStrategy = keywordRetrievalStrategy;
         this.retrievalKeywordService = retrievalKeywordService;
     }
@@ -167,36 +177,70 @@ public class RagEvaluationDatasetService {
     }
 
     public RagRetrievalEvaluationResponse retrievalEvaluation(Long userId) {
-        EvaluationRun currentRun = evaluateWithStrategy(userId, retrievalStrategy);
         EvaluationRun baselineRun = evaluateWithStrategy(userId, keywordRetrievalStrategy);
+        EvaluationRun sparseRun = evaluateWithHybridProvider(userId, LOCAL_SPARSE_PROVIDER);
+        List<RagRetrievalStrategyEvaluationResponse> strategyResults = List.of(
+                availableStrategyResult(
+                        "keyword-baseline",
+                        null,
+                        keywordRetrievalStrategy.strategyName(),
+                        keywordRetrievalStrategy.description(),
+                        baselineRun,
+                        baselineRun
+                ),
+                availableStrategyResult(
+                        "sparse-hybrid",
+                        LOCAL_SPARSE_PROVIDER,
+                        hybridRetrievalStrategy.strategyName(),
+                        hybridRetrievalStrategy.description(),
+                        sparseRun,
+                        baselineRun
+                ),
+                denseHybridStrategyResult(userId, baselineRun)
+        );
 
         return new RagRetrievalEvaluationResponse(
-                currentRun.caseResponses().size(),
-                currentRun.passedCaseCount(),
-                currentRun.passRate(),
-                currentRun.positiveCaseCount(),
+                sparseRun.caseResponses().size(),
+                sparseRun.passedCaseCount(),
+                sparseRun.passRate(),
+                sparseRun.positiveCaseCount(),
                 RETRIEVAL_EVALUATION_K,
                 RETRIEVAL_EVALUATION_LIMIT,
-                retrievalStrategy.strategyName(),
-                retrievalStrategy.description(),
+                hybridRetrievalStrategy.strategyName(),
+                hybridRetrievalStrategy.description(),
                 keywordRetrievalStrategy.strategyName(),
                 keywordRetrievalStrategy.description(),
                 RELEVANCE_MODE,
-                currentRun.hitAtK(),
-                currentRun.mrr(),
+                sparseRun.hitAtK(),
+                sparseRun.mrr(),
                 baselineRun.passedCaseCount(),
                 baselineRun.passRate(),
                 baselineRun.hitAtK(),
                 baselineRun.mrr(),
-                roundToFourDecimals(currentRun.hitAtK() - baselineRun.hitAtK()),
-                roundToFourDecimals(currentRun.mrr() - baselineRun.mrr()),
-                currentRun.caseResponses()
+                roundToFourDecimals(sparseRun.hitAtK() - baselineRun.hitAtK()),
+                roundToFourDecimals(sparseRun.mrr() - baselineRun.mrr()),
+                strategyResults,
+                sparseRun.caseResponses()
         );
     }
 
     private EvaluationRun evaluateWithStrategy(Long userId, RetrievalStrategy strategy) {
+        return evaluateWithRetriever(userId, strategy::retrieve);
+    }
+
+    private EvaluationRun evaluateWithHybridProvider(Long userId, String provider) {
+        return evaluateWithRetriever(userId,
+                (caseUserId, keywords, limit) -> hybridRetrievalStrategy.retrieveWithEmbeddingProvider(
+                        caseUserId,
+                        keywords,
+                        limit,
+                        provider
+                ));
+    }
+
+    private EvaluationRun evaluateWithRetriever(Long userId, CaseRetriever retriever) {
         List<RagRetrievalEvaluationCaseResponse> caseResponses = CASES.stream()
-                .map(caseDefinition -> evaluateRetrievalCase(userId, caseDefinition, strategy))
+                .map(caseDefinition -> evaluateRetrievalCase(userId, caseDefinition, retriever))
                 .toList();
 
         int passedCaseCount = (int) caseResponses.stream()
@@ -223,6 +267,70 @@ public class RagEvaluationDatasetService {
                 .sum() / positiveCaseCount);
 
         return new EvaluationRun(caseResponses, passedCaseCount, passRate, positiveCaseCount, hitAtK, mrr);
+    }
+
+    private RagRetrievalStrategyEvaluationResponse denseHybridStrategyResult(Long userId, EvaluationRun baselineRun) {
+        try {
+            EvaluationRun denseRun = evaluateWithHybridProvider(userId, REMOTE_DENSE_PROVIDER);
+            return availableStrategyResult(
+                    "dense-hybrid",
+                    REMOTE_DENSE_PROVIDER,
+                    hybridRetrievalStrategy.strategyName(),
+                    hybridRetrievalStrategy.description(),
+                    denseRun,
+                    baselineRun
+            );
+        } catch (RuntimeException ex) {
+            log.warn("Dense hybrid retrieval evaluation is unavailable. provider={}, reason={}",
+                    REMOTE_DENSE_PROVIDER,
+                    safeUnavailableReason(ex));
+            return new RagRetrievalStrategyEvaluationResponse(
+                    "dense-hybrid",
+                    REMOTE_DENSE_PROVIDER,
+                    hybridRetrievalStrategy.strategyName(),
+                    hybridRetrievalStrategy.description(),
+                    STATUS_UNAVAILABLE,
+                    safeUnavailableReason(ex),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    List.of()
+            );
+        }
+    }
+
+    private RagRetrievalStrategyEvaluationResponse availableStrategyResult(String strategyKey,
+                                                                          String embeddingProvider,
+                                                                          String retrievalStrategy,
+                                                                          String retrievalStrategyDescription,
+                                                                          EvaluationRun run,
+                                                                          EvaluationRun baselineRun) {
+        return new RagRetrievalStrategyEvaluationResponse(
+                strategyKey,
+                embeddingProvider,
+                retrievalStrategy,
+                retrievalStrategyDescription,
+                STATUS_AVAILABLE,
+                null,
+                run.passedCaseCount(),
+                run.passRate(),
+                run.positiveCaseCount(),
+                run.hitAtK(),
+                run.mrr(),
+                roundToFourDecimals(run.hitAtK() - baselineRun.hitAtK()),
+                roundToFourDecimals(run.mrr() - baselineRun.mrr()),
+                run.caseResponses()
+        );
+    }
+
+    private String safeUnavailableReason(RuntimeException ex) {
+        return ex.getMessage() == null || ex.getMessage().isBlank()
+                ? "dense hybrid retrieval is unavailable"
+                : ex.getMessage();
     }
 
     private Map<String, AiAskLog> loadLatestLogByQuestion(Long userId) {
@@ -267,9 +375,9 @@ public class RagEvaluationDatasetService {
 
     private RagRetrievalEvaluationCaseResponse evaluateRetrievalCase(Long userId,
                                                                     EvaluationCaseDefinition caseDefinition,
-                                                                    RetrievalStrategy strategy) {
+                                                                    CaseRetriever retriever) {
         List<String> queryKeywords = retrievalKeywordService.resolveKeywords(caseDefinition.question());
-        List<ChunkSearchResponse> chunks = strategy.retrieve(userId, queryKeywords, RETRIEVAL_EVALUATION_LIMIT);
+        List<ChunkSearchResponse> chunks = retriever.retrieve(userId, queryKeywords, RETRIEVAL_EVALUATION_LIMIT);
         boolean expectedNoContext = "no_context_negative_case".equals(caseDefinition.riskType());
         List<String> matchedKeywords = matchedExpectedKeywords(caseDefinition.expectedKeywords(), chunks);
         List<String> missingKeywords = missingExpectedKeywords(caseDefinition.expectedKeywords(), matchedKeywords);
@@ -420,5 +528,11 @@ public class RagEvaluationDatasetService {
                                  int positiveCaseCount,
                                  double hitAtK,
                                  double mrr) {
+    }
+
+    @FunctionalInterface
+    private interface CaseRetriever {
+
+        List<ChunkSearchResponse> retrieve(Long userId, List<String> keywords, Integer limit);
     }
 }
