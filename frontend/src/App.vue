@@ -843,6 +843,40 @@ onMounted(async () => {
               </div>
             </div>
 
+            <div
+              v-if="(retrievalEvaluation?.strategyResults?.length ?? 0) > 0"
+              class="strategy-comparison"
+            >
+              <h4>四方检索策略对比（Hit@{{ retrievalEvaluation?.evaluationK ?? 3 }} / MRR，相对 keyword baseline）</h4>
+              <table class="strategy-table">
+                <thead>
+                  <tr>
+                    <th>策略</th>
+                    <th>状态</th>
+                    <th>Hit@{{ retrievalEvaluation?.evaluationK ?? 3 }}</th>
+                    <th>MRR</th>
+                    <th>ΔHit</th>
+                    <th>ΔMRR</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="strategy in retrievalEvaluation?.strategyResults || []" :key="strategy.strategyKey">
+                    <td>{{ strategy.strategyKey }}</td>
+                    <td>
+                      <span v-if="strategy.status === 'available'" class="strategy-ok">可用</span>
+                      <span v-else class="strategy-na" :title="strategy.unavailableReason || ''">
+                        不可用<template v-if="strategy.unavailableReason">（{{ strategy.unavailableReason }}）</template>
+                      </span>
+                    </td>
+                    <td>{{ strategy.status === 'available' ? Math.round((strategy.hitAtK ?? 0) * 100) + '%' : '—' }}</td>
+                    <td>{{ strategy.status === 'available' ? (strategy.mrr ?? 0).toFixed(3) : '—' }}</td>
+                    <td>{{ strategy.status === 'available' ? formatSignedPercent(strategy.hitAtKDelta ?? 0) : '—' }}</td>
+                    <td>{{ strategy.status === 'available' ? formatSignedNumber(strategy.mrrDelta ?? 0) : '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
             <div class="evaluation-case-list">
               <div
                 v-for="testCase in retrievalEvaluation?.cases || []"

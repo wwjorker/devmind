@@ -127,10 +127,11 @@ sequenceDiagram
 
 - Soft archive is used for documents and chunks to preserve history.
 - Chunks are rebuilt after document updates to keep retrieval results aligned with the latest content.
-- Retrieval uses a `RetrievalStrategy` abstraction so keyword, hybrid, and future vector strategies can share the same ask and evaluation flow.
-- `EmbeddingClient` separates local sparse-vector similarity from retrieval orchestration, so the current deterministic implementation can later be replaced by a real embedding provider or vector store.
+- Retrieval uses `RetrievalStrategy`, `EmbeddingClient`, and `RerankClient` abstractions so keyword, sparse-vector, dense-embedding, and rerank strategies share the same ask and evaluation flow.
+- `EmbeddingClient` separates vector representation from retrieval orchestration: a local deterministic sparse vector (default, zero external cost) and an optional real dense embedding (OpenAI-compatible API) coexist by `provider_name` in the same vector table and can be switched by configuration.
+- `RerankClient` isolates the rerank provider (default `none`, optional external `/rerank` API), used in the offline four-way evaluation.
 - Chunk vector rows are rebuilt together with document chunks and stored in `knowledge_document_chunk_vector`. The ask path builds only the query vector, then compares it with persisted chunk vectors instead of recomputing every chunk vector on each question.
-- Hybrid retrieval uses RRF to fuse keyword/FULLTEXT ranking with local sparse-vector ranking, avoiding direct addition of scores with different scales.
+- Hybrid retrieval uses RRF to fuse keyword/FULLTEXT ranking with vector ranking, avoiding direct addition of scores with different scales.
 - `LlmClient` separates model-provider implementation from RAG orchestration.
 - Ask logs record question, retrieval keyword, chunk ids, answer, provider, token usage, and elapsed time for later bad-case analysis.
 - Ask feedback stores helpfulness labels, reasons, and expected answers so bad cases can become a small evaluation dataset.
@@ -139,8 +140,8 @@ sequenceDiagram
 
 ## Next Improvements
 
-- Add DeepSeek real-call smoke test with environment-only API key.
-- Add external embedding provider and vector-store retrieval.
-- Compare keyword baseline, current hybrid/RRF retrieval, and future vector retrieval with the same gold-label evaluation set.
-- Add a dedicated rerank stage or external vector retrieval; keep RRF as the current fusion baseline.
-- Use feedback labels to build retrieval evaluation and bad-case reports.
+- Migrate vector storage from MySQL JSON to a real vector database (e.g. pgvector) for ANN-scale retrieval.
+- Wire rerank from offline evaluation into the online ask path (with cost/latency controls), instead of evaluation only.
+- Enlarge the gold-label evaluation set so the Hit@3/MRR comparison becomes statistically significant rather than directional.
+- Harden the vector backfill endpoint for production use (authorization scope, rate limiting, async job, cost control).
+- Add semantic chunking instead of fixed-length overlap chunking.

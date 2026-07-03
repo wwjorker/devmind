@@ -1202,3 +1202,35 @@ textarea:focus {
     text-align: left;
   }
 }
+
+.strategy-comparison {
+  margin: 12px 0 4px;
+}
+.strategy-comparison h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: #334155;
+}
+.strategy-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.strategy-table th,
+.strategy-table td {
+  border: 1px solid #e5e7eb;
+  padding: 6px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+.strategy-table th {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #475569;
+}
+.strategy-table .strategy-ok {
+  color: #16a34a;
+}
+.strategy-table .strategy-na {
+  color: #94a3b8;
+}

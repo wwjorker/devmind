@@ -159,6 +159,16 @@ export interface RagRetrievalEvaluationCase {
   note: string;
 }
 
+export interface RagRetrievalStrategyEvaluation {
+  strategyKey: string;
+  status: string;
+  unavailableReason: string | null;
+  hitAtK: number | null;
+  mrr: number | null;
+  hitAtKDelta: number | null;
+  mrrDelta: number | null;
+}
+
 export interface RagRetrievalEvaluation {
   totalCaseCount: number;
   passedCaseCount: number;
@@ -179,6 +189,7 @@ export interface RagRetrievalEvaluation {
   baselineMrr: number;
   hitAtKDelta: number;
   mrrDelta: number;
+  strategyResults: RagRetrievalStrategyEvaluation[];
   cases: RagRetrievalEvaluationCase[];
 }
 
