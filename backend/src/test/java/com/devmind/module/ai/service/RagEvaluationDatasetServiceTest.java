@@ -7,6 +7,10 @@ import com.devmind.module.ai.vo.RagRetrievalEvaluationResponse;
 import com.devmind.module.ai.vo.RagRetrievalStrategyEvaluationResponse;
 import com.devmind.common.api.ResultCode;
 import com.devmind.common.exception.BizException;
+import com.devmind.module.ai.config.AiProperties;
+import com.devmind.module.search.rerank.NoneRerankClient;
+import com.devmind.module.search.rerank.RemoteRerankClient;
+import com.devmind.module.search.rerank.RerankClientRouter;
 import com.devmind.module.search.strategy.HybridRetrievalStrategy;
 import com.devmind.module.search.strategy.KeywordRetrievalStrategy;
 import com.devmind.module.search.vo.ChunkSearchResponse;
@@ -97,7 +101,8 @@ class RagEvaluationDatasetServiceTest {
                 askLogMapper,
                 retrievalStrategy,
                 keywordRetrievalStrategy,
-                retrievalKeywordService
+                retrievalKeywordService,
+                rerankRouter()
         );
 
         RagRetrievalEvaluationResponse response = service.retrievalEvaluation(1L);
@@ -123,7 +128,7 @@ class RagEvaluationDatasetServiceTest {
         assertThat(response.getMrrDelta()).isZero();
         assertThat(response.getStrategyResults())
                 .extracting(RagRetrievalStrategyEvaluationResponse::getStrategyKey)
-                .containsExactly("keyword-baseline", "sparse-hybrid", "dense-hybrid");
+                .containsExactly("keyword-baseline", "sparse-hybrid", "dense-hybrid", "dense-hybrid-rerank");
         assertThat(response.getStrategyResults())
                 .filteredOn(result -> "dense-hybrid".equals(result.getStrategyKey()))
                 .singleElement()
@@ -132,6 +137,14 @@ class RagEvaluationDatasetServiceTest {
                     assertThat(result.getEmbeddingProvider()).isEqualTo("remote-dense");
                     assertThat(result.getHitAtK()).isEqualTo(1.0);
                     assertThat(result.getMrr()).isEqualTo(1.0);
+                });
+        assertThat(response.getStrategyResults())
+                .filteredOn(result -> "dense-hybrid-rerank".equals(result.getStrategyKey()))
+                .singleElement()
+                .satisfies(result -> {
+                    assertThat(result.getStatus()).isEqualTo("unavailable");
+                    assertThat(result.getUnavailableReason()).contains("rerank provider is not configured");
+                    assertThat(result.getCases()).isEmpty();
                 });
         assertThat(response.getCases())
                 .filteredOn(caseResponse -> "redis-cache-penetration-basic".equals(caseResponse.getCaseId()))
@@ -193,7 +206,8 @@ class RagEvaluationDatasetServiceTest {
                 askLogMapper,
                 retrievalStrategy,
                 keywordRetrievalStrategy,
-                retrievalKeywordService
+                retrievalKeywordService,
+                rerankRouter()
         );
 
         RagRetrievalEvaluationResponse response = service.retrievalEvaluation(1L);
@@ -233,7 +247,8 @@ class RagEvaluationDatasetServiceTest {
                 askLogMapper,
                 retrievalStrategy,
                 keywordRetrievalStrategy,
-                retrievalKeywordService
+                retrievalKeywordService,
+                rerankRouter()
         );
 
         RagRetrievalEvaluationResponse response = service.retrievalEvaluation(1L);
@@ -269,7 +284,8 @@ class RagEvaluationDatasetServiceTest {
                 askLogMapper,
                 retrievalStrategy,
                 keywordRetrievalStrategy,
-                retrievalKeywordService
+                retrievalKeywordService,
+                rerankRouter()
         );
 
         RagRetrievalEvaluationResponse response = service.retrievalEvaluation(1L);
@@ -502,7 +518,16 @@ class RagEvaluationDatasetServiceTest {
                 askLogMapper,
                 mock(HybridRetrievalStrategy.class),
                 mock(KeywordRetrievalStrategy.class),
-                mock(RetrievalKeywordService.class)
+                mock(RetrievalKeywordService.class),
+                rerankRouter()
+        );
+    }
+
+    private RerankClientRouter rerankRouter() {
+        AiProperties aiProperties = new AiProperties();
+        return new RerankClientRouter(
+                aiProperties,
+                List.of(new NoneRerankClient(), new RemoteRerankClient(aiProperties))
         );
     }
 }

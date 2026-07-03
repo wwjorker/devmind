@@ -8,6 +8,7 @@ import com.devmind.module.ai.vo.RagEvaluationDatasetResponse;
 import com.devmind.module.ai.vo.RagRetrievalEvaluationCaseResponse;
 import com.devmind.module.ai.vo.RagRetrievalEvaluationResponse;
 import com.devmind.module.ai.vo.RagRetrievalStrategyEvaluationResponse;
+import com.devmind.module.search.rerank.RerankClientRouter;
 import com.devmind.module.search.strategy.HybridRetrievalStrategy;
 import com.devmind.module.search.strategy.KeywordRetrievalStrategy;
 import com.devmind.module.search.strategy.RetrievalStrategy;
@@ -34,6 +35,7 @@ public class RagEvaluationDatasetService {
     private static final String RELEVANCE_MODE = "gold-document-title";
     private static final String LOCAL_SPARSE_PROVIDER = "local-sparse-vector";
     private static final String REMOTE_DENSE_PROVIDER = "remote-dense";
+    private static final String REMOTE_RERANK_PROVIDER = "remote-rerank";
     private static final String STATUS_AVAILABLE = "available";
     private static final String STATUS_UNAVAILABLE = "unavailable";
 
@@ -444,15 +446,18 @@ public class RagEvaluationDatasetService {
     private final HybridRetrievalStrategy hybridRetrievalStrategy;
     private final KeywordRetrievalStrategy keywordRetrievalStrategy;
     private final RetrievalKeywordService retrievalKeywordService;
+    private final RerankClientRouter rerankClientRouter;
 
     public RagEvaluationDatasetService(AiAskLogMapper askLogMapper,
                                        HybridRetrievalStrategy hybridRetrievalStrategy,
                                        KeywordRetrievalStrategy keywordRetrievalStrategy,
-                                       RetrievalKeywordService retrievalKeywordService) {
+                                       RetrievalKeywordService retrievalKeywordService,
+                                       RerankClientRouter rerankClientRouter) {
         this.askLogMapper = askLogMapper;
         this.hybridRetrievalStrategy = hybridRetrievalStrategy;
         this.keywordRetrievalStrategy = keywordRetrievalStrategy;
         this.retrievalKeywordService = retrievalKeywordService;
+        this.rerankClientRouter = rerankClientRouter;
     }
 
     public RagEvaluationDatasetResponse dataset(Long userId) {
@@ -496,7 +501,8 @@ public class RagEvaluationDatasetService {
                         sparseRun,
                         baselineRun
                 ),
-                denseHybridStrategyResult(userId, baselineRun)
+                denseHybridStrategyResult(userId, baselineRun),
+                denseHybridRerankStrategyResult(userId, baselineRun)
         );
 
         return new RagRetrievalEvaluationResponse(
@@ -542,7 +548,27 @@ public class RagEvaluationDatasetService {
         List<RagRetrievalEvaluationCaseResponse> caseResponses = CASES.stream()
                 .map(caseDefinition -> evaluateRetrievalCase(userId, caseDefinition, retriever))
                 .toList();
+        return evaluationRun(caseResponses);
+    }
 
+    private EvaluationRun evaluateDenseHybridWithRerank(Long userId) {
+        List<RagRetrievalEvaluationCaseResponse> caseResponses = CASES.stream()
+                .map(caseDefinition -> evaluateRetrievalCase(userId, caseDefinition,
+                        (caseUserId, keywords, limit) -> {
+                            List<ChunkSearchResponse> candidates = hybridRetrievalStrategy.retrieveWithEmbeddingProvider(
+                                    caseUserId,
+                                    keywords,
+                                    limit,
+                                    REMOTE_DENSE_PROVIDER
+                            );
+                            return rerankClientRouter.clientFor(REMOTE_RERANK_PROVIDER)
+                                    .rerank(caseDefinition.question(), candidates, limit);
+                        }))
+                .toList();
+        return evaluationRun(caseResponses);
+    }
+
+    private EvaluationRun evaluationRun(List<RagRetrievalEvaluationCaseResponse> caseResponses) {
         int passedCaseCount = (int) caseResponses.stream()
                 .filter(response -> Boolean.TRUE.equals(response.getPassed()))
                 .count();
@@ -584,21 +610,38 @@ public class RagEvaluationDatasetService {
             log.warn("Dense hybrid retrieval evaluation is unavailable. provider={}, reason={}",
                     REMOTE_DENSE_PROVIDER,
                     safeUnavailableReason(ex));
-            return new RagRetrievalStrategyEvaluationResponse(
+            return unavailableStrategyResult(
                     "dense-hybrid",
                     REMOTE_DENSE_PROVIDER,
                     hybridRetrievalStrategy.strategyName(),
                     hybridRetrievalStrategy.description(),
-                    STATUS_UNAVAILABLE,
-                    safeUnavailableReason(ex),
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    List.of()
+                    safeUnavailableReason(ex)
+            );
+        }
+    }
+
+    private RagRetrievalStrategyEvaluationResponse denseHybridRerankStrategyResult(Long userId, EvaluationRun baselineRun) {
+        try {
+            EvaluationRun denseRerankRun = evaluateDenseHybridWithRerank(userId);
+            return availableStrategyResult(
+                    "dense-hybrid-rerank",
+                    REMOTE_DENSE_PROVIDER,
+                    hybridRetrievalStrategy.strategyName() + "+remote-rerank",
+                    hybridRetrievalStrategy.description() + " plus remote rerank",
+                    denseRerankRun,
+                    baselineRun
+            );
+        } catch (RuntimeException ex) {
+            log.warn("Dense hybrid rerank retrieval evaluation is unavailable. embeddingProvider={}, rerankProvider={}, reason={}",
+                    REMOTE_DENSE_PROVIDER,
+                    REMOTE_RERANK_PROVIDER,
+                    safeUnavailableReason(ex));
+            return unavailableStrategyResult(
+                    "dense-hybrid-rerank",
+                    REMOTE_DENSE_PROVIDER,
+                    hybridRetrievalStrategy.strategyName() + "+remote-rerank",
+                    hybridRetrievalStrategy.description() + " plus remote rerank",
+                    safeUnavailableReason(ex)
             );
         }
     }
@@ -624,6 +667,29 @@ public class RagEvaluationDatasetService {
                 roundToFourDecimals(run.hitAtK() - baselineRun.hitAtK()),
                 roundToFourDecimals(run.mrr() - baselineRun.mrr()),
                 run.caseResponses()
+        );
+    }
+
+    private RagRetrievalStrategyEvaluationResponse unavailableStrategyResult(String strategyKey,
+                                                                            String embeddingProvider,
+                                                                            String retrievalStrategy,
+                                                                            String retrievalStrategyDescription,
+                                                                            String unavailableReason) {
+        return new RagRetrievalStrategyEvaluationResponse(
+                strategyKey,
+                embeddingProvider,
+                retrievalStrategy,
+                retrievalStrategyDescription,
+                STATUS_UNAVAILABLE,
+                unavailableReason,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of()
         );
     }
 

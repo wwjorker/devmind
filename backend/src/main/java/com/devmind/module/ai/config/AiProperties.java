@@ -13,6 +13,7 @@ public class AiProperties {
     private String deepseekModel = "deepseek-v4-flash";
     private Double deepseekTemperature = 0.2;
     private EmbeddingProperties embedding = new EmbeddingProperties();
+    private RerankProperties rerank = new RerankProperties();
 
     public String getProvider() {
         return provider;
@@ -60,6 +61,14 @@ public class AiProperties {
 
     public void setEmbedding(EmbeddingProperties embedding) {
         this.embedding = embedding;
+    }
+
+    public RerankProperties getRerank() {
+        return rerank;
+    }
+
+    public void setRerank(RerankProperties rerank) {
+        this.rerank = rerank;
     }
 
     public static class EmbeddingProperties {
@@ -121,6 +130,59 @@ public class AiProperties {
 
         public void setDimension(Integer dimension) {
             this.dimension = dimension;
+        }
+    }
+
+    public static class RerankProperties {
+
+        private String provider = "none";
+        private RerankRemoteProperties remote = new RerankRemoteProperties();
+
+        public String getProvider() {
+            return provider;
+        }
+
+        public void setProvider(String provider) {
+            this.provider = provider;
+        }
+
+        public RerankRemoteProperties getRemote() {
+            return remote;
+        }
+
+        public void setRemote(RerankRemoteProperties remote) {
+            this.remote = remote;
+        }
+    }
+
+    public static class RerankRemoteProperties {
+
+        private String baseUrl = "";
+        private String apiKey = "";
+        private String model = "";
+
+        public String getBaseUrl() {
+            return baseUrl;
+        }
+
+        public void setBaseUrl(String baseUrl) {
+            this.baseUrl = baseUrl;
+        }
+
+        public String getApiKey() {
+            return apiKey;
+        }
+
+        public void setApiKey(String apiKey) {
+            this.apiKey = apiKey;
+        }
+
+        public String getModel() {
+            return model;
+        }
+
+        public void setModel(String model) {
+            this.model = model;
         }
     }
 }

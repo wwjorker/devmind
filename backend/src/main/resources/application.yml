@@ -51,3 +51,9 @@ devmind:
         api-key: ${DEVMIND_AI_EMBEDDING_REMOTE_API_KEY:}
         model: ${DEVMIND_AI_EMBEDDING_REMOTE_MODEL:}
         dimension: ${DEVMIND_AI_EMBEDDING_REMOTE_DIMENSION:0}
+    rerank:
+      provider: ${DEVMIND_AI_RERANK_PROVIDER:none}
+      remote:
+        base-url: ${DEVMIND_AI_RERANK_REMOTE_BASE_URL:}
+        api-key: ${DEVMIND_AI_RERANK_REMOTE_API_KEY:}
+        model: ${DEVMIND_AI_RERANK_REMOTE_MODEL:}
