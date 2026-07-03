@@ -69,10 +69,10 @@ DeepSeek API
 
 ## Testing And CI
 
-Run the backend test suite locally:
+Run the backend test suite locally with the Maven Wrapper (no system Maven required):
 
 ```bash
-mvn test
+./mvnw test        # Windows: .\mvnw.cmd test
 ```
 
 The current tests cover core logic that should stay stable during later iterations:
