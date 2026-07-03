@@ -52,8 +52,6 @@ Vite dev server 会把 `/api` 请求代理到后端。
 7. 提交“有帮助”或 bad case 反馈。
 8. 打开评估看板，查看 bad case、RAG 评估集覆盖率、Hit@3 和 MRR。
 
-更完整的展示顺序见根目录：[docs/demo/devmind-demo-script-cn.md](../docs/demo/devmind-demo-script-cn.md)。
-
 ## 无上下文兜底验证
 
 可以提问：

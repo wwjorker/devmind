@@ -14,3 +14,10 @@ frontend/.env.*
 *.log
 .DS_Store
 docs/project-state-cn.md
+backend/docs/resume-cn.md
+backend/docs/interview-guide-cn.md
+backend/docs/learning/
+docs/learning/
+docs/project-direction-cn.md
+docs/demo/
+docs/environment-jdk17-cn.md

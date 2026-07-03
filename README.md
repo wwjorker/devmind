@@ -190,8 +190,6 @@ DevMind：面向开发学习的 AI 知识库与 RAG 问答系统
 基于 Spring Boot + Vue 3 实现知识文档管理、TXT/Markdown 导入、自动分块、关键词 + 向量混合检索（FULLTEXT / 稀疏向量 / 真实 dense embedding + RRF 融合 + rerank 精排）、Prompt 构造、DeepSeek 调用、引用来源追踪、token 成本观测、问答日志、bad case 反馈，以及基于人工 gold label 的四方检索策略 Hit@3/MRR 对比评估。
 ```
 
-更详细的项目描述、简历 bullet 和面试讲法见：[backend/docs/resume-cn.md](backend/docs/resume-cn.md)。
-
 ## 后续规划
 
 后续迭代按优先级分为三类：
@@ -202,9 +200,6 @@ DevMind：面向开发学习的 AI 知识库与 RAG 问答系统
 
 ## 文档
 
-- 项目方向护栏：[docs/project-direction-cn.md](docs/project-direction-cn.md)
-- Java 17 环境说明：[docs/environment-jdk17-cn.md](docs/environment-jdk17-cn.md)
-- 演示脚本：[docs/demo/devmind-demo-script-cn.md](docs/demo/devmind-demo-script-cn.md)
 - 后端说明：[backend/README.md](backend/README.md)
 - 前端说明：[frontend/README.md](frontend/README.md)
 - 架构说明：[backend/docs/architecture.md](backend/docs/architecture.md)
