@@ -15,7 +15,7 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 ## 一句话项目介绍
 
 ```text
-基于 Spring Boot 和 Vue 3 设计并实现开发学习知识库系统，支持知识文档管理、Markdown/TXT 导入、自动分块、MySQL FULLTEXT 与本地稀疏向量持久化、RRF 融合排序、RAG 问答、DeepSeek 模型调用、引用来源追踪、token 成本观测、问答日志、bad case 反馈和标准问题检索评估。
+基于 Spring Boot 和 Vue 3 设计并实现开发学习知识库系统，支持知识文档管理、Markdown/TXT 导入、自动分块、关键词 + 向量混合检索（MySQL FULLTEXT / 本地稀疏向量 / 真实 dense embedding + RRF 融合 + rerank 精排）、RAG 问答、DeepSeek 模型调用、引用来源追踪、token 成本观测、问答日志、bad case 反馈，以及基于人工 gold label 的四方检索策略 Hit@3/MRR 对比评估。
 ```
 
 ## 当前可投递版本
@@ -23,30 +23,30 @@ Java 17、Spring Boot、Spring Security、JWT、BCrypt、Redis、MyBatis-Plus、
 当前版本适合写进 Java 后端简历，但表述要准确：
 
 ```text
-已完成：认证、文档管理、文件导入、自动分块、MySQL FULLTEXT 检索、多关键词与元数据召回、本地稀疏向量持久化、RRF 融合排序、RetrievalStrategy 与 EmbeddingClient 抽象、Prompt 构造、DeepSeek/Mock Provider、Provider fallback、引用来源、token 统计、问答日志、bad case 反馈、检索评估看板、前后端联调和 GitHub Actions CI。
+已完成：认证、文档管理、文件导入、自动分块、MySQL FULLTEXT 检索、多关键词与元数据召回、本地稀疏向量持久化、真实 dense embedding 接入、rerank 精排、RRF 融合排序、RetrievalStrategy / EmbeddingClient / RerankClient 抽象、keyword/sparse/dense/rerank 四方 Hit@3-MRR 检索评估、Prompt 构造、DeepSeek/Mock Provider、Provider fallback、引用来源、token 统计、问答日志、bad case 反馈、前后端联调和 GitHub Actions CI。
 
-未完成：外部 embedding API、向量数据库、专业 rerank、PDF/OCR、SSE 流式输出、生产级部署。
+未完成：向量数据库（当前向量以 JSON 存于 MySQL）、rerank 接入线上问答链路（当前仅离线评估）、更大规模标注评估集、PDF/OCR、SSE 流式输出、生产级部署。
 ```
 
-面试时可以主动说“第一版先做 MySQL FULLTEXT 与可解释关键词检索，把完整后端链路和评估闭环跑通；当前已经抽象 RetrievalStrategy 和 EmbeddingClient，并在 chunk 重建时持久化本地稀疏向量，用 RRF 融合关键词排序和稀疏向量排序，下一步会接外部 embedding 和向量库做指标对比”。这比把项目包装成生产级 AI Agent 更稳。
+面试时可以主动说“我先做 MySQL FULLTEXT 与可解释关键词检索，把完整后端链路和评估闭环跑通；再抽象 RetrievalStrategy / EmbeddingClient / RerankClient，接入真实 dense embedding 和 rerank，并在同一套 gold-label 评估集上做了 keyword/sparse/dense/rerank 四方 Hit@3/MRR 对比，量化出各策略的权衡；下一步是把向量存储从 MySQL JSON 换成真正的向量库”。这比把项目包装成生产级 AI Agent 更稳。
 
 ## 简历 Bullet 版本
 
 - 设计用户级知识库数据模型，实现知识文档 CRUD、软归档、Markdown/TXT 导入、自动 chunk 生成与文档更新后的 chunk 重建机制。
 - 实现 RAG 问答链路，包括问题关键词解析、chunk 检索、Prompt 构造、LLM 调用、答案返回和 citations 引用来源追踪。
-- 抽象 `RetrievalStrategy` 检索策略层与 `EmbeddingClient` 向量表示层，实现 MySQL FULLTEXT + 多关键词 baseline、持久化本地稀疏向量余弦相似度和 RRF 融合排序的 hybrid retrieval，并在同一 AI Ask 与 evaluation 流程下支持后续替换外部 embedding/vector store。
+- 抽象 `RetrievalStrategy` / `EmbeddingClient` / `RerankClient` 三层可插拔接口，实现 MySQL FULLTEXT + 多关键词 baseline、本地稀疏向量与真实 dense embedding（OpenAI 兼容 API）双路持久化、RRF 融合排序与 rerank 精排；默认全本地零外部调用，配置 key 后可切换外部 provider，不配 key 不产生费用。
 - 抽象 `LlmClient` 与 `LlmClientRouter`，支持 Mock 与 DeepSeek Provider 切换，降低模型调用与业务编排耦合，便于本地测试和后续扩展其他模型。
 - 实现 Provider fallback：真实模型调用失败时先记录失败日志，再降级到本地 Mock Provider 返回带引用来源的兜底回答，避免接口直接 500。
 - 基于 Spring Security、JWT、BCrypt 和 Redis blacklist 实现认证与退出登录，退出时将 token 写入 Redis 并设置剩余 TTL，避免未过期 token 继续访问。
 - 设计 `ai_ask_log` 问答日志，记录 provider、prompt preview、召回 chunk、token usage、耗时和成功/兜底/失败状态，用于成本观测与问题排查。
-- 设计 `ai_ask_feedback`、RAG evaluation dataset 与检索评估接口，支持 bad case 标注、标准问题覆盖率、基于人工 gold label 的 Hit@3/MRR、首个相关片段排名、关键词诊断、keyword baseline 对比和问答日志回放。
+- 设计 `ai_ask_feedback` bad case 反馈与四方检索评估（keyword / sparse-hybrid / dense-hybrid / dense-hybrid-rerank）：基于 14 篇文档、40 个人工标注 gold-label 用例（含词法失配、同义改写、跨主题 hard-negative）计算 Hit@3/MRR，量化发现无单一最优——dense embedding 排序精度最高（MRR 0.81→0.91），叠加 rerank 后 top-3 召回满分（Hit@3 1.0）但 MRR 回落至 0.87，揭示"精确排序 vs 最坏情况召回"的权衡；期望关键词仅作诊断展示、不作相关性裁判。
 - 引入 Flyway 管理数据库结构版本，并配置 GitHub Actions 执行后端测试和前端构建，提升项目初始化、协作和持续集成的工程化程度。
 
 ## 更短版本
 
-- 基于 Spring Boot + Vue 3 实现开发学习知识库与 RAG 问答系统，支持文档导入、自动分块、MySQL FULLTEXT + 本地稀疏向量持久化 + RRF 融合排序、Prompt 构造、DeepSeek 调用和引用来源展示。
-- 抽象 LLM Provider 层，支持 Mock/DeepSeek 切换，并记录 token usage、耗时、召回 chunk 和模型来源，实现 AI 调用可观测。
-- 设计 bad case feedback、RAG evaluation dataset 和检索评估看板，支持回答质量反馈、期望答案沉淀、基于相关文档标注的 Hit@3/MRR、keyword baseline vs hybrid/RRF 对比和召回质量分析。
+- 基于 Spring Boot + Vue 3 实现开发学习知识库与 RAG 问答系统，支持文档导入、自动分块、关键词 + 稀疏/dense 向量混合检索、RRF 融合、rerank 精排、Prompt 构造、DeepSeek 调用和引用来源展示。
+- 抽象 LlmClient / EmbeddingClient / RerankClient 三层 Provider，默认本地零成本、配 key 可切外部 API，并记录 token usage、耗时、召回 chunk 和模型来源，实现 AI 调用可观测。
+- 构建 gold-label 检索评估体系：40 个人工标注用例上对比 keyword / sparse / dense / rerank 四方 Hit@3/MRR（dense MRR 0.81→0.91，rerank Hit@3 1.0），量化揭示排序精度与最坏情况召回的权衡。
 
 ## 面试主线
 
