@@ -210,7 +210,7 @@ DevMind：面向开发学习的 AI 知识库与 RAG 问答系统
 GitHub Actions 会在 push 和 pull request 时执行：
 
 ```text
-backend: mvn test
+backend: ./mvnw test
 frontend: npm ci && npm run build
 ```
 
