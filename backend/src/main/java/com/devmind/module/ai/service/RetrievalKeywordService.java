@@ -1,5 +1,6 @@
 package com.devmind.module.ai.service;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -65,13 +66,24 @@ public class RetrievalKeywordService {
             "DeepSeek"
     );
 
+    private final boolean techPhrasesEnabled;
+
+    public RetrievalKeywordService(
+            @Value("${devmind.retrieval.tech-phrases-enabled:true}") boolean techPhrasesEnabled) {
+        // The curated phrase list is hand-written and can overfit the evaluation corpus.
+        // Keeping it switchable lets the evaluation measure retrieval with and without it.
+        this.techPhrasesEnabled = techPhrasesEnabled;
+    }
+
     public List<String> resolveKeywords(String question) {
         if (!StringUtils.hasText(question)) {
             return List.of();
         }
 
         LinkedHashSet<String> keywords = new LinkedHashSet<>();
-        addKnownTechPhrases(question, keywords);
+        if (techPhrasesEnabled) {
+            addKnownTechPhrases(question, keywords);
+        }
         addEnglishTokens(question, keywords);
         addChineseFallbackTerms(question, keywords);
 

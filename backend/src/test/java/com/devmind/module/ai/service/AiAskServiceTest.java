@@ -49,7 +49,7 @@ class AiAskServiceTest {
                 retrievalStrategy,
                 askLogService,
                 new PromptBuilderService(),
-                new RetrievalKeywordService(),
+                new RetrievalKeywordService(true),
                 llmClientRouter
         );
         AskRequest request = new AskRequest();
@@ -90,7 +90,7 @@ class AiAskServiceTest {
                 retrievalStrategy,
                 askLogService,
                 new PromptBuilderService(),
-                new RetrievalKeywordService(),
+                new RetrievalKeywordService(true),
                 llmClientRouter
         );
         AskRequest request = new AskRequest();
@@ -144,7 +144,7 @@ class AiAskServiceTest {
                 retrievalStrategy,
                 askLogService,
                 new PromptBuilderService(),
-                new RetrievalKeywordService(),
+                new RetrievalKeywordService(true),
                 llmClientRouter
         );
         AskRequest request = new AskRequest();

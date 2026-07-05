@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class RetrievalKeywordServiceTest {
 
-    private final RetrievalKeywordService retrievalKeywordService = new RetrievalKeywordService();
+    private final RetrievalKeywordService retrievalKeywordService = new RetrievalKeywordService(true);
 
     @Test
     void resolveKeywordsShouldExtractChineseAndEnglishTechnicalTerms() {
