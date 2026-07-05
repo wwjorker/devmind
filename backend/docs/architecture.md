@@ -132,7 +132,9 @@ sequenceDiagram
 - `RerankClient` 隔离 rerank 供应商（默认 `none`，可选外部 `/rerank` API），用于离线四方评估。
 - chunk 向量行随文档 chunk 一起重建，存入 `knowledge_document_chunk_vector`。问答路径只构造 query 向量，再与已持久化的 chunk 向量比较，而不是每次提问都重算全部 chunk 向量。
 - chunk 内容的 FULLTEXT 索引使用 ngram parser，让中文查询直接走 FULLTEXT 相关性排序；SQL 侧只做宽候选池截断（LIKE 兜底按更新时间截取），真正的相关性打分在服务层完成。
-- 向量通道对持久化向量做暴力余弦，扫描上限为固定常量；超过该规模的正确做法是迁移到 ANN 存储（如 pgvector），而不是继续调大常量。
+- 向量通道默认对持久化向量做暴力余弦，扫描上限为固定常量；启用 pgvector 后 dense 向量的相似度查询改由 Postgres HNSW 索引承担，不再受该上限约束。
+- 双库取舍：MySQL 始终是主数据的唯一事实来源，向量是可由源文本重建的派生数据。启用 pgvector 时 dense 向量双写（MySQL JSON 行为源，pg 为 serving 索引），pg 写入是 best-effort——失败只降低召回、绝不阻塞主流程，脏行在读取侧被主库校验兜底，可随时 backfill 重建。
+- pgvector 的 HNSW 索引对 vector 类型最多支持 2000 维，因此 dense embedding 通过 API 的 dimensions 参数请求 1024 维，启动时对超限维度 fail-fast。
 - 混合检索用 RRF 融合关键词/FULLTEXT 排名和向量排名，避免直接相加不同量纲的分数。
 - `LlmClient` 把模型供应商实现和 RAG 编排分离。
 - 调用日志记录问题、检索关键词、chunk id、答案、provider、token 用量和耗时，供后续 bad case 分析。
@@ -143,8 +145,8 @@ sequenceDiagram
 ## 后续改进
 
 - 无上下文判定目前基于“召回为空”。本地稀疏 bigram 表示下，改写正例与 hard-negative 的相似度会倒挂（实测约 0.14 vs 0.16），不存在可分阈值；计划改为基于 dense 相似度阈值或 rerank 分数做判定。
+- HNSW 参数（m、ef_construction、ef_search）目前使用 pgvector 默认值；在更大语料上应按"召回损失 vs 查询延迟"的实测曲线调优，并把 ef_search 暴露为运行时配置。
 
-- 把向量存储从 MySQL JSON 迁移到真正的向量数据库（如 pgvector），支持 ANN 级检索。
 - 把 rerank 从离线评估接入线上问答链路（配合成本/延迟控制），而不只是评估用。
 - 扩大 gold-label 评估集，让 Hit@3/MRR 对比从“方向性”变为“统计显著”。
 - 把向量回填接口做到可用于生产（权限范围、限流、异步任务、成本控制）。

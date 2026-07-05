@@ -20,7 +20,7 @@ frontend: npm run build 通过
 GitHub Actions: main 分支 CI 通过
 ```
 
-当前版本已实现真实 dense embedding 接入（OpenAI 兼容 API，可插拔 provider）、rerank 精排（离线评估）以及 keyword / sparse-hybrid / dense-hybrid / dense-hybrid-rerank 四方检索评估。仍不宣称实现向量数据库（向量以 JSON 存于 MySQL）、rerank 线上问答链路、PDF/OCR 或生产级部署。默认配置全本地运行、零外部调用，不配置 API key 不产生任何费用。
+当前版本已实现真实 dense embedding 接入（OpenAI 兼容 API，可插拔 provider）、rerank 精排（离线评估）、多策略检索评估，以及可选的 pgvector 向量存储：dense 向量双写 MySQL JSON（源数据，兼对照组）与 Postgres + pgvector HNSW（serving 索引，`docker compose` 一键启动，默认关闭）。仍不宣称实现 rerank 线上问答链路、PDF/OCR 或生产级部署。默认配置全本地运行、零外部调用，不配置 API key 不产生任何费用。
 
 ## 项目亮点
 
@@ -88,6 +88,7 @@ MyBatis-Plus
 MySQL
 Redis
 Flyway
+PostgreSQL + pgvector（可选向量索引）
 JJWT
 Springdoc OpenAPI
 DeepSeek API
@@ -160,6 +161,7 @@ backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql
 - 中英文关键词检索与 MySQL FULLTEXT，保留各通道得分用于调试
 - chunk 向量持久化（本地稀疏向量与真实 dense embedding 按 provider 共存）、余弦相似度与 RRF 融合排序
 - 可插拔 EmbeddingClient / RerankClient：默认本地零成本，配置 key 后可切换外部 embedding 与 rerank API
+- 可选 pgvector 向量存储：dense 向量双写 MySQL JSON 与 Postgres HNSW 索引，评估接口可直接对比两种 serving 路径的 Hit@3 / MRR
 - 无上下文兜底，避免知识库没有资料时强行调用模型
 - Prompt Preview 保存，方便排查 RAG 问题
 - `LlmClient` 抽象，支持 Mock 与 DeepSeek Provider
@@ -198,7 +200,7 @@ DevMind 是一个面向开发学习场景的 AI 知识库系统，重点展示 J
 
 后续迭代按优先级分为三类：
 
-1. 检索增强：把向量存储从 MySQL JSON 迁移到真正的向量数据库（如 pgvector），rerank 从离线评估接入线上问答链路。
+1. 检索增强：rerank 从离线评估接入线上问答链路；无上下文判定从"召回为空"升级为基于 dense 相似度阈值；HNSW 参数（m / ef_search）按规模调优。
 2. 评估增强：扩大标注评估集规模使结论具备统计显著性，补充 bad case 分类统计和模型回答质量评测。
 3. 工程增强：接口限流、SSE 流式输出、PDF/Word 导入。
 

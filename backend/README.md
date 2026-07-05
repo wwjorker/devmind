@@ -367,6 +367,21 @@ DEVMIND_DEEPSEEK_MODEL=deepseek-v4-flash
 DEVMIND_DEEPSEEK_TEMPERATURE=0.2
 ```
 
+可选 pgvector 向量存储（默认关闭；启用前先 `docker compose up -d devmind-pgvector`）：
+
+```text
+DEVMIND_VECTOR_STORE_PROVIDER=pgvector
+DEVMIND_PGVECTOR_URL=jdbc:postgresql://localhost:5433/devmind_vectors
+DEVMIND_PGVECTOR_USERNAME=devmind
+DEVMIND_PGVECTOR_PASSWORD=devmind
+# 必须与 dense embedding 维度一致；HNSW 对 vector 类型上限 2000 维，
+# 所以 dense embedding 用 dimensions 参数请求 1024 维
+DEVMIND_PGVECTOR_DIMENSION=1024
+DEVMIND_AI_EMBEDDING_REMOTE_DIMENSION=1024
+```
+
+启用后 dense 向量双写：MySQL JSON 行保持源数据与对照组身份，pgvector HNSW 承担相似度查询；评估接口会多出一路 `dense-hybrid-pgvector` 策略，直接对比两种 serving 路径。切换维度后需要调用向量回填接口重建向量。
+
 可选行为开关：
 
 ```text
