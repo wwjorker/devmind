@@ -6,6 +6,7 @@ import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -47,6 +48,13 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleConstraintViolationException(ConstraintViolationException ex) {
         return Result.fail(ResultCode.BAD_REQUEST.getCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.OK)
+    public Result<Void> handleMessageNotReadableException(HttpMessageNotReadableException ex) {
+        // Malformed or wrongly encoded request bodies are client errors, not server faults.
+        return Result.fail(ResultCode.BAD_REQUEST.getCode(), "request body is not readable");
     }
 
     @ExceptionHandler(AccessDeniedException.class)
