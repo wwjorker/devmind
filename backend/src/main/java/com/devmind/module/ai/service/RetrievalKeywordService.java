@@ -100,13 +100,44 @@ public class RetrievalKeywordService {
         return String.join(",", keywords);
     }
 
+    // Connector-style characters that separate terms rather than extend them.
+    private static final Set<Character> CHINESE_CONNECTOR_CHARS = Set.of('的', '和', '与', '或', '是', '在', '了');
+
     private void addKnownTechPhrases(String question, LinkedHashSet<String> keywords) {
         String lowerQuestion = question.toLowerCase(Locale.ROOT);
         for (String phrase : TECH_PHRASES) {
-            if (lowerQuestion.contains(phrase.toLowerCase(Locale.ROOT))) {
+            String lowerPhrase = phrase.toLowerCase(Locale.ROOT);
+            if (lowerQuestion.contains(lowerPhrase) && hasStandaloneOccurrence(lowerQuestion, lowerPhrase)) {
                 keywords.add(phrase);
             }
         }
+    }
+
+    /**
+     * A phrase whose every occurrence sits inside a longer Chinese word is almost always
+     * a substring mis-extraction: in "Elasticsearch 倒排索引怎么做相关性排序" the phrase
+     * "索引" only appears inside "倒排索引", and keeping it would lexically match every
+     * indexing note instead of the actual intent. "JWT 鉴权和登录流程" keeps both terms
+     * because "和" is a connector, not part of a longer word.
+     */
+    private boolean hasStandaloneOccurrence(String lowerQuestion, String lowerPhrase) {
+        int index = lowerQuestion.indexOf(lowerPhrase);
+        while (index >= 0) {
+            if (!isEmbeddedInLongerWord(lowerQuestion, index)) {
+                return true;
+            }
+            index = lowerQuestion.indexOf(lowerPhrase, index + 1);
+        }
+        return false;
+    }
+
+    private boolean isEmbeddedInLongerWord(String question, int phraseStart) {
+        if (phraseStart == 0) {
+            return false;
+        }
+        char before = question.charAt(phraseStart - 1);
+        return Character.UnicodeScript.of(before) == Character.UnicodeScript.HAN
+                && !CHINESE_CONNECTOR_CHARS.contains(before);
     }
 
     private void addEnglishTokens(String question, LinkedHashSet<String> keywords) {

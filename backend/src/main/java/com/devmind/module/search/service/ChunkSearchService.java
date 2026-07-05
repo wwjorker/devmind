@@ -106,6 +106,12 @@ public class ChunkSearchService {
 
         List<ChunkSearchResponse> responses = chunks.stream()
                 .filter(chunk -> documentMap.containsKey(chunk.getDocumentId()))
+                // Lexical-evidence gate: ngram FULLTEXT happily matches shared bigram
+                // fragments (e.g. "驱逐策略" hitting a "拒绝策略" note), so a candidate that
+                // never contains any extracted keyword literally is treated as noise here.
+                // Fuzzy/semantic recall is the vector channel's job, not this one's.
+                .filter(chunk -> keywordEvidenceScore(
+                        chunk, documentMap.get(chunk.getDocumentId()), normalizedKeywords) > 0)
                 .map(chunk -> toResponse(
                         chunk,
                         documentMap.get(chunk.getDocumentId()),
@@ -324,7 +330,14 @@ public class ChunkSearchService {
                                KnowledgeDocument document,
                                List<String> keywords,
                                double fullTextScore) {
-        int score = fullTextScoreContribution(fullTextScore);
+        int score = fullTextScoreContribution(fullTextScore) + keywordEvidenceScore(chunk, document, keywords);
+        return Math.max(score, 1);
+    }
+
+    private int keywordEvidenceScore(DocumentChunk chunk,
+                                     KnowledgeDocument document,
+                                     List<String> keywords) {
+        int score = 0;
         for (String keyword : keywords) {
             String lowerKeyword = keyword.toLowerCase();
             score += countOccurrences(chunk.getContent(), lowerKeyword) * 10;
@@ -332,7 +345,7 @@ public class ChunkSearchService {
             score += countOccurrences(document.getTags(), lowerKeyword) * 3;
             score += countOccurrences(document.getSourceType(), lowerKeyword);
         }
-        return Math.max(score, 1);
+        return score;
     }
 
     private int fullTextScoreContribution(double fullTextScore) {
