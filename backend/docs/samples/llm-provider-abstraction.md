@@ -1,32 +1,32 @@
-# LLM Provider 抽象设计
+# 面向接口隔离第三方模型供应商
 
-## 问题
+## 解决什么问题
 
-如果在 `AiAskService` 里直接写 DeepSeek HTTP 调用，业务流程会和某一个模型供应商强绑定。后续想切换模型、做本地测试或增加兜底 Provider，都需要改核心业务代码。
+如果在业务代码里直接写死某一家大模型的 HTTP 调用，业务流程就和这个供应商强绑定：想换模型、想本地无网测试、想加兜底，都得改核心业务代码。第三方服务（模型、支付、短信、OSS）都有这个通病 —— 它们不稳定、要花钱、还可能被替换。
 
-## 设计
+## 核心思路：策略模式 + 面向接口编程
 
-DevMind 抽象了 `LlmClient` 接口，并通过 `LlmClientRouter` 选择具体 Provider：
+抽象一个统一接口，把"调哪家、怎么调"藏到实现类后面，业务只依赖接口：
 
 ```text
-AiAskService
--> LlmClientRouter
--> LlmClient
--> MockLlmClient / DeepSeekLlmClient
+业务 Service
+-> Router（按配置选实现）
+-> LlmClient(接口)
+-> MockClient / DeepSeekClient / 其他 Provider
 ```
 
-`MockLlmClient` 用于本地开发和测试，不需要真实 API Key，也不会产生模型费用。
-
-`DeepSeekLlmClient` 用于真实模型调用，通过环境变量配置模型名、API Key 和调用参数。
+- **接口**定义 `generate(prompt) -> answer` 这样的统一契约。
+- **多实现**：`MockClient` 本地无 key、零成本、结果确定，适合单测和 CI；真实 `Client` 走环境变量配 key/模型名/参数。
+- **Router**按配置（如 `provider=mock|deepseek`）选具体实现，Spring 里可用 `Map<String, LlmClient>` 注入所有实现再按 key 取。
 
 ## 价值
 
-- 业务服务不依赖某个厂商 API。
-- 本地开发默认使用 Mock，稳定且低成本。
-- 演示或真实问答时切换到 DeepSeek。
-- 真实模型调用失败时可以降级到 Mock Provider，避免核心问答接口直接 500。
-- 后续可以继续扩展通义千问等其他 Provider。
+- 业务不依赖某个厂商 API，符合**依赖倒置 / 开闭原则**：加新 Provider 只新增一个实现类，不改业务。
+- 本地和 CI 用 Mock，稳定、免费、不联网。
+- 真实调用失败可**降级**到 Mock 或返回可控错误，避免核心接口直接 500。
 
-## 面试表达
+## 延伸
 
-我没有把 DeepSeek 调用直接写死在业务 Service 里，而是通过 `LlmClient` 接口隔离模型供应商。这样可以支持 Mock/DeepSeek 切换，方便本地测试、控制成本，也避免 RAG 主链路和单一模型厂商强耦合。真实模型异常时，系统还能记录失败日志并降级到 Mock Provider，保证接口有可控兜底。
+- Spring 注入同一接口多个实现会歧义，解决办法：`@Qualifier`、`@Primary`、或注入 `List<T>`/`Map<String,T>` 自己路由。
+- 这套写法本质就是 GoF 的**策略模式**；同样适合支付渠道、短信通道、存储后端等"可替换外部依赖"。
+- 生产还要考虑：超时、重试、熔断（如 Resilience4j）、限流、调用日志与成本统计。
