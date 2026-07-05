@@ -2,7 +2,7 @@
 
 DevMind 是一个个人开发者知识库的 Spring Boot 后端，内置 RAG 式的 AI 问答链路。
 
-它被定位为一个 Java 后端作品集项目，而不是简单的大模型 API 套壳。项目包含认证、文档管理、chunk 生成、检索、Prompt 构造、LLM Provider 抽象、引用来源、AI 调用日志、token 用量统计、bad case 反馈，以及一套轻量的 RAG 评估接口。
+项目包含认证、文档管理、chunk 生成、检索、Prompt 构造、LLM Provider 抽象、引用来源、AI 调用日志、token 用量统计、bad case 反馈，以及一套轻量的 RAG 评估接口。
 
 ## 为什么做这个项目
 
@@ -276,7 +276,7 @@ tags match:        +3 per occurrence
 source type match: +1 per occurrence
 ```
 
-MySQL InnoDB FULLTEXT 提供一个轻量的 BM25 式相关性信号。DevMind 把这个信号和显式的关键词、元数据分数结合起来，让排名在调试时仍然容易检查。
+MySQL InnoDB FULLTEXT 提供一个轻量的 BM25 式相关性信号。DevMind 把这个信号和显式的关键词、元数据分数结合起来，让排名在调试时仍然容易检查。需要说明的是：上面的可解释性只针对关键词通道的原始得分；RRF 融合之后的最终分数是排名融合分，只用于排序，不能按业务含义解读。
 
 `EmbeddingClient` 背后共存两种向量表示：一种是本地确定性稀疏向量（由英文 token 和中文 bigram 归一化得到，是零成本的默认值），另一种是来自 OpenAI 兼容 API 的真实 dense embedding（仅在配置了 key 时启用）。两者都按 `provider_name` 存进 `knowledge_document_chunk_vector`，在 chunk 重建或回填时生成，所以查询路径只需构造 query 向量、再与已持久化的 chunk 向量比较。混合检索用 RRF 融合关键词/FULLTEXT 排名与向量排名，并可用一个可选的 `RerankClient` 对融合后的候选重排。向量以 JSON 存在 MySQL 里，而不是专用向量数据库——设计目标是一个可度量、可替换的检索骨架，而不是生产级 ANN 存储。
 

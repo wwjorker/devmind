@@ -44,11 +44,11 @@ Vite dev server 会把 `/api` 请求代理到后端。
 ## 演示流程
 
 1. 登录或注册本地账号。
-2. 如果本地数据很乱，可以先在 DBeaver 执行 `backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql`，为 `testuser` 重建一套标准演示数据。
+2. 需要重置演示数据时，在 MySQL 中执行 `backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql`，为 `testuser` 重建一套演示数据。
 3. 如果要演示文件导入，可以导入 `backend/docs/samples/redis-cache-penetration.md`，或你自己的任意 `.txt` / `.md` 笔记。
 4. 在 AI 问答区提问：`Redis 缓存穿透是什么，怎么解决？`
 5. 查看回答、引用来源、召回片段、提示词预览和 token 用量。
-6. 继续提问 JWT、Flyway、LlmClient 等工程设计问题，展示项目不是单纯 AI 套壳。
+6. 继续提问 JWT、Flyway、LlmClient 等工程设计问题。
 7. 提交“有帮助”或 bad case 反馈。
 8. 打开评估看板，查看 bad case、RAG 评估集覆盖率、Hit@3 和 MRR。
 

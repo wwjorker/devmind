@@ -41,7 +41,7 @@ GitHub Actions: main 分支 CI 通过
 -> 四方检索策略 Hit@3 / MRR 对比评估
 ```
 
-区别于只调用模型接口的 AI demo，DevMind 将 AI 问答接入认证、数据库设计、事务、Redis、日志、评估和 CI 等后端工程能力。
+AI 问答不是独立模块，而是接入了认证、数据库设计、事务、Redis、日志、评估和 CI 的完整后端链路。
 
 ## 检索评估结果
 
@@ -120,15 +120,15 @@ http://127.0.0.1:5173
 
 ## 本地演示路径
 
-正式展示前，可以先用 DBeaver 执行演示数据脚本：
+需要演示数据时，先在 MySQL 中执行：
 
 ```text
 backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql
 ```
 
-这个脚本只重置 `testuser` 的 DevMind 演示数据，不会影响其他数据库或其他本地项目。
+脚本只重置 `testuser` 的演示数据。
 
-推荐演示顺序：
+推荐体验顺序：
 
 1. 登录 `testuser`。
 2. 查看知识文档和自动生成的 chunks。
@@ -146,7 +146,7 @@ backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql
 - 知识文档 CRUD 与软删除
 - TXT / Markdown 笔记导入
 - 文档创建、更新、导入后自动生成 chunks
-- 中英文关键词检索、MySQL FULLTEXT 与可解释 score
+- 中英文关键词检索与 MySQL FULLTEXT，保留各通道得分用于调试
 - chunk 向量持久化（本地稀疏向量与真实 dense embedding 按 provider 共存）、余弦相似度与 RRF 融合排序
 - 可插拔 EmbeddingClient / RerankClient：默认本地零成本，配置 key 后可切换外部 embedding 与 rerank API
 - 无上下文兜底，避免知识库没有资料时强行调用模型
@@ -164,7 +164,7 @@ backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql
 DevMind 的核心设计围绕 RAG 链路和后端工程化展开：
 
 1. 文档先持久化并切分为 chunks，避免长文本直接进入 Prompt 导致上下文过长和召回不稳定。
-2. 检索层支持中英文多关键词、标题、标签和类型召回，并保留可解释 score，便于排查召回结果。
+2. 检索层支持中英文多关键词、标题、标签和类型召回，并保留各通道原始得分便于排查召回结果；RRF 融合后的分数只用于排序，不具备业务含义。
 3. chunk 重建时同步生成本地稀疏向量并持久化到向量表，提问时只计算 query 向量，再与已持久化的 chunk 向量做余弦相似度比较。
 4. 混合检索使用 RRF 融合关键词 / FULLTEXT 排名和本地稀疏向量排名，避免直接相加不同量纲的分数。
 5. 当检索不到有效上下文时，系统返回无上下文兜底，避免模型在知识库缺资料时编造答案。
@@ -206,8 +206,6 @@ GitHub Actions 会在 push 和 pull request 时执行：
 backend: ./mvnw test
 frontend: npm ci && npm run build
 ```
-
-这可以证明项目不是只在本机“刚好能跑”，而是有基础的自动化验证。
 
 ## 说明
 
