@@ -34,7 +34,12 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
     private static final int STATUS_ACTIVE = 1;
     private static final int DEFAULT_LIMIT = 5;
     private static final int MAX_LIMIT = 20;
-    private static final int VECTOR_CANDIDATE_LIMIT = 120;
+    // Upper bound for the brute-force cosine scan over persisted vectors. Vectors are
+    // stored as JSON in MySQL, so similarity is computed in memory; this bound keeps a
+    // single query cheap. Beyond this scale the right fix is ANN storage (e.g. pgvector),
+    // not a bigger constant. Rows past the bound are cut by recency and become invisible
+    // to the vector channel; keyword/FULLTEXT recall still covers them.
+    private static final int VECTOR_CANDIDATE_LIMIT = 512;
     private static final int VECTOR_SCORE_WEIGHT = 100;
     private static final int RRF_K = 60;
     private static final int RRF_SCORE_WEIGHT = 10_000;

@@ -53,7 +53,7 @@ class HybridRetrievalStrategyTest {
                         20,
                         30
                 )));
-        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(120)))
+        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(512)))
                 .thenReturn(List.of(vector(10L, 100L)));
         when(chunkVectorService.decodeVector(any())).thenReturn(embeddingClient.embed("Redis cache penetration MySQL"));
         when(chunkMapper.selectList(any())).thenReturn(List.of(
@@ -111,7 +111,7 @@ class HybridRetrievalStrategyTest {
                         50
                 )
         ));
-        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(120)))
+        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(512)))
                 .thenReturn(List.of(vector(20L, 200L)));
         when(chunkVectorService.decodeVector(any())).thenReturn(embeddingClient.embed("Redis cache penetration MySQL"));
         when(chunkMapper.selectList(any())).thenReturn(List.of(
@@ -144,7 +144,7 @@ class HybridRetrievalStrategyTest {
         );
 
         when(keywordStrategy.retrieve(eq(1L), eq(List.of("penetration")), eq(3))).thenReturn(List.of());
-        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(120))).thenReturn(List.of());
+        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(512))).thenReturn(List.of());
         when(chunkMapper.selectList(any())).thenReturn(List.of(
                 chunk(20L, 200L, "Cache penetration should cache empty values and limit abnormal traffic.")
         ));
@@ -176,7 +176,7 @@ class HybridRetrievalStrategyTest {
         );
 
         when(keywordStrategy.retrieve(eq(1L), eq(List.of("cache", "penetration")), eq(6))).thenReturn(List.of());
-        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(120))).thenReturn(List.of(
+        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(512))).thenReturn(List.of(
                 vector(10L, 100L, "generic-vector"),
                 vector(20L, 200L, "penetration-vector")
         ));
@@ -229,7 +229,7 @@ class HybridRetrievalStrategyTest {
                         20,
                         30
                 )));
-        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(120)))
+        when(chunkVectorService.listActiveVectors(eq(1L), eq("local-sparse-vector"), eq(512)))
                 .thenReturn(List.of(vector(10L, 100L, "local-vector")));
         when(chunkVectorService.decodeVector(eq("local-vector")))
                 .thenReturn(embeddingClient.embed("Redis cache penetration MySQL"));

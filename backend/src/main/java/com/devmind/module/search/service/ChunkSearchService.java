@@ -28,6 +28,13 @@ public class ChunkSearchService {
     private static final int STATUS_ACTIVE = 1;
     private static final int DEFAULT_LIMIT = 5;
     private static final int MAX_LIMIT = 20;
+    // Candidate pool fetched from MySQL before in-memory scoring. Must be much larger
+    // than MAX_LIMIT: real relevance ranking happens in calculateScore, so the SQL-side
+    // cut only decides which rows are even considered. FULLTEXT candidates are already
+    // relevance-ordered; LIKE candidates have no cheap SQL-side relevance order, so they
+    // are cut by recency, and this bound is deliberately wide to keep that bias marginal.
+    private static final int CANDIDATE_POOL_LIMIT = 200;
+    private static final int DOCUMENT_MATCH_LIMIT = 50;
 
     private final DocumentChunkMapper chunkMapper;
     private final KnowledgeDocumentMapper documentMapper;
@@ -53,9 +60,8 @@ public class ChunkSearchService {
         }
 
         int safeLimit = resolveLimit(limit);
-        int queryLimit = Math.min(safeLimit * Math.max(normalizedKeywords.size(), 1) * 3, MAX_LIMIT);
         Set<Long> matchingDocumentIds = findMatchingDocumentIds(userId, normalizedKeywords);
-        List<ChunkFullTextMatch> fullTextMatches = findFullTextMatches(userId, normalizedKeywords, queryLimit);
+        List<ChunkFullTextMatch> fullTextMatches = findFullTextMatches(userId, normalizedKeywords, CANDIDATE_POOL_LIMIT);
         Map<Long, Double> fullTextScoreMap = fullTextMatches.stream()
                 .filter(match -> match.getId() != null)
                 .collect(Collectors.toMap(
@@ -86,7 +92,7 @@ public class ChunkSearchService {
                     }
                 })
                 .orderByDesc(DocumentChunk::getUpdatedAt)
-                .last("LIMIT " + queryLimit);
+                .last("LIMIT " + CANDIDATE_POOL_LIMIT);
 
         List<DocumentChunk> chunks = mergeCandidates(fullTextMatches, chunkMapper.selectList(chunkQuery));
         if (chunks.isEmpty()) {
@@ -223,7 +229,7 @@ public class ChunkSearchService {
                                 .like(KnowledgeDocument::getSourceType, keyword);
                     }
                 })
-                .last("LIMIT " + MAX_LIMIT);
+                .last("LIMIT " + DOCUMENT_MATCH_LIMIT);
 
         return documentMapper.selectList(documentQuery).stream()
                 .map(KnowledgeDocument::getId)

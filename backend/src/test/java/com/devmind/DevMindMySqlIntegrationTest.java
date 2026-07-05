@@ -44,7 +44,7 @@ class DevMindMySqlIntegrationTest {
             """;
 
     @Container
-    static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:5.7.44")
+    static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
             .withDatabaseName("devmind_integration")
             .withUsername("devmind")
             .withPassword("devmind");
@@ -119,8 +119,9 @@ class DevMindMySqlIntegrationTest {
                 5
         );
         assertThat(chineseFullTextMatches)
-                .as("MySQL 5.7 default FULLTEXT parser should not be assumed to support Chinese terms without ngram")
-                .isEmpty();
+                .as("ngram-parsed FULLTEXT index should match Chinese terms directly")
+                .isNotEmpty()
+                .allSatisfy(match -> assertThat(match.getContent()).contains(CACHE_PENETRATION_CN));
     }
 
     private Long createUser() {
