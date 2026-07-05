@@ -12,6 +12,8 @@ import com.devmind.module.search.embedding.RemoteDenseEmbeddingClient;
 import com.devmind.module.search.entity.DocumentChunkVector;
 import com.devmind.module.search.mapper.DocumentChunkVectorMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.devmind.module.search.vectorstore.PgVectorStore;
+import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -39,7 +41,8 @@ class ChunkVectorServiceTest {
                 documentMapper,
                 localRouter(),
                 new EmbeddingTextBuilder(),
-                new ObjectMapper()
+                new ObjectMapper(),
+                emptyPgVectorStoreProvider()
         );
         when(documentMapper.selectById(100L)).thenReturn(document(100L));
 
@@ -67,7 +70,8 @@ class ChunkVectorServiceTest {
                 mock(KnowledgeDocumentMapper.class),
                 localRouter(),
                 new EmbeddingTextBuilder(),
-                new ObjectMapper()
+                new ObjectMapper(),
+                emptyPgVectorStoreProvider()
         );
         when(vectorMapper.selectList(any())).thenReturn(List.of(localVector, remoteVector));
 
@@ -91,7 +95,8 @@ class ChunkVectorServiceTest {
                 mock(KnowledgeDocumentMapper.class),
                 localRouter(),
                 new EmbeddingTextBuilder(),
-                new ObjectMapper()
+                new ObjectMapper(),
+                emptyPgVectorStoreProvider()
         );
 
         Map<String, Double> vector = service.decodeVector("{\"redis\":0.8,\"cache\":0.6}");
@@ -111,7 +116,8 @@ class ChunkVectorServiceTest {
                 documentMapper,
                 localRouter(),
                 new EmbeddingTextBuilder(),
-                new ObjectMapper()
+                new ObjectMapper(),
+                emptyPgVectorStoreProvider()
         );
         when(chunkMapper.selectList(any())).thenReturn(List.of(
                 chunk(10L, 100L),
@@ -142,7 +148,8 @@ class ChunkVectorServiceTest {
                 documentMapper,
                 localRouter(),
                 new EmbeddingTextBuilder(),
-                new ObjectMapper()
+                new ObjectMapper(),
+                emptyPgVectorStoreProvider()
         );
         when(chunkMapper.selectList(any())).thenReturn(List.of(chunk(10L, 100L)));
         when(vectorMapper.selectList(any())).thenReturn(List.of());
@@ -197,4 +204,10 @@ class ChunkVectorServiceTest {
                 List.of(new LocalEmbeddingClient(), new RemoteDenseEmbeddingClient(aiProperties))
         );
     }
+
+    @SuppressWarnings("unchecked")
+    private ObjectProvider<PgVectorStore> emptyPgVectorStoreProvider() {
+        return mock(ObjectProvider.class);
+    }
+
 }

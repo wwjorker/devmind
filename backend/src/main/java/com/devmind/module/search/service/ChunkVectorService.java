@@ -11,11 +11,14 @@ import com.devmind.module.search.embedding.EmbeddingClientRouter;
 import com.devmind.module.search.embedding.EmbeddingTextBuilder;
 import com.devmind.module.search.entity.DocumentChunkVector;
 import com.devmind.module.search.mapper.DocumentChunkVectorMapper;
+import com.devmind.module.search.vectorstore.DenseVectorCodec;
+import com.devmind.module.search.vectorstore.PgVectorStore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,19 +44,22 @@ public class ChunkVectorService {
     private final EmbeddingClientRouter embeddingClientRouter;
     private final EmbeddingTextBuilder embeddingTextBuilder;
     private final ObjectMapper objectMapper;
+    private final ObjectProvider<PgVectorStore> pgVectorStoreProvider;
 
     public ChunkVectorService(DocumentChunkVectorMapper vectorMapper,
                               DocumentChunkMapper chunkMapper,
                               KnowledgeDocumentMapper documentMapper,
                               EmbeddingClientRouter embeddingClientRouter,
                               EmbeddingTextBuilder embeddingTextBuilder,
-                              ObjectMapper objectMapper) {
+                              ObjectMapper objectMapper,
+                              ObjectProvider<PgVectorStore> pgVectorStoreProvider) {
         this.vectorMapper = vectorMapper;
         this.chunkMapper = chunkMapper;
         this.documentMapper = documentMapper;
         this.embeddingClientRouter = embeddingClientRouter;
         this.embeddingTextBuilder = embeddingTextBuilder;
         this.objectMapper = objectMapper;
+        this.pgVectorStoreProvider = pgVectorStoreProvider;
     }
 
     @Transactional
@@ -81,6 +87,7 @@ public class ChunkVectorService {
             chunkVector.setVectorJson(encodeVector(vector));
             chunkVector.setStatus(STATUS_ACTIVE);
             vectorMapper.insert(chunkVector);
+            doubleWriteToPgVector(userId, documentId, chunk.getId(), embeddingClientRouter.providerName(), vector);
         }
     }
 
@@ -95,6 +102,17 @@ public class ChunkVectorService {
         for (DocumentChunkVector vector : activeVectors) {
             vector.setStatus(STATUS_ARCHIVED);
             vectorMapper.updateById(vector);
+        }
+        PgVectorStore pgVectorStore = pgVectorStoreProvider.getIfAvailable();
+        if (pgVectorStore != null) {
+            try {
+                pgVectorStore.archiveByDocument(userId, documentId);
+            } catch (RuntimeException ex) {
+                // The serving index is derived data: stale rows self-heal at read time
+                // (retrieval hydrates chunks from MySQL and drops archived ones) and can
+                // always be rebuilt via backfill. Never fail the primary flow for it.
+                log.warn("Failed to archive pgvector rows, userId={}, documentId={}", userId, documentId, ex);
+            }
         }
     }
 
@@ -215,6 +233,38 @@ public class ChunkVectorService {
         chunkVector.setVectorJson(encodeVector(vector));
         chunkVector.setStatus(STATUS_ACTIVE);
         vectorMapper.insert(chunkVector);
+        doubleWriteToPgVector(userId, documentId, chunkId, provider, vector);
+    }
+
+    /**
+     * Best-effort double-write to the pgvector serving index. MySQL JSON rows stay the
+     * source of truth; only dense vectors fit the fixed-dimension pgvector schema, so
+     * sparse providers are skipped. Failures degrade recall until the next backfill
+     * instead of breaking document writes.
+     */
+    private void doubleWriteToPgVector(Long userId,
+                                       Long documentId,
+                                       Long chunkId,
+                                       String provider,
+                                       Map<String, Double> vector) {
+        PgVectorStore pgVectorStore = pgVectorStoreProvider.getIfAvailable();
+        if (pgVectorStore == null) {
+            return;
+        }
+        if (vector.size() != pgVectorStore.dimension()) {
+            return;
+        }
+        try {
+            pgVectorStore.upsertChunkVector(
+                    userId,
+                    documentId,
+                    chunkId,
+                    provider,
+                    DenseVectorCodec.toFloatArray(vector, pgVectorStore.dimension())
+            );
+        } catch (RuntimeException ex) {
+            log.warn("Failed to double-write chunk vector to pgvector, chunkId={}, provider={}", chunkId, provider, ex);
+        }
     }
 
     private DocumentChunkVector findVector(Long chunkId, String provider) {

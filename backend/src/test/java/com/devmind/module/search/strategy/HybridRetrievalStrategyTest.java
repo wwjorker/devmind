@@ -13,6 +13,8 @@ import com.devmind.module.search.embedding.RemoteDenseEmbeddingClient;
 import com.devmind.module.search.entity.DocumentChunkVector;
 import com.devmind.module.search.service.ChunkVectorService;
 import com.devmind.module.search.vo.ChunkSearchResponse;
+import com.devmind.module.search.vectorstore.PgVectorStore;
+import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -38,7 +40,8 @@ class HybridRetrievalStrategyTest {
                 documentMapper,
                 localRouter(),
                 new EmbeddingTextBuilder(),
-                chunkVectorService
+                chunkVectorService,
+                emptyPgVectorStoreProvider()
         );
 
         when(keywordStrategy.retrieve(eq(1L), eq(List.of("Redis", "cache")), eq(6)))
@@ -84,7 +87,8 @@ class HybridRetrievalStrategyTest {
                 documentMapper,
                 localRouter(),
                 new EmbeddingTextBuilder(),
-                chunkVectorService
+                chunkVectorService,
+                emptyPgVectorStoreProvider()
         );
 
         when(keywordStrategy.retrieve(eq(1L), eq(List.of("Redis")), eq(6))).thenReturn(List.of(
@@ -140,7 +144,8 @@ class HybridRetrievalStrategyTest {
                 documentMapper,
                 localRouter(),
                 new EmbeddingTextBuilder(),
-                chunkVectorService
+                chunkVectorService,
+                emptyPgVectorStoreProvider()
         );
 
         when(keywordStrategy.retrieve(eq(1L), eq(List.of("penetration")), eq(3))).thenReturn(List.of());
@@ -172,7 +177,8 @@ class HybridRetrievalStrategyTest {
                 documentMapper,
                 localRouter(),
                 new EmbeddingTextBuilder(),
-                chunkVectorService
+                chunkVectorService,
+                emptyPgVectorStoreProvider()
         );
 
         when(keywordStrategy.retrieve(eq(1L), eq(List.of("cache", "penetration")), eq(6))).thenReturn(List.of());
@@ -214,7 +220,8 @@ class HybridRetrievalStrategyTest {
                 documentMapper,
                 localRouter(),
                 new EmbeddingTextBuilder(),
-                chunkVectorService
+                chunkVectorService,
+                emptyPgVectorStoreProvider()
         );
 
         when(keywordStrategy.retrieve(eq(1L), eq(List.of("Redis", "cache")), eq(6)))
@@ -299,4 +306,10 @@ class HybridRetrievalStrategyTest {
                 List.of(new LocalEmbeddingClient(), new RemoteDenseEmbeddingClient(aiProperties))
         );
     }
+
+    @SuppressWarnings("unchecked")
+    private ObjectProvider<PgVectorStore> emptyPgVectorStoreProvider() {
+        return mock(ObjectProvider.class);
+    }
+
 }

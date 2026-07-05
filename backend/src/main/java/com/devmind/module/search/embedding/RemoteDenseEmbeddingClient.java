@@ -56,10 +56,15 @@ public class RemoteDenseEmbeddingClient implements EmbeddingClient {
                 .build();
         String endpoint = embeddingsEndpoint(remote.getBaseUrl());
 
-        Map<String, Object> body = Map.of(
-                "model", remote.getModel(),
-                "input", text == null ? "" : text
-        );
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", remote.getModel());
+        body.put("input", text == null ? "" : text);
+        // Ask the provider to return the configured dimension (OpenAI-compatible
+        // "dimensions" parameter). Without this the provider default (e.g. 2048) applies,
+        // which exceeds the 2000-dim cap of pgvector's HNSW index.
+        if (remote.getDimension() != null && remote.getDimension() > 0) {
+            body.put("dimensions", remote.getDimension());
+        }
 
         try {
             JsonNode response = restClient.post()

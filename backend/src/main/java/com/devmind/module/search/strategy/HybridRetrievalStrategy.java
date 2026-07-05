@@ -10,7 +10,10 @@ import com.devmind.module.search.embedding.EmbeddingClientRouter;
 import com.devmind.module.search.embedding.EmbeddingTextBuilder;
 import com.devmind.module.search.entity.DocumentChunkVector;
 import com.devmind.module.search.service.ChunkVectorService;
+import com.devmind.module.search.vectorstore.DenseVectorCodec;
+import com.devmind.module.search.vectorstore.PgVectorStore;
 import com.devmind.module.search.vo.ChunkSearchResponse;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -44,25 +47,31 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
     private static final int RRF_K = 60;
     private static final int RRF_SCORE_WEIGHT = 10_000;
 
+    // Only dense embeddings fit the fixed-dimension pgvector schema.
+    private static final String REMOTE_DENSE_PROVIDER = "remote-dense";
+
     private final KeywordRetrievalStrategy keywordRetrievalStrategy;
     private final DocumentChunkMapper chunkMapper;
     private final KnowledgeDocumentMapper documentMapper;
     private final EmbeddingClientRouter embeddingClientRouter;
     private final EmbeddingTextBuilder embeddingTextBuilder;
     private final ChunkVectorService chunkVectorService;
+    private final ObjectProvider<PgVectorStore> pgVectorStoreProvider;
 
     public HybridRetrievalStrategy(KeywordRetrievalStrategy keywordRetrievalStrategy,
                                    DocumentChunkMapper chunkMapper,
                                    KnowledgeDocumentMapper documentMapper,
                                    EmbeddingClientRouter embeddingClientRouter,
                                    EmbeddingTextBuilder embeddingTextBuilder,
-                                   ChunkVectorService chunkVectorService) {
+                                   ChunkVectorService chunkVectorService,
+                                   ObjectProvider<PgVectorStore> pgVectorStoreProvider) {
         this.keywordRetrievalStrategy = keywordRetrievalStrategy;
         this.chunkMapper = chunkMapper;
         this.documentMapper = documentMapper;
         this.embeddingClientRouter = embeddingClientRouter;
         this.embeddingTextBuilder = embeddingTextBuilder;
         this.chunkVectorService = chunkVectorService;
+        this.pgVectorStoreProvider = pgVectorStoreProvider;
     }
 
     @Override
@@ -77,21 +86,41 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
 
     @Override
     public List<ChunkSearchResponse> retrieve(Long userId, List<String> keywords, Integer limit) {
-        return retrieveInternal(userId, keywords, limit, embeddingClientRouter.currentClient(), true);
+        EmbeddingClient currentClient = embeddingClientRouter.currentClient();
+        // Serve the vector arm from pgvector only when the store is enabled AND the
+        // active embedding is dense; the local sparse representation never fits it.
+        boolean usePgStore = pgVectorStoreProvider.getIfAvailable() != null
+                && REMOTE_DENSE_PROVIDER.equals(currentClient.providerName());
+        return retrieveInternal(userId, keywords, limit, currentClient, true, usePgStore);
     }
 
     public List<ChunkSearchResponse> retrieveWithEmbeddingProvider(Long userId,
                                                                    List<String> keywords,
                                                                    Integer limit,
                                                                    String provider) {
-        return retrieveInternal(userId, keywords, limit, embeddingClientRouter.clientFor(provider), false);
+        return retrieveInternal(userId, keywords, limit, embeddingClientRouter.clientFor(provider), false, false);
+    }
+
+    /**
+     * Evaluation entry point that forces the vector arm through the pgvector store,
+     * so the same gold-label cases can compare MySQL-JSON brute force vs HNSW serving.
+     */
+    public List<ChunkSearchResponse> retrieveWithEmbeddingProviderAndPgStore(Long userId,
+                                                                             List<String> keywords,
+                                                                             Integer limit,
+                                                                             String provider) {
+        if (pgVectorStoreProvider.getIfAvailable() == null) {
+            throw new IllegalStateException("pgvector store is not enabled (devmind.vector-store.provider)");
+        }
+        return retrieveInternal(userId, keywords, limit, embeddingClientRouter.clientFor(provider), false, true);
     }
 
     private List<ChunkSearchResponse> retrieveInternal(Long userId,
                                                        List<String> keywords,
                                                        Integer limit,
                                                        EmbeddingClient embeddingClient,
-                                                       boolean allowOnTheFlyFallback) {
+                                                       boolean allowOnTheFlyFallback,
+                                                       boolean usePgStore) {
         int safeLimit = resolveLimit(limit);
         List<String> normalizedKeywords = normalizeKeywords(keywords);
         if (normalizedKeywords.isEmpty()) {
@@ -103,12 +132,9 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                 normalizedKeywords,
                 Math.min(safeLimit * 3, MAX_LIMIT)
         );
-        List<ChunkSearchResponse> vectorResults = retrieveByEmbedding(
-                userId,
-                normalizedKeywords,
-                embeddingClient,
-                allowOnTheFlyFallback
-        );
+        List<ChunkSearchResponse> vectorResults = usePgStore
+                ? retrieveByPgVector(userId, normalizedKeywords, embeddingClient)
+                : retrieveByEmbedding(userId, normalizedKeywords, embeddingClient, allowOnTheFlyFallback);
 
         Map<Long, ChunkSearchResponse> merged = new HashMap<>();
         Map<Long, Double> rrfScores = new HashMap<>();
@@ -121,6 +147,57 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                         .thenComparing(ChunkSearchResponse::getChunkId))
                 .limit(safeLimit)
                 .toList();
+    }
+
+    /**
+     * Vector arm served by pgvector: the ANN index returns the top candidates directly,
+     * instead of scanning persisted rows and computing cosine in the JVM.
+     */
+    private List<ChunkSearchResponse> retrieveByPgVector(Long userId,
+                                                         List<String> keywords,
+                                                         EmbeddingClient embeddingClient) {
+        PgVectorStore pgVectorStore = pgVectorStoreProvider.getIfAvailable();
+        Map<String, Double> queryVector = embeddingClient.embed(embeddingTextBuilder.buildForQuery(keywords));
+        if (queryVector.isEmpty() || queryVector.size() != pgVectorStore.dimension()) {
+            return List.of();
+        }
+        List<PgVectorStore.ChunkVectorMatch> matches = pgVectorStore.searchSimilar(
+                userId,
+                embeddingClient.providerName(),
+                DenseVectorCodec.toFloatArray(queryVector, pgVectorStore.dimension()),
+                MAX_LIMIT
+        );
+        if (matches.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> chunkIds = matches.stream()
+                .map(PgVectorStore.ChunkVectorMatch::chunkId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<Long, DocumentChunk> chunks = findActiveChunks(userId, chunkIds);
+        Set<Long> documentIds = chunks.values().stream()
+                .map(DocumentChunk::getDocumentId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<Long, KnowledgeDocument> documents = findActiveDocuments(userId, documentIds);
+
+        List<ChunkSearchResponse> responses = new ArrayList<>();
+        for (PgVectorStore.ChunkVectorMatch match : matches) {
+            DocumentChunk chunk = chunks.get(match.chunkId());
+            if (chunk == null) {
+                // Stale index row (chunk archived in MySQL after a failed double-write
+                // cleanup); the source of truth wins and the row is simply skipped.
+                continue;
+            }
+            KnowledgeDocument document = documents.get(chunk.getDocumentId());
+            if (document == null) {
+                continue;
+            }
+            if (match.similarity() <= 0.0) {
+                continue;
+            }
+            responses.add(toVectorResponse(chunk, document, match.similarity()));
+        }
+        return sortByVectorScore(responses);
     }
 
     private List<ChunkSearchResponse> retrieveByEmbedding(Long userId,
