@@ -25,6 +25,23 @@ services:
     volumes:
       - devmind_redis_data:/data
 
+  # Vector serving index only. MySQL stays the source of truth for all primary data;
+  # embeddings are derived, rebuildable data, so losing this volume is never fatal.
+  devmind-pgvector:
+    image: pgvector/pgvector:pg16
+    container_name: devmind-pgvector
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: devmind_vectors
+      POSTGRES_USER: devmind
+      POSTGRES_PASSWORD: devmind
+      TZ: Asia/Shanghai
+    volumes:
+      - devmind_pgvector_data:/var/lib/postgresql/data
+
 volumes:
   devmind_mysql_data:
   devmind_redis_data:
+  devmind_pgvector_data:

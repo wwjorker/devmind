@@ -45,6 +45,17 @@ devmind:
     # Curated tech-phrase extraction for query understanding. Disable to measure
     # how much retrieval quality depends on the hand-written phrase list.
     tech-phrases-enabled: ${DEVMIND_RETRIEVAL_TECH_PHRASES_ENABLED:true}
+  vector-store:
+    # mysql-json (default): dense vectors stay as JSON rows in MySQL, brute-force cosine.
+    # pgvector: dense vectors are double-written to Postgres and served by an HNSW index.
+    provider: ${DEVMIND_VECTOR_STORE_PROVIDER:mysql-json}
+    pgvector:
+      url: ${DEVMIND_PGVECTOR_URL:jdbc:postgresql://localhost:5433/devmind_vectors}
+      username: ${DEVMIND_PGVECTOR_USERNAME:devmind}
+      password: ${DEVMIND_PGVECTOR_PASSWORD:devmind}
+      # Must match the dense embedding dimension. pgvector's HNSW index caps the
+      # vector type at 2000 dims, so the remote embedding is requested at 1024.
+      dimension: ${DEVMIND_PGVECTOR_DIMENSION:1024}
   ai:
     provider: ${DEVMIND_AI_PROVIDER:mock}
     deepseek-api-key: ${DEVMIND_DEEPSEEK_API_KEY:}
