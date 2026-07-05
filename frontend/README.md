@@ -57,10 +57,12 @@ Vite dev server 会把 `/api` 请求代理到后端。
 可以提问：
 
 ```text
-Kubernetes Pod 驱逐策略是什么？
+Kafka consumer rebalance 为什么会变慢？
 ```
 
 如果知识库没有相关召回片段，后端会返回兜底回答，并跳过模型调用。
+
+注意：部分库外问题（如“Kubernetes Pod 驱逐策略”）会被本地稀疏向量以弱相似度召回而不触发兜底，这是 bigram 稀疏表示的已知限制，详见根 README 的评估说明。
 
 ## 构建
 

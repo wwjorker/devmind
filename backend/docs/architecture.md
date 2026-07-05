@@ -142,6 +142,8 @@ sequenceDiagram
 
 ## 后续改进
 
+- 无上下文判定目前基于“召回为空”。本地稀疏 bigram 表示下，改写正例与 hard-negative 的相似度会倒挂（实测约 0.14 vs 0.16），不存在可分阈值；计划改为基于 dense 相似度阈值或 rerank 分数做判定。
+
 - 把向量存储从 MySQL JSON 迁移到真正的向量数据库（如 pgvector），支持 ANN 级检索。
 - 把 rerank 从离线评估接入线上问答链路（配合成本/延迟控制），而不只是评估用。
 - 扩大 gold-label 评估集，让 Hit@3/MRR 对比从“方向性”变为“统计显著”。
