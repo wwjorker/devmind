@@ -502,6 +502,7 @@ public class RagEvaluationDatasetService {
                         baselineRun
                 ),
                 denseHybridStrategyResult(userId, baselineRun),
+                denseHybridPgVectorStrategyResult(userId, baselineRun),
                 denseHybridRerankStrategyResult(userId, baselineRun)
         );
 
@@ -615,6 +616,44 @@ public class RagEvaluationDatasetService {
                     REMOTE_DENSE_PROVIDER,
                     hybridRetrievalStrategy.strategyName(),
                     hybridRetrievalStrategy.description(),
+                    safeUnavailableReason(ex)
+            );
+        }
+    }
+
+    /**
+     * Same dense embedding, same gold-label cases, but the vector arm is served by the
+     * pgvector HNSW index instead of MySQL-JSON brute-force cosine — isolating the
+     * effect of the storage/serving layer on retrieval quality.
+     */
+    private RagRetrievalStrategyEvaluationResponse denseHybridPgVectorStrategyResult(Long userId, EvaluationRun baselineRun) {
+        String strategyName = hybridRetrievalStrategy.strategyName() + "+pgvector-hnsw";
+        String description = hybridRetrievalStrategy.description() + " with the vector arm served by pgvector HNSW";
+        try {
+            EvaluationRun pgRun = evaluateWithRetriever(userId,
+                    (caseUserId, keywords, limit) -> hybridRetrievalStrategy.retrieveWithEmbeddingProviderAndPgStore(
+                            caseUserId,
+                            keywords,
+                            limit,
+                            REMOTE_DENSE_PROVIDER
+                    ));
+            return availableStrategyResult(
+                    "dense-hybrid-pgvector",
+                    REMOTE_DENSE_PROVIDER,
+                    strategyName,
+                    description,
+                    pgRun,
+                    baselineRun
+            );
+        } catch (RuntimeException ex) {
+            log.warn("Dense hybrid pgvector retrieval evaluation is unavailable. provider={}, reason={}",
+                    REMOTE_DENSE_PROVIDER,
+                    safeUnavailableReason(ex));
+            return unavailableStrategyResult(
+                    "dense-hybrid-pgvector",
+                    REMOTE_DENSE_PROVIDER,
+                    strategyName,
+                    description,
                     safeUnavailableReason(ex)
             );
         }

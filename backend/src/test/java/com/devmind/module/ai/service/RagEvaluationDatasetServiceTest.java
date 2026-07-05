@@ -92,6 +92,8 @@ class RagEvaluationDatasetServiceTest {
                 .thenAnswer(invocation -> chunksForKeywords(invocation.getArgument(1)));
         when(retrievalStrategy.retrieveWithEmbeddingProvider(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5), eq("remote-dense")))
                 .thenAnswer(invocation -> chunksForKeywords(invocation.getArgument(1)));
+        when(retrievalStrategy.retrieveWithEmbeddingProviderAndPgStore(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5), eq("remote-dense")))
+                .thenThrow(new IllegalStateException("pgvector store is not enabled (devmind.vector-store.provider)"));
         when(keywordRetrievalStrategy.strategyName()).thenReturn("mysql-fulltext-keyword-v1");
         when(keywordRetrievalStrategy.description()).thenReturn("MySQL FULLTEXT plus multi-keyword metadata scoring");
         when(keywordRetrievalStrategy.retrieve(eq(1L), org.mockito.ArgumentMatchers.<List<String>>any(), eq(5)))
@@ -128,7 +130,7 @@ class RagEvaluationDatasetServiceTest {
         assertThat(response.getMrrDelta()).isZero();
         assertThat(response.getStrategyResults())
                 .extracting(RagRetrievalStrategyEvaluationResponse::getStrategyKey)
-                .containsExactly("keyword-baseline", "sparse-hybrid", "dense-hybrid", "dense-hybrid-rerank");
+                .containsExactly("keyword-baseline", "sparse-hybrid", "dense-hybrid", "dense-hybrid-pgvector", "dense-hybrid-rerank");
         assertThat(response.getStrategyResults())
                 .filteredOn(result -> "dense-hybrid".equals(result.getStrategyKey()))
                 .singleElement()
@@ -137,6 +139,14 @@ class RagEvaluationDatasetServiceTest {
                     assertThat(result.getEmbeddingProvider()).isEqualTo("remote-dense");
                     assertThat(result.getHitAtK()).isEqualTo(1.0);
                     assertThat(result.getMrr()).isEqualTo(1.0);
+                });
+        assertThat(response.getStrategyResults())
+                .filteredOn(result -> "dense-hybrid-pgvector".equals(result.getStrategyKey()))
+                .singleElement()
+                .satisfies(result -> {
+                    assertThat(result.getStatus()).isEqualTo("unavailable");
+                    assertThat(result.getUnavailableReason()).contains("pgvector store is not enabled");
+                    assertThat(result.getCases()).isEmpty();
                 });
         assertThat(response.getStrategyResults())
                 .filteredOn(result -> "dense-hybrid-rerank".equals(result.getStrategyKey()))
