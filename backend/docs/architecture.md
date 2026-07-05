@@ -131,6 +131,8 @@ sequenceDiagram
 - `EmbeddingClient` 把向量表示和检索编排分离：本地确定性稀疏向量（默认、零外部成本）和可选的真实 dense embedding（OpenAI 兼容 API）按 `provider_name` 共存于同一张向量表，可由配置切换。
 - `RerankClient` 隔离 rerank 供应商（默认 `none`，可选外部 `/rerank` API），用于离线四方评估。
 - chunk 向量行随文档 chunk 一起重建，存入 `knowledge_document_chunk_vector`。问答路径只构造 query 向量，再与已持久化的 chunk 向量比较，而不是每次提问都重算全部 chunk 向量。
+- chunk 内容的 FULLTEXT 索引使用 ngram parser，让中文查询直接走 FULLTEXT 相关性排序；SQL 侧只做宽候选池截断（LIKE 兜底按更新时间截取），真正的相关性打分在服务层完成。
+- 向量通道对持久化向量做暴力余弦，扫描上限为固定常量；超过该规模的正确做法是迁移到 ANN 存储（如 pgvector），而不是继续调大常量。
 - 混合检索用 RRF 融合关键词/FULLTEXT 排名和向量排名，避免直接相加不同量纲的分数。
 - `LlmClient` 把模型供应商实现和 RAG 编排分离。
 - 调用日志记录问题、检索关键词、chunk id、答案、provider、token 用量和耗时，供后续 bad case 分析。

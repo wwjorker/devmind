@@ -38,6 +38,13 @@ devmind:
   security:
     jwt-secret: ${DEVMIND_JWT_SECRET:devmind-local-secret-change-me-devmind-local-secret}
     token-expire-seconds: ${DEVMIND_TOKEN_EXPIRE_SECONDS:7200}
+    # true: a Redis failure only disables logout revocation (local-dev friendly).
+    # false: reject requests whenever the blacklist cannot be checked.
+    blacklist-fail-open: ${DEVMIND_BLACKLIST_FAIL_OPEN:true}
+  retrieval:
+    # Curated tech-phrase extraction for query understanding. Disable to measure
+    # how much retrieval quality depends on the hand-written phrase list.
+    tech-phrases-enabled: ${DEVMIND_RETRIEVAL_TECH_PHRASES_ENABLED:true}
   ai:
     provider: ${DEVMIND_AI_PROVIDER:mock}
     deepseek-api-key: ${DEVMIND_DEEPSEEK_API_KEY:}

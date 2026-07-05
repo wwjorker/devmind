@@ -276,7 +276,7 @@ tags match:        +3 per occurrence
 source type match: +1 per occurrence
 ```
 
-MySQL InnoDB FULLTEXT 提供一个轻量的 BM25 式相关性信号。DevMind 把这个信号和显式的关键词、元数据分数结合起来，让排名在调试时仍然容易检查。需要说明的是：上面的可解释性只针对关键词通道的原始得分；RRF 融合之后的最终分数是排名融合分，只用于排序，不能按业务含义解读。
+MySQL InnoDB FULLTEXT 提供一个轻量的 BM25 式相关性信号。chunk 内容上的 FULLTEXT 索引使用 MySQL 内置的 ngram parser——默认 parser 只按空格和标点分词，中文会被当成一整个 token，FULLTEXT 对中文查询形同虚设；换成 ngram 后中文查询可以直接走 FULLTEXT 相关性排序，LIKE 只作为兜底召回。DevMind 把这个信号和显式的关键词、元数据分数结合起来，让排名在调试时仍然容易检查。需要说明的是：上面的可解释性只针对关键词通道的原始得分；RRF 融合之后的最终分数是排名融合分，只用于排序，不能按业务含义解读。
 
 `EmbeddingClient` 背后共存两种向量表示：一种是本地确定性稀疏向量（由英文 token 和中文 bigram 归一化得到，是零成本的默认值），另一种是来自 OpenAI 兼容 API 的真实 dense embedding（仅在配置了 key 时启用）。两者都按 `provider_name` 存进 `knowledge_document_chunk_vector`，在 chunk 重建或回填时生成，所以查询路径只需构造 query 向量、再与已持久化的 chunk 向量比较。混合检索用 RRF 融合关键词/FULLTEXT 排名与向量排名，并可用一个可选的 `RerankClient` 对融合后的候选重排。向量以 JSON 存在 MySQL 里，而不是专用向量数据库——设计目标是一个可度量、可替换的检索骨架，而不是生产级 ANN 存储。
 
@@ -365,6 +365,18 @@ DEVMIND_DEEPSEEK_API_KEY=your_api_key
 DEVMIND_DEEPSEEK_BASE_URL=https://api.deepseek.com
 DEVMIND_DEEPSEEK_MODEL=deepseek-v4-flash
 DEVMIND_DEEPSEEK_TEMPERATURE=0.2
+```
+
+可选行为开关：
+
+```text
+# true（默认）：Redis 故障时黑名单检查放行，只损失登出撤销能力，本地开发友好。
+# false：黑名单查不到 Redis 时直接拒绝请求，用可用性换“登出后 token 一定不可用”。
+DEVMIND_BLACKLIST_FAIL_OPEN=true
+
+# true（默认）：问题解析使用内置技术短语表辅助抽取检索关键词。
+# false：关闭短语表，用于评估检索质量对这张人工词表的依赖程度（消融实验）。
+DEVMIND_RETRIEVAL_TECH_PHRASES_ENABLED=true
 ```
 
 绝不要提交真实 API key。
