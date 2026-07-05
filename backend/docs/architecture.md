@@ -1,10 +1,10 @@
-# DevMind Architecture
+# DevMind 架构
 
-## Goal
+## 目标
 
-DevMind is a Java backend project for a personal developer knowledge base. The system stores learning notes and project reviews, turns long documents into chunks, retrieves relevant chunks, builds a RAG prompt, and routes the final answer generation through a pluggable LLM client.
+DevMind 是一个个人开发者知识库的 Java 后端项目。系统存储学习笔记和项目复盘，把长文档切成 chunk，检索相关 chunk，构造 RAG Prompt，并通过可插拔的 LLM client 路由最终的答案生成。
 
-## Module Overview
+## 模块总览
 
 ```mermaid
 flowchart TB
@@ -20,7 +20,7 @@ flowchart TB
     LLM --> DeepSeek["deepseek client"]
 ```
 
-## Data Model
+## 数据模型
 
 ```mermaid
 erDiagram
@@ -100,7 +100,7 @@ erDiagram
     }
 ```
 
-## RAG Flow
+## RAG 流程
 
 ```mermaid
 sequenceDiagram
@@ -123,25 +123,25 @@ sequenceDiagram
     AI-->>Client: answer + citations + logId
 ```
 
-## Design Choices
+## 设计取舍
 
-- Soft archive is used for documents and chunks to preserve history.
-- Chunks are rebuilt after document updates to keep retrieval results aligned with the latest content.
-- Retrieval uses `RetrievalStrategy`, `EmbeddingClient`, and `RerankClient` abstractions so keyword, sparse-vector, dense-embedding, and rerank strategies share the same ask and evaluation flow.
-- `EmbeddingClient` separates vector representation from retrieval orchestration: a local deterministic sparse vector (default, zero external cost) and an optional real dense embedding (OpenAI-compatible API) coexist by `provider_name` in the same vector table and can be switched by configuration.
-- `RerankClient` isolates the rerank provider (default `none`, optional external `/rerank` API), used in the offline four-way evaluation.
-- Chunk vector rows are rebuilt together with document chunks and stored in `knowledge_document_chunk_vector`. The ask path builds only the query vector, then compares it with persisted chunk vectors instead of recomputing every chunk vector on each question.
-- Hybrid retrieval uses RRF to fuse keyword/FULLTEXT ranking with vector ranking, avoiding direct addition of scores with different scales.
-- `LlmClient` separates model-provider implementation from RAG orchestration.
-- Ask logs record question, retrieval keyword, chunk ids, answer, provider, token usage, and elapsed time for later bad-case analysis.
-- Ask feedback stores helpfulness labels, reasons, and expected answers so bad cases can become a small evaluation dataset.
-- The evaluation summary endpoint aggregates feedback count, bad-case count, bad-case rate, and recent bad cases for RAG quality analysis.
-- Flyway manages database schema versioning so local setup and future migrations do not depend on manual SQL copy-paste.
+- 文档和 chunk 用软归档而非物理删除，保留历史。
+- 文档更新后重建 chunk，保证检索结果和最新内容对齐。
+- 检索用 `RetrievalStrategy`、`EmbeddingClient`、`RerankClient` 三层抽象，让关键词、稀疏向量、dense embedding 和 rerank 策略共用同一套问答与评估流程。
+- `EmbeddingClient` 把向量表示和检索编排分离：本地确定性稀疏向量（默认、零外部成本）和可选的真实 dense embedding（OpenAI 兼容 API）按 `provider_name` 共存于同一张向量表，可由配置切换。
+- `RerankClient` 隔离 rerank 供应商（默认 `none`，可选外部 `/rerank` API），用于离线四方评估。
+- chunk 向量行随文档 chunk 一起重建，存入 `knowledge_document_chunk_vector`。问答路径只构造 query 向量，再与已持久化的 chunk 向量比较，而不是每次提问都重算全部 chunk 向量。
+- 混合检索用 RRF 融合关键词/FULLTEXT 排名和向量排名，避免直接相加不同量纲的分数。
+- `LlmClient` 把模型供应商实现和 RAG 编排分离。
+- 调用日志记录问题、检索关键词、chunk id、答案、provider、token 用量和耗时，供后续 bad case 分析。
+- 反馈记录保存 helpful 标注、原因和期望答案，让 bad case 能沉淀成一个小型评估数据集。
+- 评估汇总接口聚合反馈数、bad case 数、bad case 率和近期 bad case，用于 RAG 质量分析。
+- Flyway 管理数据库 schema 版本，让本地初始化和后续迁移不依赖手动复制 SQL。
 
-## Next Improvements
+## 后续改进
 
-- Migrate vector storage from MySQL JSON to a real vector database (e.g. pgvector) for ANN-scale retrieval.
-- Wire rerank from offline evaluation into the online ask path (with cost/latency controls), instead of evaluation only.
-- Enlarge the gold-label evaluation set so the Hit@3/MRR comparison becomes statistically significant rather than directional.
-- Harden the vector backfill endpoint for production use (authorization scope, rate limiting, async job, cost control).
-- Add semantic chunking instead of fixed-length overlap chunking.
+- 把向量存储从 MySQL JSON 迁移到真正的向量数据库（如 pgvector），支持 ANN 级检索。
+- 把 rerank 从离线评估接入线上问答链路（配合成本/延迟控制），而不只是评估用。
+- 扩大 gold-label 评估集，让 Hit@3/MRR 对比从“方向性”变为“统计显著”。
+- 把向量回填接口做到可用于生产（权限范围、限流、异步任务、成本控制）。
+- 引入语义分块，替代固定长度加重叠的分块。

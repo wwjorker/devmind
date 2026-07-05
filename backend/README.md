@@ -1,12 +1,12 @@
-# DevMind Backend
+# DevMind 后端
 
-DevMind is a Spring Boot backend for a personal developer knowledge base with a RAG-style AI question-answering pipeline.
+DevMind 是一个个人开发者知识库的 Spring Boot 后端，内置 RAG 式的 AI 问答链路。
 
-It is built as a Java backend portfolio project, not a thin AI API wrapper. The project includes authentication, document management, chunk generation, retrieval, prompt building, LLM provider abstraction, citations, AI call logs, token usage tracking, bad-case feedback, and a lightweight RAG evaluation summary API.
+它被定位为一个 Java 后端作品集项目，而不是简单的大模型 API 套壳。项目包含认证、文档管理、chunk 生成、检索、Prompt 构造、LLM Provider 抽象、引用来源、AI 调用日志、token 用量统计、bad case 反馈，以及一套轻量的 RAG 评估接口。
 
-## Why This Project
+## 为什么做这个项目
 
-Many AI demos stop at "send a prompt to a model and return an answer". DevMind treats AI Q&A as part of a normal backend system:
+很多 AI demo 止步于“把 prompt 发给模型、拿回一个答案”。DevMind 把 AI 问答当成一个正常后端系统的一部分来做：
 
 ```text
 knowledge document
@@ -23,35 +23,35 @@ knowledge document
 -> evaluation summary
 ```
 
-The AI feature is connected to familiar backend concerns: authentication, database design, service layering, observability, cost tracking, and iterative quality improvement.
+AI 功能被接进了后端工程里常见的关注点：认证、数据库设计、服务分层、可观测性、成本追踪，以及可迭代的质量改进。
 
-## Core Features
+## 核心功能
 
-- JWT authentication with BCrypt password hashing
-- Redis-backed JWT logout blacklist
-- User-scoped knowledge documents
-- Soft archive instead of physical deletion
-- Text and Markdown note import with automatic document creation
-- Automatic document chunk generation and rebuild on update
-- Multilingual keyword retrieval for Chinese and English technical questions
-- `RetrievalStrategy` / `EmbeddingClient` / `RerankClient` abstractions with keyword baseline, hybrid retrieval, dense embedding and rerank
-- MySQL FULLTEXT relevance retrieval for chunk content
-- Persisted chunk vectors (local sparse vector by default, optional real dense embedding via OpenAI-compatible API) fused with keyword ranking by RRF, plus optional rerank; default configuration makes zero external calls
-- Metadata-aware retrieval across chunk content, document title, tags, and source type
-- Duplicate chunk downranking to reduce repeated citations from copied notes
-- No-context fallback to avoid unsupported model answers
-- RAG ask flow with prompt preview and citations
-- Pluggable LLM layer with `MockLlmClient` and `DeepSeekLlmClient`
-- DeepSeek real-model integration through environment variables
-- Provider fallback from the configured real model to local mock when the model call fails
-- AI ask logs with success/failure status, provider, latency, retrieved chunk ids, and token usage
-- AI feedback records for helpful labels and bad-case collection
-- Evaluation summary API for total feedback, bad-case count, bad-case rate, and recent bad cases
-- RAG evaluation dataset API for standard questions, expected answers, expected keywords, and ask-log coverage
-- Retrieval evaluation metrics with Hit@3, MRR, first relevant rank, and no-context negative cases
-- OpenAPI / Swagger UI and IDEA HTTP Client examples
+- JWT 认证 + BCrypt 密码加密
+- 基于 Redis 的 JWT 登出黑名单
+- 按用户隔离的知识文档
+- 软归档而非物理删除
+- TXT / Markdown 笔记导入并自动建文档
+- 文档 chunk 自动生成，更新时自动重建
+- 面向中英文技术问题的多语言关键词检索
+- `RetrievalStrategy` / `EmbeddingClient` / `RerankClient` 抽象，覆盖关键词 baseline、混合检索、dense embedding 与 rerank
+- 基于 MySQL FULLTEXT 的 chunk 内容相关性检索
+- chunk 向量持久化（默认本地稀疏向量，可选经 OpenAI 兼容 API 的真实 dense embedding），与关键词排名用 RRF 融合，并可叠加 rerank；默认配置零外部调用
+- 元数据感知检索：chunk 内容、文档标题、标签、来源类型
+- 重复 chunk 降权，减少复制粘贴笔记造成的重复引用
+- 无上下文兜底，避免模型在无依据时强答
+- 带 Prompt Preview 和引用来源的 RAG 问答链路
+- 可插拔的 LLM 层：`MockLlmClient` 与 `DeepSeekLlmClient`
+- 通过环境变量接入 DeepSeek 真实模型
+- 真实模型调用失败时，从配置的模型降级回本地 mock
+- AI 调用日志：成功/失败状态、provider、耗时、召回 chunk id、token 用量
+- AI 反馈记录：helpful 标注与 bad case 收集
+- 评估汇总接口：总反馈数、bad case 数、bad case 率、近期 bad case
+- RAG 评估数据集接口：标准问题、期望答案、期望关键词、问答日志覆盖情况
+- 检索评估指标：Hit@3、MRR、首个相关片段排名、无上下文负例
+- OpenAPI / Swagger UI 与 IDEA HTTP Client 示例
 
-## Tech Stack
+## 技术栈
 
 ```text
 Java 17
@@ -67,15 +67,15 @@ JJWT
 DeepSeek API
 ```
 
-## Testing And CI
+## 测试与 CI
 
-Run the backend test suite locally with the Maven Wrapper (no system Maven required):
+用 Maven Wrapper 在本地跑后端测试（无需系统安装 Maven）：
 
 ```bash
 ./mvnw test        # Windows: .\mvnw.cmd test
 ```
 
-The current tests cover core logic that should stay stable during later iterations:
+现有测试覆盖了在后续迭代中应保持稳定的核心逻辑：
 
 ```text
 Prompt building
@@ -86,11 +86,11 @@ Redis-backed token blacklist
 Spring context wiring for mapper scan safety
 ```
 
-The suite also includes a Docker-gated MySQL Testcontainers integration test. When Docker is available, it starts MySQL 5.7, runs Flyway migrations against the real database engine, creates a document through the service layer, verifies chunk vector persistence, exercises hybrid retrieval, and checks the MySQL FULLTEXT mapper behavior. When Docker is not available locally, that integration test is skipped instead of blocking local development.
+测试集还包含一个受 Docker 控制的 MySQL Testcontainers 集成测试。当 Docker 可用时，它会启动 MySQL 5.7、在真实数据库引擎上执行 Flyway 迁移、经服务层创建一篇文档、验证 chunk 向量持久化、跑一遍混合检索，并检查 MySQL FULLTEXT mapper 的行为。当本地没有 Docker 时，该集成测试会被跳过，而不是阻塞本地开发。
 
-GitHub Actions runs the same Maven test command on every push and pull request to `main`, so the MySQL integration test is expected to run in CI where Docker is available.
+GitHub Actions 会在每次向 `main` 的 push 和 pull request 上执行同样的 Maven 测试命令，因此 MySQL 集成测试预期会在有 Docker 的 CI 环境里真实运行。
 
-## Architecture
+## 架构
 
 ```mermaid
 flowchart LR
@@ -115,9 +115,9 @@ flowchart LR
     AI --> Summary["Evaluation Summary"]
 ```
 
-More details: [Architecture](docs/architecture.md)
+更多细节见：[架构说明](docs/architecture.md)
 
-## RAG Flow
+## RAG 流程
 
 ```mermaid
 sequenceDiagram
@@ -152,21 +152,21 @@ sequenceDiagram
     Client->>Feedback: POST feedback for logId
 ```
 
-## API Overview
+## 接口总览
 
-Swagger UI:
+Swagger UI：
 
 ```text
 http://localhost:8081/swagger-ui.html
 ```
 
-IDEA HTTP Client examples:
+IDEA HTTP Client 示例：
 
 ```text
 docs/api/devmind-api.http
 ```
 
-Main endpoints:
+主要接口：
 
 ```text
 POST   /api/v1/auth/register
@@ -193,9 +193,9 @@ GET    /api/v1/ai/evaluation/summary
 GET    /api/v1/ai/evaluation/dataset
 ```
 
-## Observability And Evaluation
+## 可观测性与评估
 
-Each AI ask log records:
+每条 AI 调用日志记录：
 
 ```text
 question
@@ -211,13 +211,13 @@ total tokens
 status: success or failed
 ```
 
-Logout writes the current JWT into a Redis blacklist with a TTL equal to the token's remaining lifetime. The authentication filter checks the blacklist before accepting a bearer token.
+登出时会把当前 JWT 写入 Redis 黑名单，TTL 设为 token 的剩余有效期。认证过滤器在接受 bearer token 前会先检查黑名单。
 
-When retrieval returns no chunks, the backend returns a deterministic fallback answer instead of calling the LLM provider. This avoids unsupported answers and saves model tokens.
+当检索返回空 chunk 时，后端返回一个确定性的兜底回答，而不是调用 LLM。这样既避免了无依据的答案，也省下模型 token。
 
-When retrieval has context but the configured real model fails, DevMind records a failed ask log first, then falls back to `MockLlmClient` and returns a local answer with the original citations. The response provider is stored as a provider chain such as `deepseek->mock-local`, so the UI and ask-log history can distinguish a normal real-model answer from a degraded answer.
+当检索有上下文、但配置的真实模型调用失败时，DevMind 会先记一条失败日志，再降级到 `MockLlmClient` 并返回一个带原始引用的本地回答。响应的 provider 会记成一条链路，比如 `deepseek->mock-local`，这样 UI 和日志历史能区分“正常真实模型回答”和“降级回答”。
 
-Feedback records store:
+反馈记录保存：
 
 ```text
 helpful label
@@ -226,7 +226,7 @@ expected answer
 related ask log id
 ```
 
-The evaluation summary API aggregates:
+评估汇总接口聚合：
 
 ```text
 total feedback count
@@ -236,7 +236,7 @@ bad-case rate
 recent bad cases
 ```
 
-The evaluation dataset API returns standard RAG test cases and marks whether the current user has already asked each question:
+评估数据集接口返回标准 RAG 测试用例，并标记当前用户是否已经问过每个问题：
 
 ```text
 case id
@@ -251,13 +251,13 @@ covered status
 latest ask log id and retrieved chunk count
 ```
 
-The retrieval evaluation API runs the same standard cases against the retrieval layer and judges relevance by manually labeled gold document titles. It reports pass rate, positive case count, Hit@K, MRR, first relevant rank, matched keywords, and missing keywords. It also reports keyword-baseline Hit@K/MRR and the delta from the current hybrid strategy, so retrieval changes can be compared with the same gold-label dataset. Matched keywords are diagnostic only; they are not used as the relevance judge. Negative no-context cases are treated separately: they pass only when no chunk is retrieved.
+检索评估接口用同一批标准用例直接跑检索层，并**按人工标注的 gold 文档标题判断相关性**。它输出通过率、正例数、Hit@K、MRR、首个相关片段排名、命中关键词与缺失关键词，同时输出 keyword baseline 的 Hit@K/MRR 以及当前混合策略相对它的 delta，这样检索改动可以在同一套 gold-label 数据集上对比。命中关键词只作为诊断信息，不作为相关性裁判。无上下文负例单独处理：只有召回为空才算通过。
 
-## Retrieval Quality V1
+## 检索质量 V1
 
-The retrieval layer is exposed through a `RetrievalStrategy` interface, while vector representation and reranking are isolated behind `EmbeddingClient` and `RerankClient` interfaces. DevMind uses `HybridRetrievalStrategy` as the primary strategy: it keeps the explainable keyword/FULLTEXT baseline, adds a persisted vector rank (local sparse vector by default, or real dense embedding when configured), and fuses both rankings with RRF. The same AI ask and evaluation flow can compare keyword / sparse-hybrid / dense-hybrid / dense-hybrid-rerank strategies without changing the rest of the system.
+检索层通过 `RetrievalStrategy` 接口暴露，向量表示与重排则隔离在 `EmbeddingClient` 和 `RerankClient` 接口后面。DevMind 以 `HybridRetrievalStrategy` 为主策略：保留可解释的关键词/FULLTEXT baseline，再加一路持久化向量排名（默认本地稀疏向量，或配置后用真实 dense embedding），并用 RRF 融合两路排名。同一套 AI 问答与评估流程，可以在不改动系统其余部分的前提下对比 keyword / sparse-hybrid / dense-hybrid / dense-hybrid-rerank 四种策略。
 
-DevMind does not rely on a single raw keyword. The ask flow first resolves multiple retrieval keywords from the user question, including Chinese technical phrases and English tokens. Search then uses multiple candidate sources:
+DevMind 不依赖单个原始关键词。问答流程会先从用户问题里解析出多个检索关键词，包含中文技术短语和英文 token。检索随后使用多个候选来源：
 
 ```text
 MySQL FULLTEXT retrieval over chunk content
@@ -266,7 +266,7 @@ document metadata: title, tags, source type
 Persisted local sparse-vector similarity over title, tags, and chunk content, fused with keyword ranks by RRF
 ```
 
-Keyword scores are explainable:
+关键词打分是可解释的：
 
 ```text
 FULLTEXT relevance: capped BM25-style contribution
@@ -276,24 +276,24 @@ tags match:        +3 per occurrence
 source type match: +1 per occurrence
 ```
 
-MySQL InnoDB FULLTEXT provides a lightweight BM25-style relevance signal. DevMind combines that signal with the explicit keyword and metadata scores so the ranking is still easy to inspect during debugging.
+MySQL InnoDB FULLTEXT 提供一个轻量的 BM25 式相关性信号。DevMind 把这个信号和显式的关键词、元数据分数结合起来，让排名在调试时仍然容易检查。
 
-Two vector representations coexist behind `EmbeddingClient`: a local deterministic sparse vector (normalized from English tokens and Chinese bigrams, the zero-cost default) and a real dense embedding from an OpenAI-compatible API (enabled only when a key is configured). Both are stored in `knowledge_document_chunk_vector` by `provider_name`, generated when chunks are rebuilt or backfilled, so the query path only builds the query vector and compares it with persisted chunk vectors. Hybrid retrieval uses reciprocal rank fusion (RRF) to combine keyword/FULLTEXT ranks with vector ranks, and an optional `RerankClient` reorders the fused candidates. Vectors are stored as JSON in MySQL rather than in a dedicated vector database — the design goal is a measurable, swappable retrieval skeleton, not a production ANN store.
+`EmbeddingClient` 背后共存两种向量表示：一种是本地确定性稀疏向量（由英文 token 和中文 bigram 归一化得到，是零成本的默认值），另一种是来自 OpenAI 兼容 API 的真实 dense embedding（仅在配置了 key 时启用）。两者都按 `provider_name` 存进 `knowledge_document_chunk_vector`，在 chunk 重建或回填时生成，所以查询路径只需构造 query 向量、再与已持久化的 chunk 向量比较。混合检索用 RRF 融合关键词/FULLTEXT 排名与向量排名，并可用一个可选的 `RerankClient` 对融合后的候选重排。向量以 JSON 存在 MySQL 里，而不是专用向量数据库——设计目标是一个可度量、可替换的检索骨架，而不是生产级 ANN 存储。
 
-After initial ranking, repeated chunk content is downranked in the keyword baseline. This prevents copied notes from occupying all top citations and gives the prompt more diverse context.
+初步排名之后，关键词 baseline 会对重复的 chunk 内容降权，避免复制粘贴的笔记占满全部 top 引用，给 Prompt 更多样的上下文。
 
-The gold-label Hit@3/MRR evaluation API runs a four-way comparison — keyword baseline, sparse-hybrid, dense-hybrid, and dense-hybrid-rerank — on the same human-labeled case set (relevance judged by labeled gold documents, not by the retriever's own keyword score). Strategies whose external dependency (dense embedding or rerank) is not configured are reported as `unavailable` and degrade gracefully, so the evaluation never fails or makes network calls by default.
+gold-label 的 Hit@3/MRR 评估接口在同一批人工标注用例上跑四方对比——keyword baseline、sparse-hybrid、dense-hybrid、dense-hybrid-rerank（相关性由标注的 gold 文档判断，而不是检索器自己的关键词分数）。若某策略的外部依赖（dense embedding 或 rerank）未配置，会被标记为 `unavailable` 并优雅降级，因此默认情况下评估既不会失败、也不会发起网络调用。
 
-## Document Import
+## 文档导入
 
-The import API accepts `.txt`, `.md`, and `.markdown` files:
+导入接口接受 `.txt`、`.md`、`.markdown` 文件：
 
 ```text
 POST /api/v1/documents/import
 Content-Type: multipart/form-data
 ```
 
-Supported form fields:
+支持的表单字段：
 
 ```text
 file       required
@@ -303,48 +303,48 @@ tags       optional
 summary    optional
 ```
 
-After import, the backend creates a normal knowledge document and rebuilds chunks through the same `DocumentChunkService` path used by manual document creation. This keeps the RAG pipeline consistent and makes uploaded notes immediately searchable.
+导入后，后端会创建一篇正常的知识文档，并走和手动创建文档相同的 `DocumentChunkService` 路径重建 chunk。这样保证 RAG 链路一致，上传的笔记也能立即被检索到。
 
-## Local Setup
+## 本地运行
 
-Requirements:
+依赖：
 
 - JDK 17+
 - Maven 3.8+
 - MySQL 5.7+/8.0+
-- IntelliJ IDEA 2024.1.2 or compatible
+- IntelliJ IDEA 2024.1.2 或兼容版本
 
-Create the database:
+创建数据库：
 
 ```sql
 CREATE DATABASE IF NOT EXISTS devmind DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-Database tables are managed by Flyway migrations:
+数据库表由 Flyway 迁移管理：
 
 ```text
 src/main/resources/db/migration/
 ```
 
-When the application starts, Flyway checks and applies pending migrations automatically.
+应用启动时，Flyway 会自动检查并执行未执行过的迁移。
 
-For an existing local database that was created manually before Flyway was introduced, `baseline-on-migrate` is enabled so Flyway can take over the current schema safely.
+对于在引入 Flyway 之前手动创建的老数据库，已开启 `baseline-on-migrate`，让 Flyway 能安全接管当前 schema。
 
-Default app port:
+默认应用端口：
 
 ```text
 8081
 ```
 
-Default database:
+默认数据库：
 
 ```text
 devmind
 ```
 
-## Environment Variables
+## 环境变量
 
-Minimal local configuration:
+最小本地配置：
 
 ```text
 DEVMIND_DB_URL=jdbc:mysql://localhost:3306/devmind?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
@@ -357,7 +357,7 @@ DEVMIND_REDIS_PORT=6379
 DEVMIND_REDIS_DATABASE=1
 ```
 
-DeepSeek provider:
+DeepSeek provider：
 
 ```text
 DEVMIND_AI_PROVIDER=deepseek
@@ -367,6 +367,6 @@ DEVMIND_DEEPSEEK_MODEL=deepseek-v4-flash
 DEVMIND_DEEPSEEK_TEMPERATURE=0.2
 ```
 
-Never commit real API keys.
+绝不要提交真实 API key。
 
-The default JWT secret in `application.yml` is only for local development. Override `DEVMIND_JWT_SECRET` in any shared, deployed, or production-like environment.
+`application.yml` 里的默认 JWT secret 只用于本地开发。在任何共享、部署或类生产环境，请用 `DEVMIND_JWT_SECRET` 覆盖它。
