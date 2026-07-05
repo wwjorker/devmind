@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/wwjorker/devmind/actions/workflows/ci.yml/badge.svg)](https://github.com/wwjorker/devmind/actions/workflows/ci.yml)
 
-DevMind 是一个面向个人开发学习、项目复盘和面试准备的 AI 知识库系统。项目重点不是简单包装大模型 API，而是把 RAG 问答接入完整的 Java 后端工程链路。
+DevMind 是一个面向个人开发学习、项目复盘和知识沉淀的 AI 知识库系统。项目重点不是简单包装大模型 API，而是把 RAG 问答接入完整的 Java 后端工程链路。
 
 ## 当前状态
 
@@ -132,7 +132,7 @@ backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql
 
 1. 登录 `testuser`。
 2. 查看知识文档和自动生成的 chunks。
-3. 提问：`面试中应该如何解释 Redis 缓存穿透？`
+3. 提问：`Redis 缓存穿透是什么，怎么解决？`
 4. 查看回答、引用来源、召回片段、Prompt Preview 和 token 用量。
 5. 提问：`Kubernetes Pod 驱逐策略是什么？`，展示无上下文兜底。
 6. 打开评估看板，查看标准问题覆盖率、Hit@3、MRR 和问答日志。
@@ -181,14 +181,7 @@ DevMind 的核心设计围绕 RAG 链路和后端工程化展开：
 
 ## 项目定位
 
-DevMind 当前定位是一个面向开发学习场景的 AI 知识库系统，重点展示 Java 后端工程链路中的 RAG 应用实践。
-
-用于简历时可以简化为：
-
-```text
-DevMind：面向开发学习的 AI 知识库与 RAG 问答系统
-基于 Spring Boot + Vue 3 实现知识文档管理、TXT/Markdown 导入、自动分块、关键词 + 向量混合检索（FULLTEXT / 稀疏向量 / 真实 dense embedding + RRF 融合 + rerank 精排）、Prompt 构造、DeepSeek 调用、引用来源追踪、token 成本观测、问答日志、bad case 反馈，以及基于人工 gold label 的四方检索策略 Hit@3/MRR 对比评估。
-```
+DevMind 是一个面向开发学习场景的 AI 知识库系统，重点展示 Java 后端工程链路中的 RAG 应用实践与可量化的检索质量评估。
 
 ## 后续规划
 

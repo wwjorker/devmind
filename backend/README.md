@@ -23,7 +23,7 @@ knowledge document
 -> evaluation summary
 ```
 
-This makes the project easier to explain in Java backend interviews because the AI feature is connected to familiar backend concerns: authentication, database design, service layering, observability, cost tracking, and iterative quality improvement.
+The AI feature is connected to familiar backend concerns: authentication, database design, service layering, observability, cost tracking, and iterative quality improvement.
 
 ## Core Features
 
@@ -370,7 +370,3 @@ DEVMIND_DEEPSEEK_TEMPERATURE=0.2
 Never commit real API keys.
 
 The default JWT secret in `application.yml` is only for local development. Override `DEVMIND_JWT_SECRET` in any shared, deployed, or production-like environment.
-
-## Learning Notes
-
-Personal interview preparation notes are kept outside this public repository.
