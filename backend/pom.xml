@@ -23,6 +23,9 @@
         <mybatis-plus.version>3.5.9</mybatis-plus.version>
         <jjwt.version>0.12.6</jjwt.version>
         <springdoc.version>2.6.0</springdoc.version>
+        <!-- Boot 3.3 manages 1.19.x, whose docker-java cannot negotiate with the
+             raised minimum API version of Docker Engine 29+. -->
+        <testcontainers.version>1.21.3</testcontainers.version>
     </properties>
 
     <dependencies>
