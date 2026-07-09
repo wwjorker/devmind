@@ -278,11 +278,33 @@ source type match: +1 per occurrence
 
 MySQL InnoDB FULLTEXT 提供一个轻量的 BM25 式相关性信号。chunk 内容上的 FULLTEXT 索引使用 MySQL 内置的 ngram parser——默认 parser 只按空格和标点分词，中文会被当成一整个 token，FULLTEXT 对中文查询形同虚设；换成 ngram 后中文查询可以直接走 FULLTEXT 相关性排序，LIKE 只作为兜底召回。DevMind 把这个信号和显式的关键词、元数据分数结合起来，让排名在调试时仍然容易检查。需要说明的是：上面的可解释性只针对关键词通道的原始得分；RRF 融合之后的最终分数是排名融合分，只用于排序，不能按业务含义解读。
 
-`EmbeddingClient` 背后共存两种向量表示：一种是本地确定性稀疏向量（由英文 token 和中文 bigram 归一化得到，是零成本的默认值），另一种是来自 OpenAI 兼容 API 的真实 dense embedding（仅在配置了 key 时启用）。两者都按 `provider_name` 存进 `knowledge_document_chunk_vector`，在 chunk 重建或回填时生成，所以查询路径只需构造 query 向量、再与已持久化的 chunk 向量比较。混合检索用 RRF 融合关键词/FULLTEXT 排名与向量排名，并可用一个可选的 `RerankClient` 对融合后的候选重排。向量以 JSON 存在 MySQL 里，而不是专用向量数据库——设计目标是一个可度量、可替换的检索骨架，而不是生产级 ANN 存储。
+`EmbeddingClient` 背后共存两种向量表示：一种是本地确定性稀疏向量（由英文 token 和中文 bigram 归一化得到，是零成本的默认值），另一种是来自 OpenAI 兼容 API 的真实 dense embedding（仅在配置了 key 时启用）。两者都按 `provider_name` 存进 `knowledge_document_chunk_vector`，在 chunk 重建或回填时生成，所以查询路径只需构造 query 向量、再与已持久化的 chunk 向量比较。混合检索用 RRF 融合关键词/FULLTEXT 排名与向量排名，并可用一个可选的 `RerankClient` 对融合后的候选重排。向量存储分两层：MySQL JSON 行是源数据（默认 serving 路径，暴力余弦），启用 pgvector 后 dense 向量双写到 Postgres 并由 HNSW 索引承担相似度查询——MySQL 路径保留为对照组。
 
 初步排名之后，关键词 baseline 会对重复的 chunk 内容降权，避免复制粘贴的笔记占满全部 top 引用，给 Prompt 更多样的上下文。
 
-gold-label 的 Hit@3/MRR 评估接口在同一批人工标注用例上跑四方对比——keyword baseline、sparse-hybrid、dense-hybrid、dense-hybrid-rerank（相关性由标注的 gold 文档判断，而不是检索器自己的关键词分数）。若某策略的外部依赖（dense embedding 或 rerank）未配置，会被标记为 `unavailable` 并优雅降级，因此默认情况下评估既不会失败、也不会发起网络调用。
+gold-label 的 Hit@3/MRR 评估接口在同一批人工标注用例上跑多策略对比——keyword baseline、sparse-hybrid、dense-hybrid、dense-hybrid-pgvector、dense-hybrid-rerank（相关性由标注的 gold 文档判断，而不是检索器自己的关键词分数）。若某策略的外部依赖（dense embedding、rerank 或 pgvector）未配置，会被标记为 `unavailable` 并优雅降级，因此默认情况下评估既不会失败、也不会发起网络调用。
+
+### 向量 serving 规模基准：暴力余弦 vs pgvector HNSW
+
+合成聚簇语料（64 簇 + 受控噪声，模拟真实 embedding 的流形结构）、1024 维、单机实测（i7-12700H / 16GB / Windows 11，Postgres 运行于 Docker Desktop WSL2），每组含预热、top-10、50 次查询：
+
+| 规模 | 暴力余弦 P50 / P99 | HNSW ef=40（默认）P50 / P99 / recall@10 | HNSW ef=120 P50 / P99 / recall@10 |
+|---|---|---|---|
+| 1 万 | 6.0 / 13.2 ms | 1.6 / 2.0 ms / **1.000** | 1.7 / 4.0 ms / 1.000 |
+| 10 万 | 62.7 / 94.1 ms | 4.5 / 35.1 ms / **0.768** | 4.9 / 7.4 ms / **0.952** |
+
+三个可复述的结论：
+
+1. **暴力扫描线性劣化，HNSW 近乎平坦**：数据量 ×10，暴力 P50 从 6ms 涨到 63ms，HNSW 只从 1.6ms 到 4.5ms。
+2. **近似检索的召回损失在规模上真实出现**：1 万条时默认参数 recall 满分，10 万条时掉到 0.768——HNSW 的"近似"不是理论风险而是可测现象。
+3. **ef_search 是召回/延迟的线上旋钮**：调到 120 后 recall 恢复到 0.952，P50 只多 0.4ms（P99 反而更稳）；代价发生在写入侧——10 万条的 HNSW 建索引耗时约 4.6 分钟。
+
+两个诚实边界：合成聚簇数据比真实 embedding 分布更"干净"，recall 数字偏乐观；纯随机（无簇结构）高维向量下 HNSW recall 会塌到 ~0.26，这是维度灾难的已知现象，也说明 ANN 基准必须用带结构的数据。复现：
+
+```bash
+./mvnw test -Dtest=PgVectorBenchmarkTest -Ddevmind.benchmark=true \
+  -Ddevmind.benchmark.vectorCount=100000
+```
 
 ## 文档导入
 
