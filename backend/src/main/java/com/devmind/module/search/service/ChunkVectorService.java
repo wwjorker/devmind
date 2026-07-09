@@ -222,6 +222,9 @@ public class ChunkVectorService {
             existingVector.setVectorJson(encodeVector(vector));
             existingVector.setStatus(STATUS_ACTIVE);
             vectorMapper.updateById(existingVector);
+            // The update branch revives archived rows during backfill; without this
+            // double-write the pgvector index silently misses every re-embedded chunk.
+            doubleWriteToPgVector(userId, documentId, chunkId, provider, vector);
             return;
         }
 
