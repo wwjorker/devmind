@@ -12,6 +12,7 @@ flowchart TB
     Document["document module"] --> Chunk["document chunk service"]
     Search["search module"] --> Chunk
     AI["ai module"] --> Search
+    AI --> RateLimit["Redis AI ask rate limiter"]
     AI --> Prompt["prompt builder"]
     AI --> LLM["llm client router"]
     AI --> Log["ask log service"]
@@ -105,6 +106,7 @@ erDiagram
 ```mermaid
 sequenceDiagram
     participant Client
+    participant Limit as AiAskRateLimiter
     participant AI as AiAskService
     participant Search as ChunkSearchService
     participant Prompt as PromptBuilderService
@@ -112,6 +114,10 @@ sequenceDiagram
     participant Log as AiAskLogService
 
     Client->>AI: POST /api/v1/ai/ask
+    AI->>Limit: checkAllowed(userId)
+    alt over 10 requests in current minute
+        Limit-->>Client: HTTP 429
+    else allowed or configured fail-open
     AI->>Search: searchChunks(userId, keyword)
     Search-->>AI: retrieved chunks
     AI->>Prompt: buildPrompt(question, chunks)
@@ -121,6 +127,7 @@ sequenceDiagram
     AI->>Log: saveSuccessLog(...)
     Log-->>AI: logId
     AI-->>Client: answer + citations + logId
+    end
 ```
 
 ## 设计取舍
@@ -129,7 +136,7 @@ sequenceDiagram
 - 文档更新后重建 chunk，保证检索结果和最新内容对齐。
 - 检索用 `RetrievalStrategy`、`EmbeddingClient`、`RerankClient` 三层抽象，让关键词、稀疏向量、dense embedding 和 rerank 策略共用同一套问答与评估流程。
 - `EmbeddingClient` 把向量表示和检索编排分离：本地确定性稀疏向量（默认、零外部成本）和可选的真实 dense embedding（OpenAI 兼容 API）按 `provider_name` 共存于同一张向量表，可由配置切换。
-- `RerankClient` 隔离 rerank 供应商（默认 `none`，可选外部 `/rerank` API），用于离线四方评估。
+- `RerankClient` 隔离 rerank 供应商（默认 `none`，可选外部 `/rerank` API），用于离线五方评估中的精排策略。
 - chunk 向量行随文档 chunk 一起重建，存入 `knowledge_document_chunk_vector`。问答路径只构造 query 向量，再与已持久化的 chunk 向量比较，而不是每次提问都重算全部 chunk 向量。
 - chunk 内容的 FULLTEXT 索引使用 ngram parser，让中文查询直接走 FULLTEXT 相关性排序；SQL 侧只做宽候选池截断（LIKE 兜底按更新时间截取），真正的相关性打分在服务层完成。
 - 向量通道默认对持久化向量做暴力余弦，扫描上限为固定常量；启用 pgvector 后 dense 向量的相似度查询改由 Postgres HNSW 索引承担，不再受该上限约束。
@@ -137,6 +144,7 @@ sequenceDiagram
 - pgvector 的 HNSW 索引对 vector 类型最多支持 2000 维，因此 dense embedding 通过 API 的 dimensions 参数请求 1024 维，启动时对超限维度 fail-fast。
 - 混合检索用 RRF 融合关键词/FULLTEXT 排名和向量排名，避免直接相加不同量纲的分数。
 - `LlmClient` 把模型供应商实现和 RAG 编排分离。
+- AI 问答入口按登录用户做固定一分钟窗口限流。Redis Lua 将 `INCR` 与首次 `EXPIRE` 放在同一次原子执行中，避免并发下计数与 TTL 分离；默认阈值为 10 次/分钟，超限返回 HTTP 429。Redis 故障时可在 fail-open（可用性优先）和 fail-closed（保护能力优先）之间配置。
 - 调用日志记录问题、检索关键词、chunk id、答案、provider、token 用量和耗时，供后续 bad case 分析。
 - 反馈记录保存 helpful 标注、原因和期望答案，让 bad case 能沉淀成一个小型评估数据集。
 - 评估汇总接口聚合反馈数、bad case 数、bad case 率和近期 bad case，用于 RAG 质量分析。

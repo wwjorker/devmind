@@ -2,6 +2,8 @@ package com.devmind.common.exception;
 
 import com.devmind.common.api.Result;
 import com.devmind.common.api.ResultCode;
+import com.devmind.common.ratelimit.RateLimitExceededException;
+import com.devmind.common.ratelimit.RateLimitUnavailableException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +63,19 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.OK)
     public Result<Void> handleAccessDeniedException() {
         return Result.fail(ResultCode.FORBIDDEN);
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+    public Result<Void> handleRateLimitExceededException(RateLimitExceededException ex) {
+        return Result.fail(ResultCode.TOO_MANY_REQUESTS.getCode(), ex.getMessage());
+    }
+
+    @ExceptionHandler(RateLimitUnavailableException.class)
+    @ResponseStatus(HttpStatus.SERVICE_UNAVAILABLE)
+    public Result<Void> handleRateLimitUnavailableException(RateLimitUnavailableException ex) {
+        log.error("Rate limiter is unavailable", ex);
+        return Result.fail(ResultCode.SERVICE_UNAVAILABLE);
     }
 
     @ExceptionHandler(Exception.class)

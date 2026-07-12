@@ -4,6 +4,8 @@ import com.devmind.common.api.Result;
 import com.devmind.common.api.ResultCode;
 import com.devmind.common.exception.BizException;
 import com.devmind.common.security.AuthenticatedUser;
+import com.devmind.common.ratelimit.AiAskRateLimiter;
+import com.devmind.module.ai.dto.AskRequest;
 import com.devmind.module.ai.service.AiAskFeedbackService;
 import com.devmind.module.ai.service.AiAskLogService;
 import com.devmind.module.ai.service.AiAskService;
@@ -43,13 +45,34 @@ class AiAskControllerTest {
                 .hasMessageContaining("external embedding provider is not configured");
     }
 
+    @Test
+    void askShouldApplyRateLimitForCurrentUser() {
+        AiAskRateLimiter rateLimiter = mock(AiAskRateLimiter.class);
+        AiAskService aiAskService = mock(AiAskService.class);
+        AiAskController controller = controller(mock(ChunkVectorService.class), aiAskService, rateLimiter);
+        AskRequest request = new AskRequest();
+        request.setQuestion("What is RRF?");
+
+        controller.ask(new AuthenticatedUser(7L, "alice"), request);
+
+        verify(rateLimiter).checkAllowed(7L);
+        verify(aiAskService).ask(7L, request);
+    }
+
     private AiAskController controller(ChunkVectorService chunkVectorService) {
+        return controller(chunkVectorService, mock(AiAskService.class), mock(AiAskRateLimiter.class));
+    }
+
+    private AiAskController controller(ChunkVectorService chunkVectorService,
+                                       AiAskService aiAskService,
+                                       AiAskRateLimiter rateLimiter) {
         return new AiAskController(
-                mock(AiAskService.class),
+                aiAskService,
                 mock(AiAskLogService.class),
                 mock(AiAskFeedbackService.class),
                 mock(RagEvaluationDatasetService.class),
-                chunkVectorService
+                chunkVectorService,
+                rateLimiter
         );
     }
 }

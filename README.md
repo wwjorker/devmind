@@ -38,7 +38,7 @@ GitHub Actions: main 分支 CI 通过
 -> 返回带引用来源的回答
 -> 记录成功 / 失败问答日志、token 用量和耗时
 -> bad case 反馈
--> 四方检索策略 Hit@3 / MRR 对比评估
+-> 五方检索策略 Hit@3 / MRR 对比评估
 ```
 
 AI 问答不是独立模块，而是接入了认证、数据库设计、事务、Redis、日志、评估和 CI 的完整后端链路。
@@ -157,6 +157,7 @@ backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql
 - JWT 登录认证与用户数据隔离
 - BCrypt 密码加密
 - Redis JWT logout 黑名单
+- Redis Lua 固定窗口限流：AI 问答按用户默认每分钟 10 次，超限返回 HTTP 429，Redis 故障时支持 fail-open / fail-closed 配置
 - Flyway 数据库迁移管理
 - 知识文档 CRUD 与软删除
 - TXT / Markdown 笔记导入
@@ -171,7 +172,7 @@ backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql
 - AI Ask 日志记录 provider、耗时、chunk ids、token usage、成功 / 失败状态
 - bad case 反馈与评估汇总
 - RAG evaluation dataset 覆盖率，用标准问题检查检索链路
-- Retrieval evaluation 四方检索评估（keyword / sparse-hybrid / dense-hybrid / dense-hybrid-rerank），用人工标注 gold label 计算 Hit@3、MRR、首个相关片段排名与策略间 delta
+- Retrieval evaluation 五方检索评估（keyword / sparse-hybrid / dense-hybrid / dense-hybrid-pgvector / dense-hybrid-rerank），用人工标注 gold label 计算 Hit@3、MRR、首个相关片段排名与策略间 delta
 - 前端展示问答、引用来源、召回片段、Prompt、日志详情和评估看板
 - 后端单元测试与 GitHub Actions CI
 
@@ -187,13 +188,14 @@ DevMind 的核心设计围绕 RAG 链路和后端工程化展开：
 6. Prompt Preview 与 Ask Log 会记录上下文、模型来源、召回片段、token 用量、耗时和状态，方便定位 RAG 问题。
 7. `LlmClient` 抽象隔离业务流程和模型供应商，支持 Mock、本地测试、DeepSeek 接入和后续 Provider 扩展。
 8. JWT logout 使用 Redis 黑名单保存未过期 token 的剩余 TTL，解决无状态 token 退出后仍可能可用的问题。
-9. Flyway 管理数据库结构版本，避免不同环境手动执行 SQL 造成表结构漂移。
-10. bad case feedback 和 RAG evaluation dataset 用于记录问题样例、期望答案和覆盖情况，形成持续优化闭环。
-11. retrieval evaluation 会批量执行标准问题检索，用人工标注的相关文档作为 gold label 计算 Hit@3、MRR 和首个相关片段排名；命中关键词只作为诊断信息展示，不作为相关性裁判。
-12. retrieval evaluation 在同一 gold-label 用例集上对比 keyword / sparse-hybrid / dense-hybrid / dense-hybrid-rerank 四种策略的 Hit@3、MRR 和 delta；外部依赖（dense embedding、rerank）未配置时对应策略标记为 unavailable 并优雅降级，评估不失败、不联网。
-13. 评估集包含词法失配、同义改写和跨主题 hard-negative 用例；实测显示 dense embedding 能把改写问题的相关文档从第 5 位提升到第 1 位，rerank 能保证相关文档必进前 3，但会牺牲部分排序精度（详见上方评估结果表）。
-14. embedding 输入文本由 `EmbeddingTextBuilder` 统一从标题、来源类型、标签和 chunk 内容构造，避免索引、重排和后续向量化使用不同字段。
-15. 第一版优先支持 TXT / Markdown 导入，保证核心链路稳定后再扩展 PDF、Word、OCR 等解析能力。
+9. AI 问答入口使用 Redis Lua 原子执行 `INCR + EXPIRE`，按用户限制固定窗口内的请求次数；默认每分钟 10 次，超限返回 HTTP 429，Redis 故障策略可配置。
+10. Flyway 管理数据库结构版本，避免不同环境手动执行 SQL 造成表结构漂移。
+11. bad case feedback 和 RAG evaluation dataset 用于记录问题样例、期望答案和覆盖情况，形成持续优化闭环。
+12. retrieval evaluation 会批量执行标准问题检索，用人工标注的相关文档作为 gold label 计算 Hit@3、MRR 和首个相关片段排名；命中关键词只作为诊断信息展示，不作为相关性裁判。
+13. retrieval evaluation 在同一 gold-label 用例集上对比 keyword / sparse-hybrid / dense-hybrid / dense-hybrid-pgvector / dense-hybrid-rerank 五种策略的 Hit@3、MRR 和 delta；外部依赖未配置时对应策略标记为 unavailable 并优雅降级，评估不失败、不联网。
+14. 评估集包含词法失配、同义改写和跨主题 hard-negative 用例；实测显示 dense embedding 能把改写问题的相关文档从第 5 位提升到第 1 位，rerank 能保证相关文档必进前 3，但会牺牲部分排序精度（详见上方评估结果表）。
+15. embedding 输入文本由 `EmbeddingTextBuilder` 统一从标题、来源类型、标签和 chunk 内容构造，避免索引、重排和后续向量化使用不同字段。
+16. 第一版优先支持 TXT / Markdown 导入，保证核心链路稳定；PDF、Word、OCR 与 SSE 保留为产品化演进项，不纳入当前作品集版本。
 
 ## 项目定位
 
@@ -205,7 +207,7 @@ DevMind 是一个面向开发学习场景的 AI 知识库系统，重点展示 J
 
 1. 检索增强：rerank 从离线评估接入线上问答链路；无上下文判定从"召回为空"升级为基于 dense 相似度阈值；HNSW 参数（m / ef_search）按规模调优。
 2. 评估增强：扩大标注评估集规模使结论具备统计显著性，补充 bad case 分类统计和模型回答质量评测。
-3. 工程增强：接口限流、SSE 流式输出、PDF/Word 导入。
+3. 工程增强：限流已覆盖高成本 AI 问答入口；后续可扩展接口幂等、失败重试和部署监控。SSE、PDF/Word 导入保留为可选产品化能力。
 
 ## 文档
 

@@ -41,6 +41,13 @@ devmind:
     # true: a Redis failure only disables logout revocation (local-dev friendly).
     # false: reject requests whenever the blacklist cannot be checked.
     blacklist-fail-open: ${DEVMIND_BLACKLIST_FAIL_OPEN:true}
+  rate-limit:
+    ai-ask:
+      enabled: ${DEVMIND_AI_ASK_RATE_LIMIT_ENABLED:true}
+      requests-per-minute: ${DEVMIND_AI_ASK_RATE_LIMIT_PER_MINUTE:10}
+      # true keeps local development usable when Redis is absent; use false when
+      # rate-limit enforcement is a hard availability requirement.
+      fail-open: ${DEVMIND_AI_ASK_RATE_LIMIT_FAIL_OPEN:true}
   retrieval:
     # Curated tech-phrase extraction for query understanding. Disable to measure
     # how much retrieval quality depends on the hand-written phrase list.

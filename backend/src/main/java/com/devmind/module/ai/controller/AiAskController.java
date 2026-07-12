@@ -3,6 +3,7 @@ package com.devmind.module.ai.controller;
 import com.devmind.common.api.Result;
 import com.devmind.common.api.PageResult;
 import com.devmind.common.security.AuthenticatedUser;
+import com.devmind.common.ratelimit.AiAskRateLimiter;
 import com.devmind.module.ai.dto.AskFeedbackRequest;
 import com.devmind.module.ai.dto.AskRequest;
 import com.devmind.module.ai.service.AiAskFeedbackService;
@@ -35,22 +36,26 @@ public class AiAskController {
     private final AiAskFeedbackService feedbackService;
     private final RagEvaluationDatasetService evaluationDatasetService;
     private final ChunkVectorService chunkVectorService;
+    private final AiAskRateLimiter aiAskRateLimiter;
 
     public AiAskController(AiAskService aiAskService,
                            AiAskLogService askLogService,
                            AiAskFeedbackService feedbackService,
                            RagEvaluationDatasetService evaluationDatasetService,
-                           ChunkVectorService chunkVectorService) {
+                           ChunkVectorService chunkVectorService,
+                           AiAskRateLimiter aiAskRateLimiter) {
         this.aiAskService = aiAskService;
         this.askLogService = askLogService;
         this.feedbackService = feedbackService;
         this.evaluationDatasetService = evaluationDatasetService;
         this.chunkVectorService = chunkVectorService;
+        this.aiAskRateLimiter = aiAskRateLimiter;
     }
 
     @PostMapping("/ask")
     public Result<AskResponse> ask(@AuthenticationPrincipal AuthenticatedUser user,
                                    @Valid @RequestBody AskRequest request) {
+        aiAskRateLimiter.checkAllowed(user.userId());
         return Result.success(aiAskService.ask(user.userId(), request));
     }
 

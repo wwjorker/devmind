@@ -8,6 +8,8 @@ public enum ResultCode {
     FORBIDDEN(403, "forbidden"),
     NOT_FOUND(404, "not found"),
     CONFLICT(409, "resource conflict"),
+    TOO_MANY_REQUESTS(429, "too many requests"),
+    SERVICE_UNAVAILABLE(503, "service unavailable"),
     INTERNAL_ERROR(500, "internal server error");
 
     private final int code;

@@ -5,6 +5,7 @@ import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
 import com.devmind.module.ai.config.AiProperties;
+import com.devmind.module.search.embedding.EmbeddingClient;
 import com.devmind.module.search.embedding.EmbeddingClientRouter;
 import com.devmind.module.search.embedding.EmbeddingTextBuilder;
 import com.devmind.module.search.embedding.LocalEmbeddingClient;
@@ -23,6 +24,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -135,6 +137,54 @@ class ChunkVectorServiceTest {
         assertThat(savedVector.getChunkId()).isEqualTo(20L);
         assertThat(savedVector.getProviderName()).isEqualTo("local-sparse-vector");
         assertThat(savedVector.getVectorJson()).contains("redis");
+    }
+
+    @Test
+    void shouldDoubleWriteRevivedArchivedVectorToPgVectorDuringBackfill() {
+        DocumentChunkVectorMapper vectorMapper = mock(DocumentChunkVectorMapper.class);
+        DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        EmbeddingClientRouter embeddingClientRouter = mock(EmbeddingClientRouter.class);
+        EmbeddingClient denseClient = mock(EmbeddingClient.class);
+        PgVectorStore pgVectorStore = mock(PgVectorStore.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<PgVectorStore> pgVectorStoreProvider = mock(ObjectProvider.class);
+        when(pgVectorStoreProvider.getIfAvailable()).thenReturn(pgVectorStore);
+        when(pgVectorStore.dimension()).thenReturn(3);
+        when(embeddingClientRouter.clientFor("remote-dense")).thenReturn(denseClient);
+        when(denseClient.providerName()).thenReturn("remote-dense");
+        when(denseClient.embed(any())).thenReturn(Map.of("0", 0.1, "1", 0.2, "2", 0.3));
+        ChunkVectorService service = new ChunkVectorService(
+                vectorMapper,
+                chunkMapper,
+                documentMapper,
+                embeddingClientRouter,
+                new EmbeddingTextBuilder(),
+                new ObjectMapper(),
+                pgVectorStoreProvider
+        );
+        when(chunkMapper.selectList(any())).thenReturn(List.of(chunk(10L, 100L)));
+        when(vectorMapper.selectList(any())).thenReturn(List.of());
+        when(documentMapper.selectList(any())).thenReturn(List.of(document(100L)));
+        DocumentChunkVector archivedVector = vector(10L, 100L, "remote-dense");
+        archivedVector.setStatus(0);
+        when(vectorMapper.selectOne(any())).thenReturn(archivedVector);
+
+        service.backfillVectors(1L, "remote-dense");
+
+        ArgumentCaptor<DocumentChunkVector> revivedCaptor = ArgumentCaptor.forClass(DocumentChunkVector.class);
+        verify(vectorMapper).updateById(revivedCaptor.capture());
+        assertThat(revivedCaptor.getValue().getStatus()).isEqualTo(1);
+        verify(vectorMapper, never()).insert(any(DocumentChunkVector.class));
+        ArgumentCaptor<float[]> embeddingCaptor = ArgumentCaptor.forClass(float[].class);
+        verify(pgVectorStore).upsertChunkVector(
+                eq(1L),
+                eq(100L),
+                eq(10L),
+                eq("remote-dense"),
+                embeddingCaptor.capture()
+        );
+        assertThat(embeddingCaptor.getValue()).containsExactly(0.1f, 0.2f, 0.3f);
     }
 
     @Test

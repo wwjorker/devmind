@@ -92,6 +92,7 @@ GET {{baseUrl}}/api/v1/search/chunks/by-ids?ids=1,2,3&keywords=Redis,cache,penet
 Authorization: Bearer {{authToken}}
 
 ### Ask AI
+# Default limit: 10 requests per authenticated user per minute. Excess requests return HTTP 429.
 POST {{baseUrl}}/api/v1/ai/ask
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
