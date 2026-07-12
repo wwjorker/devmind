@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -185,6 +186,99 @@ class ChunkVectorServiceTest {
                 embeddingCaptor.capture()
         );
         assertThat(embeddingCaptor.getValue()).containsExactly(0.1f, 0.2f, 0.3f);
+    }
+
+    @Test
+    void shouldReplayActiveDenseVectorToPgVectorWithoutReembeddingOrUpdatingMySql() {
+        DocumentChunkVectorMapper vectorMapper = mock(DocumentChunkVectorMapper.class);
+        DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        EmbeddingClientRouter embeddingClientRouter = mock(EmbeddingClientRouter.class);
+        EmbeddingClient denseClient = mock(EmbeddingClient.class);
+        PgVectorStore pgVectorStore = mock(PgVectorStore.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<PgVectorStore> pgVectorStoreProvider = mock(ObjectProvider.class);
+        when(pgVectorStoreProvider.getIfAvailable()).thenReturn(pgVectorStore);
+        when(pgVectorStore.dimension()).thenReturn(3);
+        when(embeddingClientRouter.clientFor("remote-dense")).thenReturn(denseClient);
+        when(denseClient.providerName()).thenReturn("remote-dense");
+        ChunkVectorService service = new ChunkVectorService(
+                vectorMapper,
+                chunkMapper,
+                documentMapper,
+                embeddingClientRouter,
+                new EmbeddingTextBuilder(),
+                new ObjectMapper(),
+                pgVectorStoreProvider
+        );
+        DocumentChunkVector activeVector = vector(10L, 100L, "remote-dense");
+        activeVector.setVectorJson("{\"0\":0.1,\"1\":0.2,\"2\":0.3}");
+        when(chunkMapper.selectList(any())).thenReturn(List.of(chunk(10L, 100L)));
+        when(vectorMapper.selectList(any())).thenReturn(List.of(activeVector));
+        when(documentMapper.selectList(any())).thenReturn(List.of(document(100L)));
+
+        service.backfillVectors(1L, "remote-dense");
+
+        verify(denseClient, never()).embed(any());
+        verify(vectorMapper, never()).insert(any(DocumentChunkVector.class));
+        verify(vectorMapper, never()).updateById(any(DocumentChunkVector.class));
+        ArgumentCaptor<float[]> embeddingCaptor = ArgumentCaptor.forClass(float[].class);
+        verify(pgVectorStore).upsertChunkVector(
+                eq(1L),
+                eq(100L),
+                eq(10L),
+                eq("remote-dense"),
+                embeddingCaptor.capture()
+        );
+        assertThat(embeddingCaptor.getValue()).containsExactly(0.1f, 0.2f, 0.3f);
+    }
+
+    @Test
+    void shouldRepairFailedPgVectorDoubleWriteOnLaterBackfill() {
+        DocumentChunkVectorMapper vectorMapper = mock(DocumentChunkVectorMapper.class);
+        DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        EmbeddingClientRouter embeddingClientRouter = mock(EmbeddingClientRouter.class);
+        EmbeddingClient denseClient = mock(EmbeddingClient.class);
+        PgVectorStore pgVectorStore = mock(PgVectorStore.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<PgVectorStore> pgVectorStoreProvider = mock(ObjectProvider.class);
+        when(pgVectorStoreProvider.getIfAvailable()).thenReturn(pgVectorStore);
+        when(pgVectorStore.dimension()).thenReturn(3);
+        when(embeddingClientRouter.providerName()).thenReturn("remote-dense");
+        when(embeddingClientRouter.embed(any())).thenReturn(Map.of("0", 0.1, "1", 0.2, "2", 0.3));
+        when(embeddingClientRouter.clientFor("remote-dense")).thenReturn(denseClient);
+        when(denseClient.providerName()).thenReturn("remote-dense");
+        doThrow(new RuntimeException("pgvector unavailable"))
+                .doNothing()
+                .when(pgVectorStore)
+                .upsertChunkVector(eq(1L), eq(100L), eq(10L), eq("remote-dense"), any(float[].class));
+        ChunkVectorService service = new ChunkVectorService(
+                vectorMapper,
+                chunkMapper,
+                documentMapper,
+                embeddingClientRouter,
+                new EmbeddingTextBuilder(),
+                new ObjectMapper(),
+                pgVectorStoreProvider
+        );
+        when(documentMapper.selectById(100L)).thenReturn(document(100L));
+
+        service.rebuildVectors(1L, 100L, List.of(chunk(10L, 100L)));
+
+        DocumentChunkVector activeVector = vector(10L, 100L, "remote-dense");
+        activeVector.setVectorJson("{\"0\":0.1,\"1\":0.2,\"2\":0.3}");
+        when(chunkMapper.selectList(any())).thenReturn(List.of(chunk(10L, 100L)));
+        when(vectorMapper.selectList(any())).thenReturn(List.of(activeVector));
+        when(documentMapper.selectList(any())).thenReturn(List.of(document(100L)));
+
+        service.backfillVectors(1L, "remote-dense");
+
+        verify(vectorMapper, times(1)).insert(any(DocumentChunkVector.class));
+        verify(vectorMapper, never()).updateById(any(DocumentChunkVector.class));
+        verify(pgVectorStore, times(2)).upsertChunkVector(
+                eq(1L), eq(100L), eq(10L), eq("remote-dense"), any(float[].class)
+        );
     }
 
     @Test

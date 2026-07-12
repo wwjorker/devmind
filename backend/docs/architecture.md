@@ -140,7 +140,7 @@ sequenceDiagram
 - chunk 向量行随文档 chunk 一起重建，存入 `knowledge_document_chunk_vector`。问答路径只构造 query 向量，再与已持久化的 chunk 向量比较，而不是每次提问都重算全部 chunk 向量。
 - chunk 内容的 FULLTEXT 索引使用 ngram parser，让中文查询直接走 FULLTEXT 相关性排序；SQL 侧只做宽候选池截断（LIKE 兜底按更新时间截取），真正的相关性打分在服务层完成。
 - 向量通道默认对持久化向量做暴力余弦，扫描上限为固定常量；启用 pgvector 后 dense 向量的相似度查询改由 Postgres HNSW 索引承担，不再受该上限约束。
-- 双库取舍：MySQL 始终是主数据的唯一事实来源，向量是可由源文本重建的派生数据。启用 pgvector 时 dense 向量双写（MySQL JSON 行为源，pg 为 serving 索引），pg 写入是 best-effort——失败只降低召回、绝不阻塞主流程，脏行在读取侧被主库校验兜底，可随时 backfill 重建。
+- 双库取舍：MySQL 始终是主数据的唯一事实来源，向量是可由源文本重建的派生数据。启用 pgvector 时 dense 向量双写（MySQL JSON 行为源，pg 为 serving 索引），pg 写入是 best-effort——失败只降低召回、绝不阻塞主流程，脏行在读取侧被主库校验兜底。backfill 会把已有 active dense JSON 直接重放到 pgvector，也会生成缺失或复活归档的 MySQL 向量行。
 - pgvector 的 HNSW 索引对 vector 类型最多支持 2000 维，因此 dense embedding 通过 API 的 dimensions 参数请求 1024 维，启动时对超限维度 fail-fast。
 - 混合检索用 RRF 融合关键词/FULLTEXT 排名和向量排名，避免直接相加不同量纲的分数。
 - `LlmClient` 把模型供应商实现和 RAG 编排分离。

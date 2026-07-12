@@ -124,18 +124,34 @@ public class ChunkVectorService {
             return;
         }
 
-        Set<Long> existingActiveChunkIds = listExistingActiveChunkIds(userId, embeddingClient.providerName());
+        Map<Long, DocumentChunkVector> existingActiveVectors =
+                listExistingActiveVectorsByChunkId(userId, embeddingClient.providerName());
         Set<Long> documentIds = chunks.stream()
                 .map(DocumentChunk::getDocumentId)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Map<Long, KnowledgeDocument> activeDocuments = findActiveDocuments(userId, documentIds);
 
         for (DocumentChunk chunk : chunks) {
-            if (existingActiveChunkIds.contains(chunk.getId())) {
-                continue;
-            }
             KnowledgeDocument document = activeDocuments.get(chunk.getDocumentId());
             if (document == null) {
+                continue;
+            }
+            DocumentChunkVector existingActiveVector = existingActiveVectors.get(chunk.getId());
+            if (existingActiveVector != null) {
+                // MySQL JSON is the source of truth. Replaying an active dense vector
+                // makes backfill useful both for first-time pgvector migration and for
+                // repairing a previous best-effort double-write failure, without paying
+                // for another embedding request or touching the MySQL row.
+                Map<String, Double> storedVector = decodeVector(existingActiveVector.getVectorJson());
+                if (!storedVector.isEmpty()) {
+                    doubleWriteToPgVector(
+                            userId,
+                            document.getId(),
+                            chunk.getId(),
+                            embeddingClient.providerName(),
+                            storedVector
+                    );
+                }
                 continue;
             }
             Map<String, Double> vector = embeddingClient.embed(embeddingTextBuilder.buildForChunk(document, chunk));
@@ -188,14 +204,17 @@ public class ChunkVectorService {
         return chunkMapper.selectList(queryWrapper);
     }
 
-    private Set<Long> listExistingActiveChunkIds(Long userId, String provider) {
+    private Map<Long, DocumentChunkVector> listExistingActiveVectorsByChunkId(Long userId, String provider) {
         QueryWrapper<DocumentChunkVector> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_id", userId)
                 .eq("provider_name", provider)
                 .eq("status", STATUS_ACTIVE);
         return vectorMapper.selectList(queryWrapper).stream()
-                .map(DocumentChunkVector::getChunkId)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toMap(
+                        DocumentChunkVector::getChunkId,
+                        Function.identity(),
+                        (first, ignored) -> first
+                ));
     }
 
     private Map<Long, KnowledgeDocument> findActiveDocuments(Long userId, Set<Long> documentIds) {

@@ -403,7 +403,7 @@ DEVMIND_PGVECTOR_DIMENSION=1024
 DEVMIND_AI_EMBEDDING_REMOTE_DIMENSION=1024
 ```
 
-启用后 dense 向量双写：MySQL JSON 行保持源数据与对照组身份，pgvector HNSW 承担相似度查询；评估接口会多出一路 `dense-hybrid-pgvector` 策略，直接对比两种 serving 路径。切换维度后需要调用向量回填接口重建向量。
+启用后 dense 向量双写：MySQL JSON 行保持源数据与对照组身份，pgvector HNSW 承担相似度查询；评估接口会多出一路 `dense-hybrid-pgvector` 策略，直接对比两种 serving 路径。切换维度后需要调用向量回填接口重建向量；对于 MySQL 中已有的 active dense 向量，backfill 会直接解码 JSON 并重放到 pgvector，不重复请求 embedding，可用于首次迁移或修复此前失败的 best-effort 双写。
 
 可选行为开关：
 

@@ -75,6 +75,18 @@ class AiAskRateLimiterTest {
     }
 
     @Test
+    void shouldFailClosedWhenRedisReturnsNoCounter() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        when(redisTemplate.execute(any(RedisScript.class), anyList(), (Object[]) any()))
+                .thenReturn(null);
+        AiAskRateLimiter limiter = limiter(redisTemplate, properties(true, 10, false));
+
+        assertThatThrownBy(() -> limiter.checkAllowed(7L))
+                .isInstanceOf(RateLimitUnavailableException.class)
+                .hasMessageContaining("unavailable");
+    }
+
+    @Test
     void shouldSkipRedisWhenDisabled() {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
         AiAskRateLimiter limiter = limiter(redisTemplate, properties(false, 10, true));

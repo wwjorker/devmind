@@ -42,8 +42,12 @@ public class JwtTokenProvider {
 
     public long getRemainingTtlSeconds(String token) {
         Date expiration = parseClaims(token).getExpiration();
-        long remainingSeconds = expiration.toInstant().getEpochSecond() - Instant.now().getEpochSecond();
-        return Math.max(remainingSeconds, 0);
+        long remainingMillis = expiration.getTime() - System.currentTimeMillis();
+        if (remainingMillis <= 0) {
+            return 0;
+        }
+        // Round up so the Redis blacklist never expires before the JWT itself.
+        return (remainingMillis + 999) / 1000;
     }
 
     public long getExpireSeconds() {
