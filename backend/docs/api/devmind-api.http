@@ -157,6 +157,22 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/v1/ai/evaluation/summary?recentLimit=5
 Authorization: Bearer {{authToken}}
 
+### Evaluation Dataset Coverage
+GET {{baseUrl}}/api/v1/ai/evaluation/dataset
+Authorization: Bearer {{authToken}}
+
+### Retrieval Evaluation
+# Runs the configured local strategies without external calls by default.
+# Dense, pgvector, and rerank strategies are reported as unavailable unless configured.
+GET {{baseUrl}}/api/v1/ai/evaluation/retrieval
+Authorization: Bearer {{authToken}}
+
+### Backfill Chunk Embeddings
+# Safe local example: rebuild or repair the default local sparse vectors for the current user.
+# Do not switch this to remote-dense unless an external embedding provider is intentionally configured.
+POST {{baseUrl}}/api/v1/ai/embedding/backfill?provider=local-sparse-vector
+Authorization: Bearer {{authToken}}
+
 ### Inspect Latest Ask Logs in Database
 # Run this SQL in DBeaver after Ask AI:
 # SELECT id, question, retrieval_keyword, prompt_tokens, completion_tokens, total_tokens, retrieved_chunk_ids, elapsed_ms, status, created_at
