@@ -16,6 +16,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class KnowledgeDocumentServiceTest {
 
@@ -69,5 +70,23 @@ class KnowledgeDocumentServiceTest {
         assertThatThrownBy(() -> documentService.importFromFile(1L, file, null, null, null, null))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("only .txt, .md, and .markdown files are supported");
+    }
+
+    @Test
+    void archiveShouldArchiveOwnedDocumentAndItsChunks() {
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        DocumentChunkService chunkService = mock(DocumentChunkService.class);
+        KnowledgeDocument document = new KnowledgeDocument();
+        document.setId(42L);
+        document.setUserId(7L);
+        document.setStatus(1);
+        when(documentMapper.selectOne(any())).thenReturn(document);
+        KnowledgeDocumentService documentService = new KnowledgeDocumentService(documentMapper, chunkService);
+
+        documentService.archive(7L, 42L);
+
+        assertThat(document.getStatus()).isZero();
+        verify(documentMapper).updateById(document);
+        verify(chunkService).archiveByDocument(7L, 42L);
     }
 }
