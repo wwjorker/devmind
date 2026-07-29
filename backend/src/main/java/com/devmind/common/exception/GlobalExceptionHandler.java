@@ -15,6 +15,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.stream.Collectors;
 
@@ -57,6 +58,12 @@ public class GlobalExceptionHandler {
     public Result<Void> handleMessageNotReadableException(HttpMessageNotReadableException ex) {
         // Malformed or wrongly encoded request bodies are client errors, not server faults.
         return Result.fail(ResultCode.BAD_REQUEST.getCode(), "request body is not readable");
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+    public Result<Void> handleMaxUploadSizeExceededException() {
+        return Result.fail(ResultCode.BAD_REQUEST.getCode(), "文件过大，单个文件不能超过 256KB");
     }
 
     @ExceptionHandler(AccessDeniedException.class)

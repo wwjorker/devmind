@@ -59,4 +59,12 @@ class RetrievalKeywordServiceTest {
 
         assertThat(logKeyword).isEqualTo("Redis,缓存穿透,缓存雪崩");
     }
+
+    @Test
+    void toLogKeywordShouldFitDatabaseColumnWithoutSplittingUnicodeCharacters() {
+        String logKeyword = retrievalKeywordService.toLogKeyword(List.of("😀".repeat(140)));
+
+        assertThat(logKeyword.codePointCount(0, logKeyword.length())).isEqualTo(128);
+        assertThat(logKeyword).endsWith("…");
+    }
 }

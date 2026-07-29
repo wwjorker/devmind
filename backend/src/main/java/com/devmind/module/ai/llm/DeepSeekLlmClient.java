@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.devmind.common.api.ResultCode;
 import com.devmind.common.exception.BizException;
 import com.devmind.module.ai.config.AiProperties;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -27,9 +28,16 @@ public class DeepSeekLlmClient implements LlmClient {
             """;
 
     private final AiProperties aiProperties;
+    private final RestClient.Builder restClientBuilder;
+
+    @Autowired
+    public DeepSeekLlmClient(AiProperties aiProperties, RestClient.Builder restClientBuilder) {
+        this.aiProperties = aiProperties;
+        this.restClientBuilder = restClientBuilder;
+    }
 
     public DeepSeekLlmClient(AiProperties aiProperties) {
-        this.aiProperties = aiProperties;
+        this(aiProperties, RestClient.builder());
     }
 
     @Override
@@ -43,7 +51,7 @@ public class DeepSeekLlmClient implements LlmClient {
             throw new BizException(ResultCode.BAD_REQUEST, "DeepSeek API key is not configured");
         }
 
-        RestClient restClient = RestClient.builder()
+        RestClient restClient = restClientBuilder.clone()
                 .baseUrl(aiProperties.getDeepseekBaseUrl())
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + aiProperties.getDeepseekApiKey())
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)

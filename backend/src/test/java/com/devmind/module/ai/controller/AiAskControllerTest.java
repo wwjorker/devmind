@@ -5,6 +5,7 @@ import com.devmind.common.api.ResultCode;
 import com.devmind.common.exception.BizException;
 import com.devmind.common.security.AuthenticatedUser;
 import com.devmind.common.ratelimit.AiAskRateLimiter;
+import com.devmind.common.ratelimit.RetrievalEvaluationGuard;
 import com.devmind.module.ai.dto.AskRequest;
 import com.devmind.module.ai.service.AiAskFeedbackService;
 import com.devmind.module.ai.service.AiAskLogService;
@@ -72,7 +73,8 @@ class AiAskControllerTest {
                 mock(AiAskFeedbackService.class),
                 mock(RagEvaluationDatasetService.class),
                 chunkVectorService,
-                rateLimiter
+                rateLimiter,
+                mock(RetrievalEvaluationGuard.class)
         );
     }
 }

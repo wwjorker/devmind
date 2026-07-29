@@ -3,6 +3,8 @@ package com.devmind.module.ai.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+
 @Component
 @ConfigurationProperties(prefix = "devmind.ai")
 public class AiProperties {
@@ -12,6 +14,8 @@ public class AiProperties {
     private String deepseekBaseUrl = "https://api.deepseek.com";
     private String deepseekModel = "deepseek-v4-flash";
     private Double deepseekTemperature = 0.2;
+    private Duration connectTimeout = Duration.ofSeconds(5);
+    private Duration readTimeout = Duration.ofSeconds(30);
     private EmbeddingProperties embedding = new EmbeddingProperties();
     private RerankProperties rerank = new RerankProperties();
 
@@ -53,6 +57,22 @@ public class AiProperties {
 
     public void setDeepseekTemperature(Double deepseekTemperature) {
         this.deepseekTemperature = deepseekTemperature;
+    }
+
+    public Duration getConnectTimeout() {
+        return connectTimeout;
+    }
+
+    public void setConnectTimeout(Duration connectTimeout) {
+        this.connectTimeout = connectTimeout;
+    }
+
+    public Duration getReadTimeout() {
+        return readTimeout;
+    }
+
+    public void setReadTimeout(Duration readTimeout) {
+        this.readTimeout = readTimeout;
     }
 
     public EmbeddingProperties getEmbedding() {

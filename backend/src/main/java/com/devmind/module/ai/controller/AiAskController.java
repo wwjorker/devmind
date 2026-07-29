@@ -4,6 +4,7 @@ import com.devmind.common.api.Result;
 import com.devmind.common.api.PageResult;
 import com.devmind.common.security.AuthenticatedUser;
 import com.devmind.common.ratelimit.AiAskRateLimiter;
+import com.devmind.common.ratelimit.RetrievalEvaluationGuard;
 import com.devmind.module.ai.dto.AskFeedbackRequest;
 import com.devmind.module.ai.dto.AskRequest;
 import com.devmind.module.ai.service.AiAskFeedbackService;
@@ -37,19 +38,22 @@ public class AiAskController {
     private final RagEvaluationDatasetService evaluationDatasetService;
     private final ChunkVectorService chunkVectorService;
     private final AiAskRateLimiter aiAskRateLimiter;
+    private final RetrievalEvaluationGuard retrievalEvaluationGuard;
 
     public AiAskController(AiAskService aiAskService,
                            AiAskLogService askLogService,
                            AiAskFeedbackService feedbackService,
                            RagEvaluationDatasetService evaluationDatasetService,
                            ChunkVectorService chunkVectorService,
-                           AiAskRateLimiter aiAskRateLimiter) {
+                           AiAskRateLimiter aiAskRateLimiter,
+                           RetrievalEvaluationGuard retrievalEvaluationGuard) {
         this.aiAskService = aiAskService;
         this.askLogService = askLogService;
         this.feedbackService = feedbackService;
         this.evaluationDatasetService = evaluationDatasetService;
         this.chunkVectorService = chunkVectorService;
         this.aiAskRateLimiter = aiAskRateLimiter;
+        this.retrievalEvaluationGuard = retrievalEvaluationGuard;
     }
 
     @PostMapping("/ask")
@@ -95,6 +99,7 @@ public class AiAskController {
 
     @GetMapping("/evaluation/retrieval")
     public Result<RagRetrievalEvaluationResponse> retrievalEvaluation(@AuthenticationPrincipal AuthenticatedUser user) {
+        retrievalEvaluationGuard.checkAllowed(user.userId());
         return Result.success(evaluationDatasetService.retrievalEvaluation(user.userId()));
     }
 

@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 public class RetrievalKeywordService {
 
     private static final int MAX_KEYWORD_COUNT = 6;
+    private static final int MAX_LOG_KEYWORD_CODE_POINTS = 128;
     private static final Pattern ENGLISH_TOKEN_PATTERN = Pattern.compile("[A-Za-z][A-Za-z0-9_+#.-]*");
     private static final Pattern CHINESE_BLOCK_PATTERN = Pattern.compile("[\\u4e00-\\u9fa5]{2,12}");
 
@@ -97,7 +98,13 @@ public class RetrievalKeywordService {
     }
 
     public String toLogKeyword(List<String> keywords) {
-        return String.join(",", keywords);
+        String joined = String.join(",", keywords);
+        int codePointCount = joined.codePointCount(0, joined.length());
+        if (codePointCount <= MAX_LOG_KEYWORD_CODE_POINTS) {
+            return joined;
+        }
+        int endIndex = joined.offsetByCodePoints(0, MAX_LOG_KEYWORD_CODE_POINTS - 1);
+        return joined.substring(0, endIndex) + "…";
     }
 
     // Connector-style characters that separate terms rather than extend them.

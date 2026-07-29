@@ -4,6 +4,10 @@ server:
 spring:
   application:
     name: devmind-backend
+  servlet:
+    multipart:
+      max-file-size: 256KB
+      max-request-size: 512KB
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: ${DEVMIND_DB_URL:jdbc:mysql://localhost:3306/devmind?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
@@ -48,6 +52,10 @@ devmind:
       # true keeps local development usable when Redis is absent; use false when
       # rate-limit enforcement is a hard availability requirement.
       fail-open: ${DEVMIND_AI_ASK_RATE_LIMIT_FAIL_OPEN:true}
+    retrieval-evaluation:
+      enabled: ${DEVMIND_RETRIEVAL_EVALUATION_GUARD_ENABLED:true}
+      cooldown-seconds: ${DEVMIND_RETRIEVAL_EVALUATION_COOLDOWN_SECONDS:300}
+      fail-open: ${DEVMIND_RETRIEVAL_EVALUATION_GUARD_FAIL_OPEN:true}
   retrieval:
     # Curated tech-phrase extraction for query understanding. Disable to measure
     # how much retrieval quality depends on the hand-written phrase list.
@@ -69,6 +77,8 @@ devmind:
     deepseek-base-url: ${DEVMIND_DEEPSEEK_BASE_URL:https://api.deepseek.com}
     deepseek-model: ${DEVMIND_DEEPSEEK_MODEL:deepseek-v4-flash}
     deepseek-temperature: ${DEVMIND_DEEPSEEK_TEMPERATURE:0.2}
+    connect-timeout: ${DEVMIND_AI_CONNECT_TIMEOUT:5s}
+    read-timeout: ${DEVMIND_AI_READ_TIMEOUT:30s}
     embedding:
       provider: ${DEVMIND_AI_EMBEDDING_PROVIDER:local-sparse-vector}
       remote:
