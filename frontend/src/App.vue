@@ -27,11 +27,17 @@ const apiTargetLabel = import.meta.env.VITE_API_TARGET || 'http://localhost:8081
 type AppView = 'documents' | 'ask' | 'evaluation' | 'logs';
 const activeView = ref<AppView>('ask');
 const documents = ref<DocumentItem[]>([]);
+const documentTotal = ref(0);
 const selectedDocumentId = ref<number | null>(null);
+const editingDocumentId = ref<number | null>(null);
 const askResponse = ref<AskResponse | null>(null);
 const restoredFromLog = ref(false);
 const restoredAskLogStatus = ref<number | null>(null);
 const askLogs = ref<AskLogItem[]>([]);
+const askLogPage = ref(1);
+const askLogTotal = ref(0);
+const askLogPageSize = 10;
+const backendStatus = ref<'checking' | 'up' | 'down'>('checking');
 const selectedLogDetail = ref<{
   log: AskLogItem;
   chunks: AskResponse['retrievedChunks'];
@@ -50,6 +56,8 @@ const loading = reactive({
   initialData: false,
   documents: false,
   createDocument: false,
+  updateDocument: false,
+  archiveDocument: false,
   importDocument: false,
   ask: false,
   askLogs: false,
@@ -84,6 +92,14 @@ const documentForm = reactive({
 
 面试表达：
 缓存穿透和缓存击穿、缓存雪崩不同，核心目标是保护数据库，避免不存在的数据被反复查询。`
+});
+
+const documentEditForm = reactive({
+  title: '',
+  sourceType: '',
+  tags: '',
+  summary: '',
+  content: ''
 });
 
 const importForm = reactive({
@@ -195,6 +211,9 @@ function friendlyError(err: unknown, fallback: string) {
   if (normalized.includes('file is required')) {
     return '请先选择要导入的文件。';
   }
+  if (normalized.includes('file is too large') || normalized.includes('文件过大')) {
+    return '文件过大，请选择不超过 256KB 的 TXT 或 Markdown 文件。';
+  }
   if (normalized.includes('request failed: 500') || normalized.includes('failed to fetch')) {
     return '无法连接 DevMind 后端，请确认 8081 端口的后端服务已经启动。';
   }
@@ -219,6 +238,16 @@ function normalizeTags(value: string) {
 function setActiveView(view: AppView) {
   activeView.value = view;
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function checkBackendHealth() {
+  backendStatus.value = 'checking';
+  try {
+    const health = await apiRequest<{ status: string }>('/api/v1/health');
+    backendStatus.value = health.status === 'UP' ? 'up' : 'down';
+  } catch {
+    backendStatus.value = 'down';
+  }
 }
 
 function startAskTimer() {
@@ -303,10 +332,15 @@ function clearLocalSession() {
   token.value = '';
   user.value = null;
   documents.value = [];
+  documentTotal.value = 0;
+  selectedDocumentId.value = null;
+  editingDocumentId.value = null;
   askResponse.value = null;
   restoredFromLog.value = false;
   restoredAskLogStatus.value = null;
   askLogs.value = [];
+  askLogPage.value = 1;
+  askLogTotal.value = 0;
   selectedLogDetail.value = null;
   evaluation.value = null;
   evaluationDataset.value = null;
@@ -314,9 +348,16 @@ function clearLocalSession() {
   lastEvaluationRunAt.value = null;
   loading.auth = false;
   loading.initialData = false;
+  loading.documents = false;
+  loading.createDocument = false;
+  loading.updateDocument = false;
+  loading.archiveDocument = false;
+  loading.importDocument = false;
+  loading.askLogs = false;
   loading.evaluation = false;
   loading.ask = false;
   loading.feedback = false;
+  loading.logDetail = false;
   stopAskTimer();
 }
 
@@ -356,13 +397,17 @@ async function loadDocuments(
 ) {
   loading.documents = true;
   setError('');
+  const previousSelection = selectedDocumentId.value;
   try {
-    const page = await apiRequest<PageResult<DocumentItem>>('/api/v1/documents?pageNo=1&pageSize=20', { signal });
+    const page = await apiRequest<PageResult<DocumentItem>>('/api/v1/documents?pageNo=1&pageSize=50', { signal });
     if (!isCurrentSession(expectedGeneration)) {
       return;
     }
     documents.value = page.records;
-    selectedDocumentId.value = page.records[0]?.id ?? null;
+    documentTotal.value = page.total;
+    selectedDocumentId.value = page.records.some((document) => document.id === previousSelection)
+      ? previousSelection
+      : page.records[0]?.id ?? null;
   } catch (err) {
     if (!signal.aborted && isCurrentSession(expectedGeneration)) {
       setError(friendlyError(err, '加载知识文档失败。'));
@@ -371,6 +416,67 @@ async function loadDocuments(
     if (isCurrentSession(expectedGeneration)) {
       loading.documents = false;
     }
+  }
+}
+
+function beginEditDocument(document: DocumentItem | null = selectedDocument.value) {
+  if (!document) {
+    return;
+  }
+  editingDocumentId.value = document.id;
+  Object.assign(documentEditForm, {
+    title: document.title,
+    sourceType: document.sourceType,
+    tags: document.tags || '',
+    summary: document.summary || '',
+    content: document.content
+  });
+}
+
+function cancelEditDocument() {
+  editingDocumentId.value = null;
+}
+
+async function updateDocument() {
+  if (!editingDocumentId.value) {
+    return;
+  }
+  loading.updateDocument = true;
+  setError('');
+  try {
+    await apiRequest<DocumentItem>(`/api/v1/documents/${editingDocumentId.value}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        ...documentEditForm,
+        tags: normalizeTags(documentEditForm.tags)
+      })
+    });
+    await loadDocuments();
+    editingDocumentId.value = null;
+    showToast('文档已更新，检索分块已重新生成');
+  } catch (err) {
+    setError(friendlyError(err, '更新文档失败。'));
+  } finally {
+    loading.updateDocument = false;
+  }
+}
+
+async function archiveDocument(document: DocumentItem | null = selectedDocument.value) {
+  if (!document || !window.confirm(`确定归档“${document.title}”吗？归档后它不会再参与检索。`)) {
+    return;
+  }
+  loading.archiveDocument = true;
+  setError('');
+  try {
+    await apiRequest(`/api/v1/documents/${document.id}`, { method: 'DELETE' });
+    editingDocumentId.value = null;
+    selectedDocumentId.value = null;
+    await loadDocuments();
+    showToast('文档已归档');
+  } catch (err) {
+    setError(friendlyError(err, '归档文档失败。'));
+  } finally {
+    loading.archiveDocument = false;
   }
 }
 
@@ -395,6 +501,13 @@ async function createDocument() {
 function onImportFileChange(event: Event) {
   const input = event.target as HTMLInputElement;
   selectedImportFile.value = input.files?.[0] ?? null;
+
+  if (selectedImportFile.value && selectedImportFile.value.size > 256 * 1024) {
+    selectedImportFile.value = null;
+    importFileInputKey.value += 1;
+    setError('文件过大，请选择不超过 256KB 的 TXT 或 Markdown 文件。');
+    return;
+  }
 
   if (selectedImportFile.value && !importForm.title) {
     importForm.title = selectedImportFile.value.name.replace(/\.(txt|md|markdown)$/i, '');
@@ -670,7 +783,8 @@ async function restoreAskFromLog(log: AskLogItem, notify = true) {
 async function loadAskLogs(
   restoreLatest = false,
   expectedGeneration = sessionGeneration,
-  signal: AbortSignal = sessionAbortController.signal
+  signal: AbortSignal = sessionAbortController.signal,
+  requestedPage = askLogPage.value
 ) {
   if (!isAuthed.value) {
     return;
@@ -678,13 +792,15 @@ async function loadAskLogs(
   loading.askLogs = true;
   try {
     const page = await apiRequest<PageResult<AskLogItem>>(
-      '/api/v1/ai/ask-logs?pageNo=1&pageSize=10',
+      `/api/v1/ai/ask-logs?pageNo=${requestedPage}&pageSize=${askLogPageSize}`,
       { signal }
     );
     if (!isCurrentSession(expectedGeneration)) {
       return;
     }
     askLogs.value = page.records;
+    askLogPage.value = page.pageNo;
+    askLogTotal.value = page.total;
     if (restoreLatest && !askResponse.value && page.records.length > 0) {
       await restoreAskFromLog(page.records[0], false);
     }
@@ -699,7 +815,18 @@ async function loadAskLogs(
   }
 }
 
+function changeAskLogPage(nextPage: number) {
+  const totalPages = Math.max(1, Math.ceil(askLogTotal.value / askLogPageSize));
+  if (nextPage < 1 || nextPage > totalPages || loading.askLogs) {
+    return;
+  }
+  selectedLogDetail.value = null;
+  askLogPage.value = nextPage;
+  void loadAskLogs(false, sessionGeneration, sessionAbortController.signal, nextPage);
+}
+
 async function refreshAll() {
+  void checkBackendHealth();
   await Promise.all([
     loadDocuments(),
     loadEvaluationOverview(),
@@ -739,6 +866,7 @@ function formatSignedNumber(value: number | null | undefined) {
 }
 
 onMounted(async () => {
+  void checkBackendHealth();
   if (!token.value) {
     return;
   }
@@ -768,27 +896,30 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <nav class="nav-list" aria-label="Primary">
-        <button :class="{ active: activeView === 'documents' }" @click="setActiveView('documents')">
+      <nav class="nav-list" aria-label="主导航">
+        <button aria-label="知识文档" title="知识文档" :class="{ active: activeView === 'documents' }" @click="setActiveView('documents')">
           <span v-html="icons.documents"></span>
           知识文档
         </button>
-        <button :class="{ active: activeView === 'ask' }" @click="setActiveView('ask')">
+        <button aria-label="AI 问答" title="AI 问答" :class="{ active: activeView === 'ask' }" @click="setActiveView('ask')">
           <span v-html="icons.ask"></span>
           AI 问答
         </button>
-        <button :class="{ active: activeView === 'evaluation' }" @click="setActiveView('evaluation')">
+        <button aria-label="评估看板" title="评估看板" :class="{ active: activeView === 'evaluation' }" @click="setActiveView('evaluation')">
           <span v-html="icons.chart"></span>
           评估看板
         </button>
-        <button :class="{ active: activeView === 'logs' }" @click="setActiveView('logs')">
+        <button aria-label="问答日志" title="问答日志" :class="{ active: activeView === 'logs' }" @click="setActiveView('logs')">
           <span v-html="icons.ask"></span>
           问答日志
         </button>
       </nav>
 
       <div class="sidebar-note">
-        <span>API 目标</span>
+        <span class="backend-status-line">
+          <i :class="['backend-dot', backendStatus]"></i>
+          {{ backendStatus === 'up' ? '后端在线' : backendStatus === 'down' ? '后端离线' : '正在检测' }}
+        </span>
         <strong>{{ apiTargetLabel.replace(/^https?:\/\//, '') }}</strong>
       </div>
     </aside>
@@ -857,7 +988,7 @@ onUnmounted(() => {
         <section class="status-grid">
           <div class="metric">
             <span>知识文档</span>
-            <strong>{{ documents.length }}</strong>
+            <strong>{{ documentTotal }}</strong>
           </div>
           <div class="metric">
             <span>问答状态</span>
@@ -869,7 +1000,7 @@ onUnmounted(() => {
           </div>
           <div class="metric">
             <span>问答日志</span>
-            <strong>{{ askLogs.length }}</strong>
+            <strong>{{ askLogTotal }}</strong>
           </div>
         </section>
 
@@ -896,8 +1027,73 @@ onUnmounted(() => {
                 <span>{{ document.sourceType }} - {{ document.tags }}</span>
                 <small>{{ formatDate(document.updatedAt || document.createdAt) }}</small>
               </button>
-                <div v-if="!loading.documents && documents.length === 0" class="empty-state">还没有知识文档。先创建或导入一篇笔记来测试检索。</div>
+              <div v-if="!loading.documents && documents.length === 0" class="empty-state">还没有知识文档。先创建或导入一篇笔记来测试检索。</div>
             </div>
+
+            <section v-if="selectedDocument" class="document-inspector">
+              <div class="document-inspector-header">
+                <div>
+                  <span>当前文档</span>
+                  <strong>{{ selectedDocument.title }}</strong>
+                </div>
+                <div class="panel-actions">
+                  <button class="mini-button" type="button" @click="beginEditDocument()">编辑</button>
+                  <button
+                    class="mini-button danger-outline"
+                    type="button"
+                    :disabled="loading.archiveDocument"
+                    @click="archiveDocument()"
+                  >
+                    {{ loading.archiveDocument ? '归档中...' : '归档' }}
+                  </button>
+                </div>
+              </div>
+              <p>{{ selectedDocument.summary || '暂无摘要' }}</p>
+              <div class="document-meta-strip">
+                <span>{{ selectedDocument.sourceType }}</span>
+                <span>{{ selectedDocument.tags || '无标签' }}</span>
+                <span>更新于 {{ formatDate(selectedDocument.updatedAt || selectedDocument.createdAt) }}</span>
+              </div>
+            </section>
+
+            <form v-if="editingDocumentId" class="document-form edit-document-form" @submit.prevent="updateDocument">
+              <div class="form-section-heading">
+                <div>
+                  <h3>编辑文档</h3>
+                  <p>保存后会重新生成检索分块。</p>
+                </div>
+                <button class="mini-button" type="button" @click="cancelEditDocument">取消</button>
+              </div>
+              <div class="form-row">
+                <label>
+                  标题
+                  <input v-model="documentEditForm.title" maxlength="120" required />
+                </label>
+                <label>
+                  类型
+                  <select v-model="documentEditForm.sourceType">
+                    <option v-for="option in sourceTypeOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}（{{ option.value }}）
+                    </option>
+                  </select>
+                </label>
+              </div>
+              <label>
+                标签
+                <input v-model="documentEditForm.tags" maxlength="255" />
+              </label>
+              <label>
+                摘要
+                <input v-model="documentEditForm.summary" maxlength="500" />
+              </label>
+              <label>
+                内容
+                <textarea v-model="documentEditForm.content" rows="9" maxlength="20000" required></textarea>
+              </label>
+              <button class="primary-button" type="submit" :disabled="loading.updateDocument">
+                {{ loading.updateDocument ? '保存中...' : '保存修改' }}
+              </button>
+            </form>
 
             <form class="import-form" @submit.prevent="importDocument">
               <div class="import-header">
@@ -1016,14 +1212,14 @@ onUnmounted(() => {
               <div class="markdown-content" v-html="renderedAnswer"></div>
 
               <div class="citation-list">
-                <h3>引用来源</h3>
+                <h3>召回来源（检索上下文）</h3>
                 <div v-for="citation in askResponse.citations" :key="citation.chunkId" class="citation">
                   <strong>#{{ citation.chunkId }}</strong>
                   <span>{{ citation.documentTitle }}</span>
                   <small>分数 {{ citation.score }}</small>
                 </div>
                 <div v-if="askResponse.citations.length === 0" class="empty-state compact">
-                  {{ restoredFromLog ? '这条历史日志没有保存引用 id。' : '没有引用来源。无上下文兜底时这是正常情况。' }}
+                  {{ restoredFromLog ? '这条历史日志没有保存召回片段 id。' : '没有召回来源。无上下文兜底时这是正常情况。' }}
                 </div>
               </div>
 
@@ -1072,7 +1268,7 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            <div v-else class="empty-answer">提出一个问题后，这里会展示回答、引用来源、token 用量和反馈控件。</div>
+            <div v-else class="empty-answer">提出一个问题后，这里会展示回答、召回来源、token 用量和反馈控件。</div>
           </div>
         </section>
 
@@ -1099,6 +1295,7 @@ onUnmounted(() => {
           <div class="evaluation-warning" role="note">
             <strong>完整评估不会自动运行。</strong>
             <span>它会执行 40 条用例和多种检索策略；若配置了远程 embedding 或 rerank，可能产生外部请求、等待时间和费用。</span>
+            <span>指标基于当前账号实际导入的文档。未导入标准评估语料时出现 0%，不代表检索策略本身不可用，也不能直接与 README 基准比较。</span>
             <small v-if="lastEvaluationRunAt">本页最近完成：{{ formatDate(lastEvaluationRunAt) }}</small>
           </div>
           <div class="badcase-list">
@@ -1137,6 +1334,7 @@ onUnmounted(() => {
               class="strategy-comparison"
             >
               <h4>五路检索策略对比（Hit@{{ retrievalEvaluation?.evaluationK ?? 3 }} / MRR，相对 keyword baseline）</h4>
+              <div class="table-scroll" role="region" aria-label="检索策略对比表" tabindex="0">
               <table class="strategy-table">
                 <thead>
                   <tr>
@@ -1164,6 +1362,7 @@ onUnmounted(() => {
                   </tr>
                 </tbody>
               </table>
+              </div>
             </div>
 
             <div class="evaluation-case-list">
@@ -1281,6 +1480,21 @@ onUnmounted(() => {
             </div>
             <div v-if="!askLogs.length" class="empty-state">暂无问答日志。</div>
           </div>
+
+          <nav v-if="askLogTotal > askLogPageSize" class="pagination" aria-label="问答日志分页">
+            <button class="secondary-button compact-button" type="button" :disabled="askLogPage <= 1 || loading.askLogs" @click="changeAskLogPage(askLogPage - 1)">
+              上一页
+            </button>
+            <span>第 {{ askLogPage }} / {{ Math.ceil(askLogTotal / askLogPageSize) }} 页 · 共 {{ askLogTotal }} 条</span>
+            <button
+              class="secondary-button compact-button"
+              type="button"
+              :disabled="askLogPage >= Math.ceil(askLogTotal / askLogPageSize) || loading.askLogs"
+              @click="changeAskLogPage(askLogPage + 1)"
+            >
+              下一页
+            </button>
+          </nav>
 
           <div v-if="selectedLogDetail" class="log-detail-panel">
             <div class="log-detail-header">
