@@ -9,7 +9,7 @@ DevMind 是一个面向个人开发学习、项目复盘和知识沉淀的 AI �
 这是一个前后端分离的完整 monorepo 项目：
 
 - `backend`：Spring Boot 后端，已实现认证、知识文档、检索、AI 问答、日志、反馈和评估接口。
-- `frontend`：Vue 3 前端，已实现中文工作台、文档导入、AI 问答、引用来源、日志详情和评估看板。
+- `frontend`：Vue 3 前端，已实现中文工作台、文档创建/编辑/归档与导入、AI 问答、召回上下文、日志分页详情和评估看板。
 - `CI`：GitHub Actions 已配置后端测试和前端构建。
 
 已验证：
@@ -35,7 +35,7 @@ GitHub Actions: main 分支 CI 通过
 -> 无上下文兜底，减少幻觉
 -> 构建带上下文的 Prompt
 -> LLM Provider 路由
--> 返回带引用来源的回答
+-> 返回带召回来源的回答
 -> 记录成功 / 失败问答日志、token 用量和耗时
 -> bad case 反馈
 -> 五方检索策略 Hit@3 / MRR 对比评估
@@ -107,31 +107,38 @@ TypeScript
 
 ## 本地启动
 
-后端：
+默认本地模式只使用 Docker 中的 MySQL、Redis，以及本机运行的 Spring Boot、Vite。它不会调用 DeepSeek、远程 embedding、rerank 或 pgvector。
 
-```bash
-cd backend
-./mvnw test        # Windows 用 .\mvnw.cmd test
-./mvnw spring-boot:run
+准备条件：
+
+- Docker Desktop 已启动。
+- `JAVA_HOME` 指向 JDK 17+（可以使用 IntelliJ IDEA 自带的 JBR 17）。
+- Node.js 20+ 和 npm 可用。
+
+Windows 一键启动（会打开前后端两个日志终端）：
+
+```powershell
+cd F:\AI项目\devmind
+.\start-local.ps1
 ```
 
-后端要求 Java 17。创建 `devmind` 数据库并配置本地 MySQL、Redis、模型环境变量后，启动后端服务，默认端口为 `8081`。
+也可以手动分开启动：
 
-前端：
+```powershell
+# 终端 1：自动启动 Docker MySQL 3307、Redis 6380 和 Spring Boot 8081
+cd F:\AI项目\devmind
+.\backend\scripts\run-local.ps1
 
-```bash
-cd frontend
-npm install
-npm run dev
+# 终端 2：启动 Vite 5173
+cd F:\AI项目\devmind
+.\frontend\scripts\run-local.ps1
 ```
 
-打开：
+打开 `http://127.0.0.1:5173`。前后端分别占用终端，是因为 Spring Boot 和 Vite 是两个持续运行、各自输出日志的进程；一键脚本只是帮你统一发起它们。
 
-```text
-http://127.0.0.1:5173
-```
+Compose 固定映射 MySQL `3307 -> 3306`、Redis `6380 -> 6379`。如果提示端口已占用，先停止占用该端口的其他项目容器，不要在未确认目标时删除数据卷。
 
-如果本地命令行仍然是 Java 8，可以先用 IntelliJ IDEA 打开 `backend`，在项目或运行配置里选择 Java 17 及以上的 JDK。推荐使用 Java 17，和 GitHub Actions 的 CI 环境保持一致。
+若要启用真实 DeepSeek 或完整 dense/rerank/pgvector 链路，请显式配置对应环境变量和依赖；不要把带密钥的 IDEA 运行配置提交到 Git。
 
 ## 本地演示路径
 
@@ -148,7 +155,7 @@ backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql
 1. 登录 `testuser`。
 2. 查看知识文档和自动生成的 chunks。
 3. 提问：`Redis 缓存穿透是什么，怎么解决？`
-4. 查看回答、引用来源、召回片段、Prompt Preview 和 token 用量。
+4. 查看回答、召回来源、召回片段、Prompt Preview 和 token 用量。
 5. 提问：`Kafka consumer rebalance 为什么会变慢？`，展示无上下文兜底。
 6. 打开评估看板，查看标准问题覆盖率、Hit@3、MRR 和问答日志。
 
@@ -173,7 +180,7 @@ backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql
 - bad case 反馈与评估汇总
 - RAG evaluation dataset 覆盖率，用标准问题检查检索链路
 - Retrieval evaluation 五方检索评估（keyword / sparse-hybrid / dense-hybrid / dense-hybrid-pgvector / dense-hybrid-rerank），用人工标注 gold label 计算 Hit@3、MRR、首个相关片段排名与策略间 delta
-- 前端展示问答、引用来源、召回片段、Prompt、日志详情和评估看板
+- 前端展示问答、召回来源、召回片段、Prompt、文档管理、日志分页详情和评估看板
 - 后端单元测试与 GitHub Actions CI
 
 ## 核心设计要点

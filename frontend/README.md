@@ -5,14 +5,14 @@
 ## 功能
 
 - 登录 / 注册
-- 知识文档列表
+- 知识文档列表、编辑和归档
 - 手动创建知识文档
 - 导入 `.txt / .md / .markdown` 笔记文件
 - AI 问答
-- 引用来源展示
+- 召回来源（检索上下文）展示
 - token 用量展示
 - 无上下文兜底状态展示
-- 问答日志列表
+- 问答日志分页列表
 - 页面刷新后从后端 ask logs 恢复最近一次回答
 - 问答日志详情：回答、提示词预览、token、召回片段、反馈
 - 有帮助 / bad case 反馈提交
@@ -20,17 +20,16 @@
 
 ## 本地启动
 
-先启动后端：
+推荐在项目根目录执行：
 
-```text
-http://localhost:8081
+```powershell
+.\start-local.ps1
 ```
 
-再启动前端：
+它会分别打开后端和前端日志终端。只启动前端时执行：
 
-```bash
-npm install
-npm run dev
+```powershell
+.\scripts\run-local.ps1
 ```
 
 打开：
@@ -39,7 +38,7 @@ npm run dev
 http://127.0.0.1:5173
 ```
 
-Vite dev server 会把 `/api` 请求代理到后端。
+Vite dev server 会把 `/api` 请求代理到 `VITE_API_TARGET`，默认是 `http://localhost:8081`。页面左下角会通过 `/api/v1/health` 显示真实后端在线状态。
 
 ## 演示流程
 
@@ -47,7 +46,7 @@ Vite dev server 会把 `/api` 请求代理到后端。
 2. 需要重置演示数据时，在 MySQL 中执行 `backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql`，为 `testuser` 重建一套演示数据。
 3. 如果要演示文件导入，可以导入 `backend/docs/samples/redis-cache-penetration.md`，或你自己的任意 `.txt` / `.md` 笔记。
 4. 在 AI 问答区提问：`Redis 缓存穿透是什么，怎么解决？`
-5. 查看回答、引用来源、召回片段、提示词预览和 token 用量。
+5. 查看回答、召回来源、召回片段、提示词预览和 token 用量。
 6. 继续提问 JWT、Flyway、LlmClient 等工程设计问题。
 7. 提交“有帮助”或 bad case 反馈。
 8. 打开评估看板，查看 bad case、RAG 评估集覆盖率、Hit@3 和 MRR。

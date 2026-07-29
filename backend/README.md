@@ -2,7 +2,7 @@
 
 DevMind 是一个个人开发者知识库的 Spring Boot 后端，内置 RAG 式的 AI 问答链路。
 
-项目包含认证、文档管理、chunk 生成、检索、Prompt 构造、LLM Provider 抽象、引用来源、AI 调用日志、token 用量统计、bad case 反馈，以及一套轻量的 RAG 评估接口。
+项目包含认证、文档管理、chunk 生成、检索、Prompt 构造、LLM Provider 抽象、召回来源、AI 调用日志、token 用量统计、bad case 反馈，以及一套轻量的 RAG 评估接口。
 
 ## 为什么做这个项目
 
@@ -41,7 +41,7 @@ AI 功能被接进了后端工程里常见的关注点：认证、数据库设�
 - 元数据感知检索：chunk 内容、文档标题、标签、来源类型
 - 重复 chunk 降权，减少复制粘贴笔记造成的重复引用
 - 无上下文兜底，避免模型在无依据时强答
-- 带 Prompt Preview 和引用来源的 RAG 问答链路
+- 带 Prompt Preview 和召回上下文的 RAG 问答链路
 - 可插拔的 LLM 层：`MockLlmClient` 与 `DeepSeekLlmClient`
 - 通过环境变量接入 DeepSeek 真实模型
 - 真实模型调用失败时，从配置的模型降级回本地 mock
@@ -333,15 +333,10 @@ summary    optional
 依赖：
 
 - JDK 17+
-- Maven 3.8+
-- MySQL 5.7+/8.0+
+- Docker Desktop（推荐，用于 MySQL 8 与 Redis 7）
 - IntelliJ IDEA 2024.1.2 或兼容版本
 
-创建数据库：
-
-```sql
-CREATE DATABASE IF NOT EXISTS devmind DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
+推荐从项目根目录运行 `.\backend\scripts\run-local.ps1`。脚本会使用 Maven Wrapper、启动 Compose 中的 MySQL `3307` 和 Redis `6380`，并以 Mock + 本地稀疏检索 + MySQL JSON 向量存储启动后端。
 
 数据库表由 Flyway 迁移管理：
 
@@ -351,7 +346,7 @@ src/main/resources/db/migration/
 
 应用启动时，Flyway 会自动检查并执行未执行过的迁移。
 
-对于在引入 Flyway 之前手动创建的老数据库，已开启 `baseline-on-migrate`，让 Flyway 能安全接管当前 schema。
+对于在引入 Flyway 之前手动创建的老数据库，已开启 `baseline-on-migrate`，让 Flyway 能安全接管当前 schema。仓库不再保留第二份可执行 `schema.sql`，避免它与 Flyway 漂移。
 
 默认应用端口：
 
@@ -367,7 +362,7 @@ devmind
 
 ## 环境变量
 
-最小本地配置：
+直接连接本机默认端口时的最小配置：
 
 ```text
 DEVMIND_DB_URL=jdbc:mysql://localhost:3306/devmind?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
@@ -378,6 +373,13 @@ DEVMIND_AI_PROVIDER=mock
 DEVMIND_REDIS_HOST=localhost
 DEVMIND_REDIS_PORT=6379
 DEVMIND_REDIS_DATABASE=1
+```
+
+使用本仓库 Docker Compose 时，端口应改为：
+
+```text
+DEVMIND_DB_URL=jdbc:mysql://localhost:3307/devmind?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+DEVMIND_REDIS_PORT=6380
 ```
 
 DeepSeek provider：
@@ -417,6 +419,15 @@ DEVMIND_AI_ASK_RATE_LIMIT_ENABLED=true
 DEVMIND_AI_ASK_RATE_LIMIT_PER_MINUTE=10
 # true（默认）：Redis 故障时放行；false：限流器不可用时返回 HTTP 503。
 DEVMIND_AI_ASK_RATE_LIMIT_FAIL_OPEN=true
+
+# 完整五路检索评估默认每个用户 300 秒只能触发一次，避免重复外部调用。
+DEVMIND_RETRIEVAL_EVALUATION_GUARD_ENABLED=true
+DEVMIND_RETRIEVAL_EVALUATION_COOLDOWN_SECONDS=300
+DEVMIND_RETRIEVAL_EVALUATION_GUARD_FAIL_OPEN=true
+
+# DeepSeek、远程 embedding 和 rerank 共用的 HTTP 超时。
+DEVMIND_AI_CONNECT_TIMEOUT=5s
+DEVMIND_AI_READ_TIMEOUT=30s
 
 # true（默认）：问题解析使用内置技术短语表辅助抽取检索关键词。
 # false：关闭短语表，用于评估检索质量对这张人工词表的依赖程度（消融实验）。

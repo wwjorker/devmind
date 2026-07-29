@@ -2,6 +2,9 @@
 @username = testuser
 @password = 123456
 
+### Health
+GET {{baseUrl}}/api/v1/health
+
 ### Register
 POST {{baseUrl}}/api/v1/auth/register
 Content-Type: application/json
