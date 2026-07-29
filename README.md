@@ -138,6 +138,8 @@ cd F:\AI项目\devmind
 
 Compose 固定映射 MySQL `3307 -> 3306`、Redis `6380 -> 6379`。如果提示端口已占用，先停止占用该端口的其他项目容器，不要在未确认目标时删除数据卷。
 
+IDEA 打开 `backend` 后，可以直接选择仓库共享的 `DevMind - Local Mock` 运行配置。它与脚本使用同一套 `3307/6380` 数据环境，且不会调用外部模型。`.idea/workspace.xml` 属于个人本地状态，不进入 Git；不要再把其中旧的 `3306/6379` 配置当作项目默认值。
+
 若要启用真实 DeepSeek 或完整 dense/rerank/pgvector 链路，请显式配置对应环境变量和依赖；不要把带密钥的 IDEA 运行配置提交到 Git。
 
 ## 本地演示路径

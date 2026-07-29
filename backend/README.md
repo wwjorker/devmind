@@ -362,25 +362,27 @@ devmind
 
 ## 环境变量
 
-直接连接本机默认端口时的最小配置：
-
-```text
-DEVMIND_DB_URL=jdbc:mysql://localhost:3306/devmind?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-DEVMIND_DB_USERNAME=your_mysql_username
-DEVMIND_DB_PASSWORD=your_mysql_password
-DEVMIND_JWT_SECRET=replace_with_a_long_random_secret_for_non_local_use
-DEVMIND_AI_PROVIDER=mock
-DEVMIND_REDIS_HOST=localhost
-DEVMIND_REDIS_PORT=6379
-DEVMIND_REDIS_DATABASE=1
-```
-
-使用本仓库 Docker Compose 时，端口应改为：
+仓库默认连接 Docker Compose 暴露的端口，最小配置为：
 
 ```text
 DEVMIND_DB_URL=jdbc:mysql://localhost:3307/devmind?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+DEVMIND_DB_USERNAME=root
+DEVMIND_DB_PASSWORD=root
+DEVMIND_JWT_SECRET=replace_with_a_long_random_secret_for_non_local_use
+DEVMIND_AI_PROVIDER=mock
+DEVMIND_REDIS_HOST=localhost
 DEVMIND_REDIS_PORT=6380
+DEVMIND_REDIS_DATABASE=1
 ```
+
+只有在明确使用 Windows 本机安装的 MySQL / Redis 时，才覆盖成默认服务端口：
+
+```text
+DEVMIND_DB_URL=jdbc:mysql://localhost:3306/devmind?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+DEVMIND_REDIS_PORT=6379
+```
+
+IDEA 打开本目录后可选择共享运行配置 `DevMind - Local Mock`。它不包含密钥，并与 `run-local.ps1` 使用同一套 Compose 数据；真实 Provider 配置应保留在未提交的个人运行配置或操作系统环境变量中。
 
 DeepSeek provider：
 

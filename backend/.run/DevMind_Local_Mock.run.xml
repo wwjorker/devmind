@@ -1,0 +1,21 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="DevMind - Local Mock" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <envs>
+      <env name="DEVMIND_AI_EMBEDDING_PROVIDER" value="local-sparse-vector" />
+      <env name="DEVMIND_AI_PROVIDER" value="mock" />
+      <env name="DEVMIND_AI_RERANK_PROVIDER" value="none" />
+      <env name="DEVMIND_DB_PASSWORD" value="root" />
+      <env name="DEVMIND_DB_URL" value="jdbc:mysql://localhost:3307/devmind?useUnicode=true&amp;characterEncoding=utf8&amp;useSSL=false&amp;serverTimezone=Asia/Shanghai&amp;allowPublicKeyRetrieval=true" />
+      <env name="DEVMIND_DB_USERNAME" value="root" />
+      <env name="DEVMIND_REDIS_DATABASE" value="1" />
+      <env name="DEVMIND_REDIS_HOST" value="127.0.0.1" />
+      <env name="DEVMIND_REDIS_PORT" value="6380" />
+      <env name="DEVMIND_VECTOR_STORE_PROVIDER" value="mysql-json" />
+    </envs>
+    <module name="devmind-backend" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.devmind.DevMindApplication" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

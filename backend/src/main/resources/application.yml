@@ -10,7 +10,7 @@ spring:
       max-request-size: 512KB
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: ${DEVMIND_DB_URL:jdbc:mysql://localhost:3306/devmind?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
+    url: ${DEVMIND_DB_URL:jdbc:mysql://localhost:3307/devmind?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true}
     username: ${DEVMIND_DB_USERNAME:root}
     password: ${DEVMIND_DB_PASSWORD:root}
   flyway:
@@ -22,7 +22,7 @@ spring:
   data:
     redis:
       host: ${DEVMIND_REDIS_HOST:localhost}
-      port: ${DEVMIND_REDIS_PORT:6379}
+      port: ${DEVMIND_REDIS_PORT:6380}
       database: ${DEVMIND_REDIS_DATABASE:1}
       password: ${DEVMIND_REDIS_PASSWORD:}
 
