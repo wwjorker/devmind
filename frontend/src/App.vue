@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import DOMPurify from 'dompurify';
+import { marked } from 'marked';
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue';
 import {
   apiRequest,
   clearToken,
@@ -21,10 +23,9 @@ import { icons } from './icons';
 
 const token = ref(getToken() || '');
 const user = ref<UserProfile | null>(null);
-const activeView = ref<'documents' | 'ask' | 'evaluation'>('ask');
-const documentsSection = ref<HTMLElement | null>(null);
-const askSection = ref<HTMLElement | null>(null);
-const evaluationSection = ref<HTMLElement | null>(null);
+const apiTargetLabel = import.meta.env.VITE_API_TARGET || 'http://localhost:8081';
+type AppView = 'documents' | 'ask' | 'evaluation' | 'logs';
+const activeView = ref<AppView>('ask');
 const documents = ref<DocumentItem[]>([]);
 const selectedDocumentId = ref<number | null>(null);
 const askResponse = ref<AskResponse | null>(null);
@@ -39,8 +40,14 @@ const selectedLogDetail = ref<{
 const evaluation = ref<EvaluationSummary | null>(null);
 const evaluationDataset = ref<RagEvaluationDataset | null>(null);
 const retrievalEvaluation = ref<RagRetrievalEvaluation | null>(null);
+const lastEvaluationRunAt = ref<string | null>(null);
+const askElapsedSeconds = ref(0);
+let askTimer: number | null = null;
+let sessionGeneration = 0;
+let sessionAbortController = new AbortController();
 const loading = reactive({
   auth: false,
+  initialData: false,
   documents: false,
   createDocument: false,
   importDocument: false,
@@ -85,6 +92,12 @@ const importForm = reactive({
   tags: 'imported,learning',
   summary: ''
 });
+const sourceTypeOptions = [
+  { value: 'imported_note', label: '导入笔记' },
+  { value: 'bug_review', label: '故障复盘' },
+  { value: 'architecture_note', label: '架构笔记' },
+  { value: 'interview_note', label: '面试笔记' }
+];
 const selectedImportFile = ref<File | null>(null);
 const importFileInputKey = ref(0);
 
@@ -126,6 +139,30 @@ const currentAskStateClass = computed(() => {
   return askResponse.value ? 'success' : 'ready';
 });
 
+const renderedAnswer = computed(() => renderMarkdown(askResponse.value?.answer || ''));
+const renderedLogAnswer = computed(() => renderMarkdown(selectedLogDetail.value?.log.answer || ''));
+const askProgressText = computed(() => {
+  if (!loading.ask) {
+    return '';
+  }
+  if (askElapsedSeconds.value < 2) {
+    return `正在检索知识库并准备回答 · ${askElapsedSeconds.value}s`;
+  }
+  return `正在等待模型生成并整理引用 · ${askElapsedSeconds.value}s`;
+});
+
+function renderMarkdown(value: string) {
+  if (!value) {
+    return '';
+  }
+  const html = marked.parse(value, {
+    async: false,
+    breaks: true,
+    gfm: true
+  }) as string;
+  return DOMPurify.sanitize(html);
+}
+
 function showToast(message: string) {
   toast.value = message;
   window.setTimeout(() => {
@@ -139,17 +176,82 @@ function setError(message: string) {
   error.value = message;
 }
 
-function setActiveView(view: 'documents' | 'ask' | 'evaluation') {
-  activeView.value = view;
-  window.requestAnimationFrame(() => {
-    const target = {
-      documents: documentsSection.value,
-      ask: askSection.value,
-      evaluation: evaluationSection.value
-    }[view];
+function friendlyError(err: unknown, fallback: string) {
+  const raw = err instanceof Error ? err.message.trim() : '';
+  const normalized = raw.toLowerCase();
 
-    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  });
+  if (normalized.includes('invalid username or password')) {
+    return '用户名或密码错误，请检查后重试。';
+  }
+  if (normalized.includes('username already exists')) {
+    return '该用户名已经存在，请直接登录或更换用户名。';
+  }
+  if (normalized.includes('account is disabled')) {
+    return '该账号已被停用。';
+  }
+  if (normalized.includes('only .txt, .md, and .markdown')) {
+    return '仅支持 TXT、MD 或 Markdown 文件。';
+  }
+  if (normalized.includes('file is required')) {
+    return '请先选择要导入的文件。';
+  }
+  if (normalized.includes('request failed: 500') || normalized.includes('failed to fetch')) {
+    return '无法连接 DevMind 后端，请确认 8081 端口的后端服务已经启动。';
+  }
+  if (normalized.includes('external embedding request failed')) {
+    return '远程向量服务暂时不可用；本地问答仍可继续，稍后再运行完整评估。';
+  }
+  if (normalized.includes('deepseek request failed')) {
+    return 'DeepSeek 暂时没有成功返回，请稍后重试并查看后端日志。';
+  }
+  return raw || fallback;
+}
+
+function normalizeTags(value: string) {
+  return Array.from(new Set(
+    value
+      .split(/[,，]/)
+      .map((tag) => tag.trim())
+      .filter(Boolean)
+  )).join(',');
+}
+
+function setActiveView(view: AppView) {
+  activeView.value = view;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function startAskTimer() {
+  stopAskTimer();
+  askElapsedSeconds.value = 0;
+  const startedAt = Date.now();
+  askTimer = window.setInterval(() => {
+    askElapsedSeconds.value = Math.floor((Date.now() - startedAt) / 1000);
+  }, 250);
+}
+
+function stopAskTimer() {
+  if (askTimer !== null) {
+    window.clearInterval(askTimer);
+    askTimer = null;
+  }
+}
+
+function resetSessionRequests() {
+  sessionAbortController.abort();
+  sessionAbortController = new AbortController();
+  sessionGeneration += 1;
+}
+
+function currentSession() {
+  return {
+    generation: sessionGeneration,
+    signal: sessionAbortController.signal
+  };
+}
+
+function isCurrentSession(generation: number) {
+  return generation === sessionGeneration && isAuthed.value;
 }
 
 async function login() {
@@ -178,22 +280,26 @@ async function login() {
     });
     token.value = loginData.token;
     setToken(loginData.token);
-    await loadCurrentUser();
-    await Promise.all([loadDocuments(), loadEvaluation(), loadAskLogs()]);
+    resetSessionRequests();
+    await loadCurrentUser(sessionAbortController.signal);
     showToast('登录成功');
+    void loadInitialData();
   } catch (err) {
-    setError(err instanceof Error ? err.message : '认证失败');
+    clearLocalSession();
+    setError(friendlyError(err, '认证失败，请稍后重试。'));
   } finally {
     loading.auth = false;
   }
 }
 
-async function loadCurrentUser() {
-  user.value = await apiRequest<UserProfile>('/api/v1/auth/me');
+async function loadCurrentUser(signal?: AbortSignal) {
+  user.value = await apiRequest<UserProfile>('/api/v1/auth/me', { signal });
 }
 
 function clearLocalSession() {
+  resetSessionRequests();
   clearToken();
+  error.value = '';
   token.value = '';
   user.value = null;
   documents.value = [];
@@ -205,32 +311,66 @@ function clearLocalSession() {
   evaluation.value = null;
   evaluationDataset.value = null;
   retrievalEvaluation.value = null;
+  lastEvaluationRunAt.value = null;
+  loading.auth = false;
+  loading.initialData = false;
+  loading.evaluation = false;
+  loading.ask = false;
+  loading.feedback = false;
+  stopAskTimer();
 }
 
-async function logout() {
+function logout() {
+  const logoutRequest = token.value
+    ? apiRequest('/api/v1/auth/logout', { method: 'POST' }).catch(() => undefined)
+    : Promise.resolve();
+
+  clearLocalSession();
+  authForm.mode = 'login';
+  showToast('已退出登录');
+  void logoutRequest;
+}
+
+async function loadInitialData() {
+  if (!isAuthed.value) {
+    return;
+  }
+  const session = currentSession();
+  loading.initialData = true;
   try {
-    if (token.value) {
-      await apiRequest('/api/v1/auth/logout', { method: 'POST' });
-    }
-  } catch {
-    // Local cleanup should still happen even if Redis or the backend is temporarily unavailable.
+    await Promise.all([
+      loadDocuments(session.generation, session.signal),
+      loadEvaluationOverview(session.generation, session.signal),
+      loadAskLogs(true, session.generation, session.signal)
+    ]);
   } finally {
-    clearLocalSession();
-    showToast('已退出登录');
+    if (isCurrentSession(session.generation)) {
+      loading.initialData = false;
+    }
   }
 }
 
-async function loadDocuments() {
+async function loadDocuments(
+  expectedGeneration = sessionGeneration,
+  signal: AbortSignal = sessionAbortController.signal
+) {
   loading.documents = true;
   setError('');
   try {
-    const page = await apiRequest<PageResult<DocumentItem>>('/api/v1/documents?pageNo=1&pageSize=20');
+    const page = await apiRequest<PageResult<DocumentItem>>('/api/v1/documents?pageNo=1&pageSize=20', { signal });
+    if (!isCurrentSession(expectedGeneration)) {
+      return;
+    }
     documents.value = page.records;
     selectedDocumentId.value = page.records[0]?.id ?? null;
   } catch (err) {
-    setError(err instanceof Error ? err.message : '加载知识文档失败');
+    if (!signal.aborted && isCurrentSession(expectedGeneration)) {
+      setError(friendlyError(err, '加载知识文档失败。'));
+    }
   } finally {
-    loading.documents = false;
+    if (isCurrentSession(expectedGeneration)) {
+      loading.documents = false;
+    }
   }
 }
 
@@ -246,7 +386,7 @@ async function createDocument() {
     await loadDocuments();
     showToast('文档已创建并完成分块');
   } catch (err) {
-    setError(err instanceof Error ? err.message : '创建文档失败');
+    setError(friendlyError(err, '创建文档失败。'));
   } finally {
     loading.createDocument = false;
   }
@@ -279,7 +419,7 @@ async function importDocument() {
       formData.append('sourceType', importForm.sourceType.trim());
     }
     if (importForm.tags.trim()) {
-      formData.append('tags', importForm.tags.trim());
+      formData.append('tags', normalizeTags(importForm.tags));
     }
     if (importForm.summary.trim()) {
       formData.append('summary', importForm.summary.trim());
@@ -290,32 +430,50 @@ async function importDocument() {
     selectedImportFile.value = null;
     importFileInputKey.value += 1;
     importForm.title = '';
+    importForm.sourceType = 'imported_note';
+    importForm.tags = 'imported,learning';
+    importForm.summary = '';
     await loadDocuments();
     showToast('文件已导入并完成分块');
   } catch (err) {
-    setError(err instanceof Error ? err.message : '导入文件失败');
+    setError(friendlyError(err, '导入文件失败。'));
   } finally {
     loading.importDocument = false;
   }
 }
 
 async function ask() {
+  if (!askForm.question.trim()) {
+    setError('请输入问题后再询问 DevMind。');
+    return;
+  }
+  const session = currentSession();
   loading.ask = true;
+  startAskTimer();
   setError('');
   try {
     askResponse.value = await apiRequest<AskResponse>('/api/v1/ai/ask', {
       method: 'POST',
-      body: JSON.stringify({ question: askForm.question })
+      body: JSON.stringify({ question: askForm.question.trim() }),
+      signal: session.signal
     });
+    if (!isCurrentSession(session.generation)) {
+      return;
+    }
     restoredFromLog.value = false;
     restoredAskLogStatus.value = null;
     activeView.value = 'ask';
-    await Promise.all([loadEvaluation(), loadAskLogs()]);
     showToast('AI 回答已生成');
+    void loadAskLogs();
   } catch (err) {
-    setError(err instanceof Error ? err.message : 'AI 问答失败');
+    if (!session.signal.aborted && isCurrentSession(session.generation)) {
+      setError(friendlyError(err, 'AI 问答失败。'));
+    }
   } finally {
-    loading.ask = false;
+    if (isCurrentSession(session.generation)) {
+      loading.ask = false;
+      stopAskTimer();
+    }
   }
 }
 
@@ -324,6 +482,7 @@ async function submitFeedback(helpful: boolean) {
     setError('请先完成一次 AI 问答，再提交反馈。');
     return;
   }
+  const session = currentSession();
   loading.feedback = true;
   setError('');
   try {
@@ -333,37 +492,76 @@ async function submitFeedback(helpful: boolean) {
         helpful,
         reason: feedbackForm.reason,
         expectedAnswer: feedbackForm.expectedAnswer
-      })
+      }),
+      signal: session.signal
     });
-    await loadEvaluation();
+    if (!isCurrentSession(session.generation)) {
+      return;
+    }
     showToast(helpful ? '已标记为有帮助' : 'Bad case 已保存');
+    feedbackForm.reason = '';
+    void loadEvaluationOverview();
   } catch (err) {
-    setError(err instanceof Error ? err.message : '提交反馈失败');
+    if (!session.signal.aborted && isCurrentSession(session.generation)) {
+      setError(friendlyError(err, '提交反馈失败。'));
+    }
   } finally {
-    loading.feedback = false;
+    if (isCurrentSession(session.generation)) {
+      loading.feedback = false;
+    }
   }
 }
 
-async function loadEvaluation() {
+async function loadEvaluationOverview(
+  expectedGeneration = sessionGeneration,
+  signal: AbortSignal = sessionAbortController.signal
+) {
   if (!isAuthed.value) {
     return;
   }
-  loading.evaluation = true;
   try {
-    const [summary, dataset, retrieval] = await Promise.all([
-      apiRequest<EvaluationSummary>('/api/v1/ai/evaluation/summary?recentLimit=5'),
-      apiRequest<RagEvaluationDataset>('/api/v1/ai/evaluation/dataset'),
-      apiRequest<RagRetrievalEvaluation>('/api/v1/ai/evaluation/retrieval')
+    const [summary, dataset] = await Promise.all([
+      apiRequest<EvaluationSummary>('/api/v1/ai/evaluation/summary?recentLimit=5', { signal }),
+      apiRequest<RagEvaluationDataset>('/api/v1/ai/evaluation/dataset', { signal })
     ]);
+    if (!isCurrentSession(expectedGeneration)) {
+      return;
+    }
     evaluation.value = summary;
     evaluationDataset.value = dataset;
+  } catch (err) {
+    if (!signal.aborted && isCurrentSession(expectedGeneration)) {
+      setError(friendlyError(err, '加载评估摘要失败。'));
+    }
+  }
+}
+
+async function runRetrievalEvaluation() {
+  if (!isAuthed.value || loading.evaluation) {
+    return;
+  }
+  const session = currentSession();
+  loading.evaluation = true;
+  setError('');
+  try {
+    const retrieval = await apiRequest<RagRetrievalEvaluation>(
+      '/api/v1/ai/evaluation/retrieval',
+      { signal: session.signal }
+    );
+    if (!isCurrentSession(session.generation)) {
+      return;
+    }
     retrievalEvaluation.value = retrieval;
-  } catch {
-    evaluation.value = null;
-    evaluationDataset.value = null;
-    retrievalEvaluation.value = null;
+    lastEvaluationRunAt.value = new Date().toISOString();
+    showToast('完整检索评估已完成');
+  } catch (err) {
+    if (!session.signal.aborted && isCurrentSession(session.generation)) {
+      setError(friendlyError(err, '完整检索评估失败，请检查后端日志。'));
+    }
   } finally {
-    loading.evaluation = false;
+    if (isCurrentSession(session.generation)) {
+      loading.evaluation = false;
+    }
   }
 }
 
@@ -429,7 +627,7 @@ async function openLogDetail(log: AskLogItem) {
       feedback
     };
   } catch (err) {
-    setError(err instanceof Error ? err.message : '加载问答日志详情失败');
+    setError(friendlyError(err, '加载问答日志详情失败。'));
   } finally {
     loading.logDetail = false;
   }
@@ -469,33 +667,65 @@ async function restoreAskFromLog(log: AskLogItem, notify = true) {
   }
 }
 
-async function loadAskLogs(restoreLatest = false) {
+async function loadAskLogs(
+  restoreLatest = false,
+  expectedGeneration = sessionGeneration,
+  signal: AbortSignal = sessionAbortController.signal
+) {
   if (!isAuthed.value) {
     return;
   }
   loading.askLogs = true;
   try {
-    const page = await apiRequest<PageResult<AskLogItem>>('/api/v1/ai/ask-logs?pageNo=1&pageSize=6');
+    const page = await apiRequest<PageResult<AskLogItem>>(
+      '/api/v1/ai/ask-logs?pageNo=1&pageSize=10',
+      { signal }
+    );
+    if (!isCurrentSession(expectedGeneration)) {
+      return;
+    }
     askLogs.value = page.records;
     if (restoreLatest && !askResponse.value && page.records.length > 0) {
       await restoreAskFromLog(page.records[0], false);
     }
-  } catch {
-    askLogs.value = [];
+  } catch (err) {
+    if (!signal.aborted && isCurrentSession(expectedGeneration)) {
+      setError(friendlyError(err, '加载问答日志失败。'));
+    }
   } finally {
-    loading.askLogs = false;
+    if (isCurrentSession(expectedGeneration)) {
+      loading.askLogs = false;
+    }
   }
 }
 
 async function refreshAll() {
-  await Promise.all([loadDocuments(), loadEvaluation(), loadAskLogs(!askResponse.value)]);
+  await Promise.all([
+    loadDocuments(),
+    loadEvaluationOverview(),
+    loadAskLogs(!askResponse.value)
+  ]);
+  showToast('当前页面数据已刷新');
 }
 
 function formatDate(value: string | null) {
   if (!value) {
     return '刚刚';
   }
-  return value.replace('T', ' ').slice(0, 16);
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value.replace('T', ' ').slice(0, 16);
+  }
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  })
+    .format(parsed)
+    .replaceAll('/', '-');
 }
 
 function formatSignedPercent(value: number | null | undefined) {
@@ -513,11 +743,17 @@ onMounted(async () => {
     return;
   }
   try {
-    await loadCurrentUser();
-    await Promise.all([loadDocuments(), loadEvaluation(), loadAskLogs(true)]);
-  } catch {
+    await loadCurrentUser(sessionAbortController.signal);
+    void loadInitialData();
+  } catch (err) {
     clearLocalSession();
+    setError(friendlyError(err, '登录状态已失效，请重新登录。'));
   }
+});
+
+onUnmounted(() => {
+  stopAskTimer();
+  sessionAbortController.abort();
 });
 </script>
 
@@ -545,11 +781,15 @@ onMounted(async () => {
           <span v-html="icons.chart"></span>
           评估看板
         </button>
+        <button :class="{ active: activeView === 'logs' }" @click="setActiveView('logs')">
+          <span v-html="icons.ask"></span>
+          问答日志
+        </button>
       </nav>
 
       <div class="sidebar-note">
-        <span>后端服务</span>
-        <strong>localhost:8081</strong>
+        <span>API 目标</span>
+        <strong>{{ apiTargetLabel.replace(/^https?:\/\//, '') }}</strong>
       </div>
     </aside>
 
@@ -605,12 +845,15 @@ onMounted(async () => {
             </label>
           </template>
           <button class="primary-button" type="submit" :disabled="loading.auth">
-            {{ loading.auth ? '处理中...' : authForm.mode === 'login' ? '登录' : '创建账号' }}
+            {{ loading.auth ? (authForm.mode === 'login' ? '登录中...' : '创建中...') : authForm.mode === 'login' ? '登录' : '创建账号' }}
           </button>
         </form>
       </section>
 
       <template v-else>
+        <div v-if="loading.initialData" class="status-message" role="status" aria-live="polite">
+          正在加载文档、评估摘要和最近日志，不影响页面操作。
+        </div>
         <section class="status-grid">
           <div class="metric">
             <span>知识文档</span>
@@ -630,14 +873,14 @@ onMounted(async () => {
           </div>
         </section>
 
-        <section class="main-grid">
-          <div ref="documentsSection" class="panel document-panel">
+        <section class="main-grid single-view-grid">
+          <div v-show="activeView === 'documents'" class="panel document-panel">
             <div class="panel-header">
               <div>
                 <h2>知识文档</h2>
                 <p>用于检索召回和答案引用的学习材料。</p>
               </div>
-              <button class="icon-button" title="刷新知识文档" @click="loadDocuments">
+              <button class="icon-button" title="刷新知识文档" @click="loadDocuments()">
                 <span v-html="icons.refresh"></span>
               </button>
             </div>
@@ -664,7 +907,7 @@ onMounted(async () => {
                 </div>
               </div>
               <div class="field-group">
-                <span>文件</span>
+                <span>文件 <em class="required-mark">必选</em></span>
                 <label class="import-file-picker">
                   <input :key="importFileInputKey" type="file" accept=".md,.markdown,.txt" @change="onImportFileChange" />
                   <span class="file-button">选择文件</span>
@@ -674,19 +917,26 @@ onMounted(async () => {
               <div class="form-row">
                 <label>
                   标题
-                  <input v-model="importForm.title" placeholder="默认使用文件名" />
+                  <input v-model="importForm.title" placeholder="自动使用文件名，可按需修改" />
+                  <small class="field-hint">运行内置评估时请保留样例文件名，避免 gold 标题无法匹配。</small>
                 </label>
                 <label>
-                  类型
-                  <input v-model="importForm.sourceType" />
+                  类型 <em class="required-mark">必选</em>
+                  <select v-model="importForm.sourceType">
+                    <option v-for="option in sourceTypeOptions" :key="option.value" :value="option.value">
+                      {{ option.label }}（{{ option.value }}）
+                    </option>
+                  </select>
+                  <small class="field-hint">类型用于区分笔记用途，不要填写多个主题词。</small>
                 </label>
               </div>
               <label>
-                标签
-                <input v-model="importForm.tags" />
+                标签 <span class="optional-mark">可选</span>
+                <input v-model="importForm.tags" placeholder="例如：redis,cache,backend" />
+                <small class="field-hint">使用逗号分隔；系统会自动去除空项和重复标签。</small>
               </label>
               <label>
-                摘要
+                摘要 <span class="optional-mark">可选</span>
                 <input v-model="importForm.summary" placeholder="可选：导入笔记摘要" />
               </label>
               <button class="secondary-button" type="submit" :disabled="loading.importDocument">
@@ -721,7 +971,7 @@ onMounted(async () => {
             </form>
           </div>
 
-          <div ref="askSection" class="panel ask-panel">
+          <div v-show="activeView === 'ask'" class="panel ask-panel">
             <div class="panel-header">
               <div>
                 <h2>AI 问答</h2>
@@ -730,12 +980,29 @@ onMounted(async () => {
             </div>
 
             <form class="ask-form" @submit.prevent="ask">
-              <textarea v-model="askForm.question" rows="4"></textarea>
+              <textarea
+                v-model="askForm.question"
+                rows="4"
+                placeholder="输入一个能从当前知识文档中回答的问题"
+              ></textarea>
               <button class="primary-button" type="submit" :disabled="loading.ask">
                 <span v-html="icons.send"></span>
-                {{ loading.ask ? '生成中...' : '询问 DevMind' }}
+                {{ loading.ask ? `生成中 ${askElapsedSeconds}s` : '询问 DevMind' }}
               </button>
             </form>
+            <div
+              v-if="loading.ask"
+              class="ask-progress"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <span class="progress-dot"></span>
+              <div>
+                <strong>{{ askProgressText }}</strong>
+                <small>外部模型通常需要数秒；完整离线评估不会在这里自动运行。</small>
+              </div>
+            </div>
 
             <div v-if="askResponse" class="answer-card">
               <div class="answer-meta">
@@ -746,7 +1013,7 @@ onMounted(async () => {
                 <span>logId: {{ askResponse.logId }}</span>
                 <span v-if="restoredFromLog" class="restored-pill">从日志恢复</span>
               </div>
-              <pre>{{ askResponse.answer }}</pre>
+              <div class="markdown-content" v-html="renderedAnswer"></div>
 
               <div class="citation-list">
                 <h3>引用来源</h3>
@@ -768,7 +1035,10 @@ onMounted(async () => {
               </div>
 
               <details class="debug-details">
-                <summary>提示词预览与召回片段</summary>
+                <summary>开发者详情：原始系统提示词、token 与召回片段</summary>
+                <p class="debug-explanation">
+                  系统提示词当前使用英文编写，但明确要求按问题语言回答；这里保留原文便于调试，不是面向普通用户的正文。
+                </p>
                 <pre>{{ askResponse.promptPreview }}</pre>
                 <div class="chunk-list">
                   <div v-for="chunk in askResponse.retrievedChunks" :key="chunk.chunkId" class="chunk-row">
@@ -793,8 +1063,12 @@ onMounted(async () => {
                   placeholder="如果回答不理想，可以记录原因；保存 bad case 后会进入评估闭环。"
                 ></textarea>
                 <div class="feedback-actions">
-                  <button class="secondary-button" :disabled="loading.feedback" @click="submitFeedback(true)">有帮助</button>
-                  <button class="danger-button" :disabled="loading.feedback" @click="submitFeedback(false)">保存 bad case</button>
+                  <button class="secondary-button" :disabled="loading.feedback" @click="submitFeedback(true)">
+                    {{ loading.feedback ? '保存中...' : '有帮助' }}
+                  </button>
+                  <button class="danger-button" :disabled="loading.feedback" @click="submitFeedback(false)">
+                    {{ loading.feedback ? '保存中...' : '保存 bad case' }}
+                  </button>
                 </div>
               </div>
             </div>
@@ -802,15 +1076,30 @@ onMounted(async () => {
           </div>
         </section>
 
-        <section ref="evaluationSection" class="panel evaluation-panel">
+        <section v-show="activeView === 'evaluation'" class="panel evaluation-panel">
           <div class="panel-header">
             <div>
               <h2>评估看板</h2>
-              <p>用于持续改进 RAG 效果的 bad case 反馈闭环。</p>
+              <p>查看 bad case、评估集覆盖情况，并按需运行完整检索评估。</p>
             </div>
-            <button class="icon-button" title="刷新评估数据" @click="loadEvaluation">
-              <span v-html="icons.refresh"></span>
-            </button>
+            <div class="panel-actions">
+              <button class="secondary-button compact-button" type="button" @click="loadEvaluationOverview()">
+                刷新摘要
+              </button>
+              <button
+                class="primary-button compact-button"
+                type="button"
+                :disabled="loading.evaluation"
+                @click="runRetrievalEvaluation"
+              >
+                {{ loading.evaluation ? '评估运行中...' : '运行完整检索评估' }}
+              </button>
+            </div>
+          </div>
+          <div class="evaluation-warning" role="note">
+            <strong>完整评估不会自动运行。</strong>
+            <span>它会执行 40 条用例和多种检索策略；若配置了远程 embedding 或 rerank，可能产生外部请求、等待时间和费用。</span>
+            <small v-if="lastEvaluationRunAt">本页最近完成：{{ formatDate(lastEvaluationRunAt) }}</small>
           </div>
           <div class="badcase-list">
             <div v-for="badCase in evaluation?.recentBadCases || []" :key="badCase.feedbackId" class="badcase-row">
@@ -821,8 +1110,8 @@ onMounted(async () => {
             <div v-if="!evaluation?.recentBadCases?.length" class="empty-state">暂无 bad case。</div>
           </div>
 
-          <div class="evaluation-dataset">
-            <div class="dataset-header">
+          <details v-if="retrievalEvaluation" class="evaluation-dataset evaluation-catalog">
+            <summary class="dataset-header">
               <div>
                 <h3>检索评估</h3>
                 <p>用标准问题直接跑检索，检查召回是否命中人工标注的相关文档。</p>
@@ -841,13 +1130,13 @@ onMounted(async () => {
                 <span>基线 {{ retrievalEvaluation?.baselineRetrievalStrategy || 'mysql-fulltext-keyword-v1' }}</span>
                 <span>相关性 {{ retrievalEvaluation?.relevanceMode || 'gold-document-title' }}</span>
               </div>
-            </div>
+            </summary>
 
             <div
               v-if="(retrievalEvaluation?.strategyResults?.length ?? 0) > 0"
               class="strategy-comparison"
             >
-              <h4>四方检索策略对比（Hit@{{ retrievalEvaluation?.evaluationK ?? 3 }} / MRR，相对 keyword baseline）</h4>
+              <h4>五路检索策略对比（Hit@{{ retrievalEvaluation?.evaluationK ?? 3 }} / MRR，相对 keyword baseline）</h4>
               <table class="strategy-table">
                 <thead>
                   <tr>
@@ -919,21 +1208,23 @@ onMounted(async () => {
                   缺失关键词：{{ testCase.missingExpectedKeywords.join('、') }}
                 </p>
               </div>
-              <div v-if="!retrievalEvaluation?.cases?.length" class="empty-state">检索评估暂未加载。</div>
             </div>
+          </details>
+          <div v-else class="empty-state evaluation-empty">
+            尚未运行本次完整检索评估。登录、问答和保存反馈不会再自动触发它；需要时请点击“运行完整检索评估”。
           </div>
 
-          <div class="evaluation-dataset">
-            <div class="dataset-header">
+          <details class="evaluation-dataset evaluation-catalog">
+            <summary class="dataset-header">
               <div>
                 <h3>RAG 评估集</h3>
-                <p>用标准问题检查检索覆盖率、Hit@3、MRR 和无上下文兜底效果。</p>
+                <p>40 条标准问题默认收起，需要检查明细时再展开。</p>
               </div>
               <div class="dataset-score">
                 <strong>{{ evaluationDataset?.coveredCaseCount ?? 0 }}/{{ evaluationDataset?.totalCaseCount ?? 0 }}</strong>
                 <span>覆盖率 {{ Math.round((evaluationDataset?.coverageRate ?? 0) * 100) }}%</span>
               </div>
-            </div>
+            </summary>
 
             <div class="evaluation-case-list">
               <div v-for="testCase in evaluationDataset?.cases || []" :key="testCase.caseId" class="evaluation-case-row">
@@ -957,10 +1248,10 @@ onMounted(async () => {
               </div>
               <div v-if="!evaluationDataset?.cases?.length" class="empty-state">评估 case 暂未加载。</div>
             </div>
-          </div>
+          </details>
         </section>
 
-        <section class="panel logs-panel">
+        <section v-show="activeView === 'logs'" class="panel logs-panel">
           <div class="panel-header">
             <div>
               <h2>问答日志</h2>
@@ -1014,7 +1305,7 @@ onMounted(async () => {
             <div class="log-detail-grid">
               <section>
                 <h3>回答</h3>
-                <pre>{{ selectedLogDetail.log.answer }}</pre>
+                <div class="markdown-content compact-markdown" v-html="renderedLogAnswer"></div>
               </section>
               <section>
                 <h3>提示词预览</h3>
@@ -1056,8 +1347,8 @@ onMounted(async () => {
         </section>
       </template>
 
-      <div v-if="toast" class="toast">{{ toast }}</div>
-      <div v-if="error" class="error-banner">{{ error }}</div>
+      <div v-if="toast" class="toast" role="status" aria-live="polite">{{ toast }}</div>
+      <div v-if="error" class="error-banner" role="alert" aria-live="assertive">{{ error }}</div>
     </main>
   </div>
 </template>

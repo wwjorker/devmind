@@ -166,7 +166,8 @@ class RagEvaluationDatasetServiceTest {
                     assertThat(caseResponse.getReciprocalRank()).isEqualTo(1.0);
                     assertThat(caseResponse.getRetrievedChunkCount()).isEqualTo(1);
                     assertThat(caseResponse.getTopChunkIds()).containsExactly(17L);
-                    assertThat(caseResponse.getRelevantDocumentTitles()).contains("Redis 缓存穿透复盘");
+                    assertThat(caseResponse.getRelevantDocumentTitles())
+                            .contains("Redis 缓存穿透", "Redis 缓存穿透复盘");
                     assertThat(caseResponse.getMatchedExpectedKeywords()).contains("Redis", "cache", "penetration");
                 });
         assertThat(response.getCases())
