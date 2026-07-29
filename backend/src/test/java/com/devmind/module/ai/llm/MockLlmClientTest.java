@@ -104,7 +104,7 @@ class MockLlmClientTest {
         assertThat(response.getAnswer())
                 .contains("这是基于召回知识片段生成的 Mock 回答")
                 .contains("面试中应该如何解释 Redis 缓存穿透？")
-                .contains("引用来源")
+                .contains("召回依据（检索上下文）")
                 .contains("chunkId=8");
     }
 }

@@ -65,7 +65,7 @@ public class MockLlmClient implements LlmClient {
                 .append(compact(topChunk.getContent()))
                 .append("\n");
         answer.append("- 这个回答由 MockLlmClient 生成，真实模型 Provider 可以在不修改 RAG 编排流程的情况下替换。\n\n");
-        answer.append("引用来源：");
+        answer.append("召回依据（检索上下文）：");
         for (int i = 0; i < request.getCitations().size(); i++) {
             CitationResponse citation = request.getCitations().get(i);
             if (i > 0) {
