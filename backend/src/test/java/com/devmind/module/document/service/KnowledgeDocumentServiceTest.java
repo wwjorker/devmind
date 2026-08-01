@@ -48,7 +48,7 @@ class KnowledgeDocumentServiceTest {
 
         assertThat(response.getId()).isEqualTo(42L);
         assertThat(response.getTitle()).isEqualTo("redis-note");
-        assertThat(response.getSourceType()).isEqualTo("imported_note");
+        assertThat(response.getSourceType()).isEqualTo("learning_note");
         assertThat(response.getTags()).isEqualTo("redis,cache");
         assertThat(response.getContent()).contains("Redis cache penetration");
         verify(chunkService).rebuildChunks(eq(1L), eq(42L), eq(response.getContent()));
@@ -88,5 +88,24 @@ class KnowledgeDocumentServiceTest {
         assertThat(document.getStatus()).isZero();
         verify(documentMapper).updateById(document);
         verify(chunkService).archiveByDocument(7L, 42L);
+    }
+
+    @Test
+    void restoreShouldReactivateOwnedDocumentAndRebuildChunks() {
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        DocumentChunkService chunkService = mock(DocumentChunkService.class);
+        KnowledgeDocument document = new KnowledgeDocument();
+        document.setId(42L);
+        document.setUserId(7L);
+        document.setContent("restored content");
+        document.setStatus(0);
+        when(documentMapper.selectOne(any())).thenReturn(document);
+        KnowledgeDocumentService documentService = new KnowledgeDocumentService(documentMapper, chunkService);
+
+        DocumentResponse response = documentService.restore(7L, 42L);
+
+        assertThat(response.getStatus()).isEqualTo(1);
+        verify(documentMapper).updateById(document);
+        verify(chunkService).rebuildChunks(7L, 42L, "restored content");
     }
 }

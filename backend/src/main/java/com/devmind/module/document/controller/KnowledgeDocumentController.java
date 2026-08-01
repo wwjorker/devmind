@@ -65,6 +65,13 @@ public class KnowledgeDocumentController {
         return Result.success(documentService.page(user.userId(), keyword, sourceType, pageNo, pageSize));
     }
 
+    @GetMapping("/archived")
+    public Result<PageResult<DocumentResponse>> pageArchived(@AuthenticationPrincipal AuthenticatedUser user,
+                                                             @RequestParam(defaultValue = "1") long pageNo,
+                                                             @RequestParam(defaultValue = "20") long pageSize) {
+        return Result.success(documentService.pageArchived(user.userId(), pageNo, pageSize));
+    }
+
     @GetMapping("/{documentId}/chunks")
     public Result<List<DocumentChunkResponse>> listChunks(@AuthenticationPrincipal AuthenticatedUser user,
                                                          @PathVariable Long documentId) {
@@ -83,5 +90,11 @@ public class KnowledgeDocumentController {
                                 @PathVariable Long documentId) {
         documentService.archive(user.userId(), documentId);
         return Result.success();
+    }
+
+    @PostMapping("/{documentId}/restore")
+    public Result<DocumentResponse> restore(@AuthenticationPrincipal AuthenticatedUser user,
+                                            @PathVariable Long documentId) {
+        return Result.success(documentService.restore(user.userId(), documentId));
     }
 }

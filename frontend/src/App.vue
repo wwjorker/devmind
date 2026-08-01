@@ -27,6 +27,7 @@ const apiTargetLabel = import.meta.env.VITE_API_TARGET || 'http://localhost:8081
 type AppView = 'documents' | 'ask' | 'evaluation' | 'logs';
 const activeView = ref<AppView>('ask');
 const documents = ref<DocumentItem[]>([]);
+const archivedDocuments = ref<DocumentItem[]>([]);
 const documentTotal = ref(0);
 const selectedDocumentId = ref<number | null>(null);
 const editingDocumentId = ref<number | null>(null);
@@ -58,6 +59,7 @@ const loading = reactive({
   createDocument: false,
   updateDocument: false,
   archiveDocument: false,
+  restoreDocument: false,
   importDocument: false,
   ask: false,
   askLogs: false,
@@ -104,16 +106,20 @@ const documentEditForm = reactive({
 
 const importForm = reactive({
   title: '',
-  sourceType: 'imported_note',
-  tags: 'imported,learning',
+  sourceType: 'learning_note',
+  tags: '',
   summary: ''
 });
 const sourceTypeOptions = [
-  { value: 'imported_note', label: '导入笔记' },
+  { value: 'learning_note', label: '学习笔记' },
   { value: 'bug_review', label: '故障复盘' },
   { value: 'architecture_note', label: '架构笔记' },
-  { value: 'interview_note', label: '面试笔记' }
+  { value: 'interview_note', label: '面试笔记' },
+  { value: 'evaluation_note', label: '评估资料' },
+  { value: 'imported_note', label: '旧版导入笔记', legacy: true }
 ];
+const tagSuggestions = ['java', 'spring', 'mysql', 'redis', 'security', 'rag', 'evaluation', 'interview'];
+const documentComposerMode = ref<'import' | 'manual'>('import');
 const selectedImportFile = ref<File | null>(null);
 const importFileInputKey = ref(0);
 
@@ -235,6 +241,15 @@ function normalizeTags(value: string) {
   )).join(',');
 }
 
+function sourceTypeLabel(value: string) {
+  return sourceTypeOptions.find((option) => option.value === value)?.label || value;
+}
+
+function addSuggestedTag(target: 'create' | 'import' | 'edit', tag: string) {
+  const form = target === 'create' ? documentForm : target === 'import' ? importForm : documentEditForm;
+  form.tags = normalizeTags(`${form.tags},${tag}`);
+}
+
 function setActiveView(view: AppView) {
   activeView.value = view;
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -332,6 +347,7 @@ function clearLocalSession() {
   token.value = '';
   user.value = null;
   documents.value = [];
+  archivedDocuments.value = [];
   documentTotal.value = 0;
   selectedDocumentId.value = null;
   editingDocumentId.value = null;
@@ -352,6 +368,7 @@ function clearLocalSession() {
   loading.createDocument = false;
   loading.updateDocument = false;
   loading.archiveDocument = false;
+  loading.restoreDocument = false;
   loading.importDocument = false;
   loading.askLogs = false;
   loading.evaluation = false;
@@ -381,12 +398,29 @@ async function loadInitialData() {
   try {
     await Promise.all([
       loadDocuments(session.generation, session.signal),
+      loadArchivedDocuments(session.generation, session.signal),
       loadEvaluationOverview(session.generation, session.signal),
       loadAskLogs(true, session.generation, session.signal)
     ]);
   } finally {
     if (isCurrentSession(session.generation)) {
       loading.initialData = false;
+    }
+  }
+}
+
+async function loadArchivedDocuments(
+  expectedGeneration = sessionGeneration,
+  signal: AbortSignal = sessionAbortController.signal
+) {
+  try {
+    const page = await apiRequest<PageResult<DocumentItem>>('/api/v1/documents/archived?pageNo=1&pageSize=20', { signal });
+    if (isCurrentSession(expectedGeneration)) {
+      archivedDocuments.value = page.records;
+    }
+  } catch (err) {
+    if (!signal.aborted && isCurrentSession(expectedGeneration)) {
+      setError(friendlyError(err, '加载归档文档失败。'));
     }
   }
 }
@@ -471,12 +505,30 @@ async function archiveDocument(document: DocumentItem | null = selectedDocument.
     await apiRequest(`/api/v1/documents/${document.id}`, { method: 'DELETE' });
     editingDocumentId.value = null;
     selectedDocumentId.value = null;
-    await loadDocuments();
+    await Promise.all([loadDocuments(), loadArchivedDocuments()]);
     showToast('文档已归档');
   } catch (err) {
     setError(friendlyError(err, '归档文档失败。'));
   } finally {
     loading.archiveDocument = false;
+  }
+}
+
+async function restoreDocument(document: DocumentItem) {
+  if (!window.confirm(`确定恢复“${document.title}”吗？系统会重新生成检索分块；若当前启用了远程 embedding，可能产生一次外部调用。`)) {
+    return;
+  }
+  loading.restoreDocument = true;
+  setError('');
+  try {
+    const restored = await apiRequest<DocumentItem>(`/api/v1/documents/${document.id}/restore`, { method: 'POST' });
+    selectedDocumentId.value = restored.id;
+    await Promise.all([loadDocuments(), loadArchivedDocuments()]);
+    showToast('文档已恢复并重新加入检索');
+  } catch (err) {
+    setError(friendlyError(err, '恢复文档失败。'));
+  } finally {
+    loading.restoreDocument = false;
   }
 }
 
@@ -543,8 +595,8 @@ async function importDocument() {
     selectedImportFile.value = null;
     importFileInputKey.value += 1;
     importForm.title = '';
-    importForm.sourceType = 'imported_note';
-    importForm.tags = 'imported,learning';
+    importForm.sourceType = 'learning_note';
+    importForm.tags = '';
     importForm.summary = '';
     await loadDocuments();
     showToast('文件已导入并完成分块');
@@ -651,6 +703,9 @@ async function loadEvaluationOverview(
 
 async function runRetrievalEvaluation() {
   if (!isAuthed.value || loading.evaluation) {
+    return;
+  }
+  if (!window.confirm('完整检索评估会执行 40 条标准问题和多种检索策略。启用远程 embedding 或 rerank 时可能产生外部请求、等待时间和费用。确定继续吗？')) {
     return;
   }
   const session = currentSession();
@@ -829,6 +884,7 @@ async function refreshAll() {
   void checkBackendHealth();
   await Promise.all([
     loadDocuments(),
+    loadArchivedDocuments(),
     loadEvaluationOverview(),
     loadAskLogs(!askResponse.value)
   ]);
@@ -896,7 +952,7 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <nav class="nav-list" aria-label="主导航">
+      <nav v-if="isAuthed" class="nav-list" aria-label="主导航">
         <button aria-label="知识文档" title="知识文档" :class="{ active: activeView === 'documents' }" @click="setActiveView('documents')">
           <span v-html="icons.documents"></span>
           知识文档
@@ -1024,7 +1080,7 @@ onUnmounted(() => {
                 @click="selectedDocumentId = document.id"
               >
                 <strong>{{ document.title }}</strong>
-                <span>{{ document.sourceType }} - {{ document.tags }}</span>
+                <span>{{ sourceTypeLabel(document.sourceType) }} · {{ document.tags || '无标签' }}</span>
                 <small>{{ formatDate(document.updatedAt || document.createdAt) }}</small>
               </button>
               <div v-if="!loading.documents && documents.length === 0" class="empty-state">还没有知识文档。先创建或导入一篇笔记来测试检索。</div>
@@ -1050,11 +1106,37 @@ onUnmounted(() => {
               </div>
               <p>{{ selectedDocument.summary || '暂无摘要' }}</p>
               <div class="document-meta-strip">
-                <span>{{ selectedDocument.sourceType }}</span>
+                <span>{{ sourceTypeLabel(selectedDocument.sourceType) }}</span>
                 <span>{{ selectedDocument.tags || '无标签' }}</span>
                 <span>更新于 {{ formatDate(selectedDocument.updatedAt || selectedDocument.createdAt) }}</span>
               </div>
             </section>
+
+            <details class="archived-documents">
+              <summary>
+                <span>归档记录</span>
+                <small>{{ archivedDocuments.length ? `${archivedDocuments.length} 篇，可恢复` : '暂无归档' }}</small>
+              </summary>
+              <div class="archived-document-list">
+                <div v-for="document in archivedDocuments" :key="document.id">
+                  <div>
+                    <strong>{{ document.title }}</strong>
+                    <small>{{ sourceTypeLabel(document.sourceType) }} · {{ formatDate(document.updatedAt || document.createdAt) }}</small>
+                  </div>
+                  <button
+                    class="mini-button"
+                    type="button"
+                    :disabled="loading.restoreDocument"
+                    @click="restoreDocument(document)"
+                  >
+                    {{ loading.restoreDocument ? '恢复中...' : '恢复' }}
+                  </button>
+                </div>
+                <p v-if="!archivedDocuments.length" class="empty-state">
+                  归档相当于软删除：文档不会参与检索，但仍保留在数据库中，之后可以恢复。
+                </p>
+              </div>
+            </details>
 
             <form v-if="editingDocumentId" class="document-form edit-document-form" @submit.prevent="updateDocument">
               <div class="form-section-heading">
@@ -1070,9 +1152,9 @@ onUnmounted(() => {
                   <input v-model="documentEditForm.title" maxlength="120" required />
                 </label>
                 <label>
-                  类型
+                  文档类别
                   <select v-model="documentEditForm.sourceType">
-                    <option v-for="option in sourceTypeOptions" :key="option.value" :value="option.value">
+                    <option v-for="option in sourceTypeOptions" :key="option.value" :value="option.value" :disabled="option.legacy">
                       {{ option.label }}（{{ option.value }}）
                     </option>
                   </select>
@@ -1081,6 +1163,10 @@ onUnmounted(() => {
               <label>
                 标签
                 <input v-model="documentEditForm.tags" maxlength="255" />
+                <small class="field-hint">标签是可搜索的主题词，可选多个；类别只表达文档用途。</small>
+                <span class="tag-suggestions">
+                  <button v-for="tag in tagSuggestions" :key="tag" type="button" @click="addSuggestedTag('edit', tag)">+ {{ tag }}</button>
+                </span>
               </label>
               <label>
                 摘要
@@ -1095,7 +1181,18 @@ onUnmounted(() => {
               </button>
             </form>
 
-            <form class="import-form" @submit.prevent="importDocument">
+            <div class="document-composer-heading">
+              <div>
+                <h3>添加知识文档</h3>
+                <p>已有 Markdown/TXT 选择“导入文件”；临时记录内容选择“手动创建”。两种方式最终都会生成同一种知识文档和检索分块。</p>
+              </div>
+              <div class="segmented compact-segmented" aria-label="添加文档方式">
+                <button type="button" :class="{ active: documentComposerMode === 'import' }" @click="documentComposerMode = 'import'">导入文件</button>
+                <button type="button" :class="{ active: documentComposerMode === 'manual' }" @click="documentComposerMode = 'manual'">手动创建</button>
+              </div>
+            </div>
+
+            <form v-if="documentComposerMode === 'import'" class="import-form" @submit.prevent="importDocument">
               <div class="import-header">
                 <div>
                   <h3>导入笔记文件</h3>
@@ -1117,9 +1214,9 @@ onUnmounted(() => {
                   <small class="field-hint">运行内置评估时请保留样例文件名，避免 gold 标题无法匹配。</small>
                 </label>
                 <label>
-                  类型 <em class="required-mark">必选</em>
+                  文档类别 <em class="required-mark">必选</em>
                   <select v-model="importForm.sourceType">
-                    <option v-for="option in sourceTypeOptions" :key="option.value" :value="option.value">
+                    <option v-for="option in sourceTypeOptions" :key="option.value" :value="option.value" :disabled="option.legacy">
                       {{ option.label }}（{{ option.value }}）
                     </option>
                   </select>
@@ -1129,7 +1226,10 @@ onUnmounted(() => {
               <label>
                 标签 <span class="optional-mark">可选</span>
                 <input v-model="importForm.tags" placeholder="例如：redis,cache,backend" />
-                <small class="field-hint">使用逗号分隔；系统会自动去除空项和重复标签。</small>
+                <small class="field-hint">标签是用于搜索和聚合的主题词，使用逗号分隔；系统会自动去重。</small>
+                <span class="tag-suggestions">
+                  <button v-for="tag in tagSuggestions" :key="tag" type="button" @click="addSuggestedTag('import', tag)">+ {{ tag }}</button>
+                </span>
               </label>
               <label>
                 摘要 <span class="optional-mark">可选</span>
@@ -1141,24 +1241,40 @@ onUnmounted(() => {
               </button>
             </form>
 
-            <form class="document-form" @submit.prevent="createDocument">
+            <form v-else class="document-form manual-document-form" @submit.prevent="createDocument">
+              <div class="import-header">
+                <h3>手动创建</h3>
+                <p>适合直接粘贴复盘、架构说明或面试笔记；保存后会自动切分并加入检索。</p>
+              </div>
               <div class="form-row">
                 <label>
                   标题
-                  <input v-model="documentForm.title" />
+                  <input v-model="documentForm.title" maxlength="120" required />
                 </label>
                 <label>
-                  类型
-                  <input v-model="documentForm.sourceType" />
+                  文档类别
+                  <select v-model="documentForm.sourceType">
+                    <option v-for="option in sourceTypeOptions" :key="option.value" :value="option.value" :disabled="option.legacy">
+                      {{ option.label }}（{{ option.value }}）
+                    </option>
+                  </select>
                 </label>
               </div>
               <label>
-                标签
-                <input v-model="documentForm.tags" />
+                标签 <span class="optional-mark">可选</span>
+                <input v-model="documentForm.tags" maxlength="255" />
+                <small class="field-hint">选择常用主题，或继续手动输入更具体的技术词。</small>
+                <span class="tag-suggestions">
+                  <button v-for="tag in tagSuggestions" :key="tag" type="button" @click="addSuggestedTag('create', tag)">+ {{ tag }}</button>
+                </span>
+              </label>
+              <label>
+                摘要 <span class="optional-mark">可选</span>
+                <input v-model="documentForm.summary" maxlength="500" />
               </label>
               <label>
                 内容
-                <textarea v-model="documentForm.content" rows="7"></textarea>
+                <textarea v-model="documentForm.content" rows="9" maxlength="20000" required></textarea>
               </label>
               <button class="secondary-button" type="submit" :disabled="loading.createDocument">
                 <span v-html="icons.plus"></span>

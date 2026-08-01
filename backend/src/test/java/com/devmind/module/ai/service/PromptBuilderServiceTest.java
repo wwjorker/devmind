@@ -47,6 +47,23 @@ class PromptBuilderServiceTest {
     }
 
     @Test
+    void buildPromptShouldUseChineseInstructionsForChineseQuestion() {
+        ChunkSearchResponse chunk = new ChunkSearchResponse(
+                12L, 4L, "Redis 缓存穿透", "learning_note", "redis", 0,
+                "缓存空值可以减少不存在 key 对数据库的重复访问。", 40, 20
+        );
+
+        String prompt = promptBuilderService.buildPrompt("如何处理缓存穿透？", List.of(chunk));
+
+        assertThat(prompt)
+                .contains("你是 DevMind")
+                .contains("问题:")
+                .contains("检索上下文:")
+                .contains("引用依据：实际使用的 chunkId")
+                .doesNotContain("Citations:");
+    }
+
+    @Test
     void buildPromptShouldLimitVeryLongChunkContext() {
         ChunkSearchResponse chunk = new ChunkSearchResponse(
                 11L,

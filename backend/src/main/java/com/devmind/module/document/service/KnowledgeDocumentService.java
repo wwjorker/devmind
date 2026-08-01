@@ -29,7 +29,7 @@ public class KnowledgeDocumentService {
     private static final long MAX_PAGE_SIZE = 50;
     private static final int MAX_TITLE_LENGTH = 120;
     private static final int MAX_CONTENT_LENGTH = 20000;
-    private static final String DEFAULT_IMPORTED_SOURCE_TYPE = "imported_note";
+    private static final String DEFAULT_IMPORTED_SOURCE_TYPE = "learning_note";
 
     private final KnowledgeDocumentMapper documentMapper;
     private final DocumentChunkService chunkService;
@@ -80,7 +80,7 @@ public class KnowledgeDocumentService {
         request.setContent(content);
         request.setSourceType(StringUtils.hasText(sourceType) ? sourceType.trim() : DEFAULT_IMPORTED_SOURCE_TYPE);
         request.setTags(StringUtils.hasText(tags) ? tags.trim() : "");
-        request.setSummary(StringUtils.hasText(summary) ? summary.trim() : "Imported from file: " + filename);
+        request.setSummary(StringUtils.hasText(summary) ? summary.trim() : "导入文件：" + filename);
         return create(userId, request);
     }
 
@@ -93,12 +93,27 @@ public class KnowledgeDocumentService {
                                              String sourceType,
                                              long pageNo,
                                              long pageSize) {
+        return pageByStatus(userId, keyword, sourceType, STATUS_ACTIVE, pageNo, pageSize);
+    }
+
+    public PageResult<DocumentResponse> pageArchived(Long userId,
+                                                     long pageNo,
+                                                     long pageSize) {
+        return pageByStatus(userId, null, null, STATUS_ARCHIVED, pageNo, pageSize);
+    }
+
+    private PageResult<DocumentResponse> pageByStatus(Long userId,
+                                                      String keyword,
+                                                      String sourceType,
+                                                      int status,
+                                                      long pageNo,
+                                                      long pageSize) {
         long safePageNo = Math.max(pageNo, 1);
         long safePageSize = Math.min(Math.max(pageSize, 1), MAX_PAGE_SIZE);
 
         LambdaQueryWrapper<KnowledgeDocument> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(KnowledgeDocument::getUserId, userId)
-                .eq(KnowledgeDocument::getStatus, STATUS_ACTIVE)
+                .eq(KnowledgeDocument::getStatus, status)
                 .eq(StringUtils.hasText(sourceType), KnowledgeDocument::getSourceType, sourceType)
                 .and(StringUtils.hasText(keyword), wrapper -> wrapper
                         .like(KnowledgeDocument::getTitle, keyword)
@@ -143,11 +158,24 @@ public class KnowledgeDocumentService {
         chunkService.archiveByDocument(userId, documentId);
     }
 
+    @Transactional
+    public DocumentResponse restore(Long userId, Long documentId) {
+        KnowledgeDocument document = findOwnedDocumentByStatus(userId, documentId, STATUS_ARCHIVED);
+        document.setStatus(STATUS_ACTIVE);
+        documentMapper.updateById(document);
+        chunkService.rebuildChunks(userId, documentId, document.getContent());
+        return toResponse(document);
+    }
+
     private KnowledgeDocument findOwnedActiveDocument(Long userId, Long documentId) {
+        return findOwnedDocumentByStatus(userId, documentId, STATUS_ACTIVE);
+    }
+
+    private KnowledgeDocument findOwnedDocumentByStatus(Long userId, Long documentId, int status) {
         LambdaQueryWrapper<KnowledgeDocument> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(KnowledgeDocument::getId, documentId)
                 .eq(KnowledgeDocument::getUserId, userId)
-                .eq(KnowledgeDocument::getStatus, STATUS_ACTIVE);
+                .eq(KnowledgeDocument::getStatus, status);
 
         KnowledgeDocument document = documentMapper.selectOne(queryWrapper);
         if (document == null) {
@@ -219,7 +247,7 @@ public class KnowledgeDocumentService {
             title = title.substring(0, dotIndex);
         }
         if (!StringUtils.hasText(title)) {
-            title = "Imported document";
+            title = "导入文档";
         }
         return title.length() <= MAX_TITLE_LENGTH ? title : title.substring(0, MAX_TITLE_LENGTH);
     }
