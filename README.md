@@ -224,6 +224,7 @@ DevMind 是一个面向开发学习场景的 AI 知识库系统，重点展示 J
 - 前端说明：[frontend/README.md](frontend/README.md)
 - 架构说明：[backend/docs/architecture.md](backend/docs/architecture.md)
 - API 调试：[backend/docs/api/devmind-api.http](backend/docs/api/devmind-api.http)
+- 部署与运维边界：[docs/operations/production-readiness.md](docs/operations/production-readiness.md)
 
 ## CI
 

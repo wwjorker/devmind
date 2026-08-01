@@ -12,6 +12,12 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     volumes:
       - devmind_mysql_data:/var/lib/mysql
 
@@ -23,6 +29,11 @@ services:
       - "6380:6379"
     volumes:
       - devmind_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
 
   # Vector serving index only. MySQL stays the source of truth for all primary data;
   # embeddings are derived, rebuildable data, so losing this volume is never fatal.
@@ -39,6 +50,12 @@ services:
       TZ: Asia/Shanghai
     volumes:
       - devmind_pgvector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
 volumes:
   devmind_mysql_data:
