@@ -22,7 +22,21 @@ PowerShell example:
 "@
 }
 
-$javaVersionOutput = & (Join-Path $env:JAVA_HOME "bin\java.exe") -version 2>&1
+$javaExecutable = Join-Path $env:JAVA_HOME "bin\java.exe"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    # Windows PowerShell 5.1 wraps native stderr as ErrorRecord objects. java -version
+    # writes its normal version banner to stderr, so capture it without treating it
+    # as a terminating PowerShell error.
+    $ErrorActionPreference = "Continue"
+    $javaVersionOutput = & $javaExecutable -version 2>&1
+    $javaVersionExitCode = $LASTEXITCODE
+} finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+if ($javaVersionExitCode -ne 0) {
+    throw "Unable to run Java from JAVA_HOME=$env:JAVA_HOME"
+}
 $javaVersionText = $javaVersionOutput -join " "
 if ($javaVersionText -notmatch 'version "(?:1\.)?(\d+)') {
     throw "Unable to determine the Java version from JAVA_HOME=$env:JAVA_HOME"
@@ -65,6 +79,19 @@ $env:DEVMIND_VECTOR_STORE_PROVIDER = if ($env:DEVMIND_VECTOR_STORE_PROVIDER) {
     "mysql-json"
 }
 
+Write-Host "Building the executable backend JAR..." -ForegroundColor Cyan
+& ".\mvnw.cmd" package -DskipTests
+if ($LASTEXITCODE -ne 0) {
+    throw "Maven failed to build the DevMind backend."
+}
+
+$backendJar = Get-ChildItem -LiteralPath (Join-Path $backendDir "target") -Filter "devmind-backend-*.jar" |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+if (-not $backendJar) {
+    throw "The executable DevMind backend JAR was not found under backend\target."
+}
+
 Write-Host "Starting Spring Boot at http://127.0.0.1:8081 with provider=$env:DEVMIND_AI_PROVIDER" -ForegroundColor Green
-& ".\mvnw.cmd" spring-boot:run
+& $javaExecutable -jar $backendJar.FullName
 exit $LASTEXITCODE
