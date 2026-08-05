@@ -1147,10 +1147,48 @@ select:focus {
   background: #fbf7f1;
 }
 
+.feedback-box-prominent {
+  margin: 14px 0;
+  border: 1px solid #eadfce;
+}
+
+.feedback-heading {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.feedback-heading > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.feedback-heading span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .feedback-actions {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .feedback-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .feedback-actions {
+    justify-content: stretch;
+  }
+
+  .feedback-actions button {
+    flex: 1;
+  }
 }
 
 .empty-state,

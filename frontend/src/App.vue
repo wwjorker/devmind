@@ -1327,6 +1327,28 @@ onUnmounted(() => {
               </div>
               <div class="markdown-content" v-html="renderedAnswer"></div>
 
+              <div class="feedback-box feedback-box-prominent">
+                <div class="feedback-heading">
+                  <div>
+                    <strong>这个回答有帮助吗？</strong>
+                    <span>可直接标记有帮助；回答不理想时填写原因并保存 bad case。</span>
+                  </div>
+                  <div class="feedback-actions">
+                    <button class="secondary-button" :disabled="loading.feedback" @click="submitFeedback(true)">
+                      {{ loading.feedback ? '保存中...' : '有帮助' }}
+                    </button>
+                    <button class="danger-button" :disabled="loading.feedback" @click="submitFeedback(false)">
+                      {{ loading.feedback ? '保存中...' : '保存 bad case' }}
+                    </button>
+                  </div>
+                </div>
+                <textarea
+                  v-model="feedbackForm.reason"
+                  rows="2"
+                  placeholder="如果回答不理想，可以记录原因；保存 bad case 后会进入评估闭环。"
+                ></textarea>
+              </div>
+
               <div class="citation-list">
                 <h3>召回来源（检索上下文）</h3>
                 <div v-for="citation in askResponse.citations" :key="citation.chunkId" class="citation">
@@ -1368,21 +1390,6 @@ onUnmounted(() => {
                 </div>
               </details>
 
-              <div class="feedback-box">
-                <textarea
-                  v-model="feedbackForm.reason"
-                  rows="2"
-                  placeholder="如果回答不理想，可以记录原因；保存 bad case 后会进入评估闭环。"
-                ></textarea>
-                <div class="feedback-actions">
-                  <button class="secondary-button" :disabled="loading.feedback" @click="submitFeedback(true)">
-                    {{ loading.feedback ? '保存中...' : '有帮助' }}
-                  </button>
-                  <button class="danger-button" :disabled="loading.feedback" @click="submitFeedback(false)">
-                    {{ loading.feedback ? '保存中...' : '保存 bad case' }}
-                  </button>
-                </div>
-              </div>
             </div>
             <div v-else class="empty-answer">提出一个问题后，这里会展示回答、召回来源、token 用量和反馈控件。</div>
           </div>
