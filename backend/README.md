@@ -76,6 +76,12 @@ DeepSeek API
 ./mvnw test        # Windows: .\mvnw.cmd test
 ```
 
+真实 DeepSeek Tool Calling smoke 默认跳过，避免普通测试意外产生外部调用。
+只有同时提供 `DEVMIND_DEEPSEEK_API_KEY` 和
+`DEVMIND_RUN_DEEPSEEK_SMOKE=true` 时，才会执行
+`DeepSeekAgentModelClientSmokeTest`；密钥应通过当前进程环境或 CI Secret
+注入，不要写入仓库。
+
 现有测试覆盖了在后续迭代中应保持稳定的核心逻辑：
 
 ```text
