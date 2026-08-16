@@ -83,4 +83,41 @@ class PromptBuilderServiceTest {
         assertThat(prompt).doesNotContain("a".repeat(700));
         assertThat(prompt).contains("Answer format:");
     }
+
+    @Test
+    void buildPromptShouldKeepAllChunksWhilePreviewRemainsBounded() {
+        List<ChunkSearchResponse> chunks = List.of(
+                longChunk(21L, "first"),
+                longChunk(22L, "second"),
+                longChunk(23L, "third")
+        );
+
+        String prompt = promptBuilderService.buildPrompt("Explain the evidence.", chunks);
+        String preview = promptBuilderService.buildPromptPreview(prompt);
+
+        assertThat(prompt)
+                .hasSizeGreaterThan(2000)
+                .contains("[chunkId=21,")
+                .contains("[chunkId=22,")
+                .contains("[chunkId=23,")
+                .contains("Answer format:");
+        assertThat(preview)
+                .hasSize(2000)
+                .endsWith("...");
+        assertThat(prompt).startsWith(preview.substring(0, preview.length() - 3));
+    }
+
+    private ChunkSearchResponse longChunk(Long chunkId, String marker) {
+        return new ChunkSearchResponse(
+                chunkId,
+                chunkId + 100,
+                marker + " evidence",
+                "bug_review",
+                "test",
+                0,
+                marker + " " + "x".repeat(1000),
+                1000,
+                10
+        );
+    }
 }

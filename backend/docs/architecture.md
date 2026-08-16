@@ -80,6 +80,7 @@ erDiagram
         varchar question
         varchar retrieval_keyword
         mediumtext prompt_preview
+        tinyint prompt_schema_version
         mediumtext answer
         varchar model_provider
         tinyint mock
@@ -121,8 +122,8 @@ sequenceDiagram
     AI->>Search: searchChunks(userId, keyword)
     Search-->>AI: retrieved chunks
     AI->>Prompt: buildPrompt(question, chunks)
-    Prompt-->>AI: promptPreview
-    AI->>LLM: generate(prompt, chunks, citations)
+    Prompt-->>AI: fullPrompt + bounded promptPreview
+    AI->>LLM: generate(fullPrompt, visible chunks, citations)
     LLM-->>AI: answer
     AI->>Log: saveSuccessLog(...)
     Log-->>AI: logId

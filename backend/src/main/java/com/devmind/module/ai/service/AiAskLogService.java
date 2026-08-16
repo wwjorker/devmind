@@ -44,6 +44,7 @@ public class AiAskLogService {
         log.setQuestion(question);
         log.setRetrievalKeyword(retrievalKeyword);
         log.setPromptPreview(promptPreview);
+        log.setPromptSchemaVersion(PromptSchemaVersions.CURRENT);
         log.setAnswer(answer);
         log.setModelProvider(modelProvider);
         log.setMock(mock);
@@ -73,6 +74,7 @@ public class AiAskLogService {
         log.setQuestion(question);
         log.setRetrievalKeyword(retrievalKeyword);
         log.setPromptPreview(promptPreview);
+        log.setPromptSchemaVersion(PromptSchemaVersions.CURRENT);
         log.setAnswer(toFailureAnswer(failureMessage));
         log.setModelProvider(modelProvider);
         log.setMock(mock);

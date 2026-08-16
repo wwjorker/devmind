@@ -5,9 +5,11 @@ import com.devmind.module.ai.llm.LlmClientRouter;
 import com.devmind.module.ai.llm.LlmRequest;
 import com.devmind.module.ai.llm.LlmResponse;
 import com.devmind.module.ai.vo.AskResponse;
+import com.devmind.module.ai.vo.CitationResponse;
 import com.devmind.module.search.strategy.RetrievalStrategy;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 
@@ -104,6 +106,80 @@ class AiAskServiceTest {
     }
 
     @Test
+    void askShouldSendFullMultiChunkPromptAndReturnMatchingVisibleCitations() {
+        RetrievalStrategy retrievalStrategy = mock(RetrievalStrategy.class);
+        AiAskLogService askLogService = mock(AiAskLogService.class);
+        LlmClientRouter llmClientRouter = mock(LlmClientRouter.class);
+        List<ChunkSearchResponse> chunks = List.of(
+                longChunk(31L, "first"),
+                longChunk(32L, "second"),
+                longChunk(33L, "third")
+        );
+        when(retrievalStrategy.retrieve(eq(1L), anyList(), anyInt())).thenReturn(chunks);
+        when(llmClientRouter.generate(any(LlmRequest.class))).thenReturn(
+                new LlmResponse("grounded answer", "deepseek:test", false, 2100, 20, 2120)
+        );
+        when(askLogService.saveSuccessLog(
+                eq(1L),
+                any(),
+                any(),
+                any(),
+                eq("grounded answer"),
+                eq("deepseek:test"),
+                eq(false),
+                eq(2100),
+                eq(20),
+                eq(2120),
+                eq(chunks),
+                anyLong()
+        )).thenReturn(91L);
+        AiAskService aiAskService = new AiAskService(
+                retrievalStrategy,
+                askLogService,
+                new PromptBuilderService(),
+                new RetrievalKeywordService(true),
+                llmClientRouter
+        );
+        AskRequest request = new AskRequest();
+        request.setQuestion("Explain all retrieved evidence.");
+
+        AskResponse response = aiAskService.ask(1L, request);
+
+        ArgumentCaptor<LlmRequest> requestCaptor = ArgumentCaptor.forClass(LlmRequest.class);
+        verify(llmClientRouter).generate(requestCaptor.capture());
+        LlmRequest llmRequest = requestCaptor.getValue();
+        assertThat(llmRequest.getPrompt())
+                .hasSizeGreaterThan(2000)
+                .contains("[chunkId=31,")
+                .contains("[chunkId=32,")
+                .contains("[chunkId=33,");
+        assertThat(response.getPromptPreview()).hasSize(2000).endsWith("...");
+        assertThat(llmRequest.getPrompt())
+                .startsWith(response.getPromptPreview().substring(0, response.getPromptPreview().length() - 3));
+        assertThat(llmRequest.getRetrievedChunks()).containsExactlyElementsOf(chunks);
+        assertThat(llmRequest.getCitations())
+                .extracting(CitationResponse::getChunkId)
+                .containsExactly(31L, 32L, 33L);
+        assertThat(response.getCitations())
+                .extracting(CitationResponse::getChunkId)
+                .containsExactly(31L, 32L, 33L);
+        verify(askLogService).saveSuccessLog(
+                eq(1L),
+                eq("Explain all retrieved evidence."),
+                any(),
+                eq(response.getPromptPreview()),
+                eq("grounded answer"),
+                eq("deepseek:test"),
+                eq(false),
+                eq(2100),
+                eq(20),
+                eq(2120),
+                eq(chunks),
+                anyLong()
+        );
+    }
+
+    @Test
     void askShouldFallbackToMockWhenConfiguredProviderFails() {
         RetrievalStrategy retrievalStrategy = mock(RetrievalStrategy.class);
         AiAskLogService askLogService = mock(AiAskLogService.class);
@@ -166,6 +242,20 @@ class AiAskServiceTest {
                 eq(false),
                 eq(List.of(chunk)),
                 anyLong()
+        );
+    }
+
+    private ChunkSearchResponse longChunk(Long chunkId, String marker) {
+        return new ChunkSearchResponse(
+                chunkId,
+                chunkId + 100,
+                marker + " evidence",
+                "bug_review",
+                "test",
+                0,
+                marker + " " + "x".repeat(1000),
+                1000,
+                10
         );
     }
 }

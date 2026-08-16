@@ -138,8 +138,8 @@ sequenceDiagram
         AI-->>Client: knowledge base has insufficient information
     else chunks found
     AI->>Prompt: buildPrompt(question, chunks)
-    Prompt-->>AI: prompt preview
-    AI->>LLM: generate(prompt)
+    Prompt-->>AI: full prompt + bounded preview
+    AI->>LLM: generate(full prompt)
     LLM-->>AI: answer + token usage
     AI->>Log: save success log with provider, chunks, latency, tokens
     AI-->>Client: answer + citations + logId
@@ -202,6 +202,7 @@ GET    /api/v1/ai/evaluation/dataset
 question
 retrieval keywords
 prompt preview
+prompt schema version
 model provider
 mock or real-provider flag
 retrieved chunk ids

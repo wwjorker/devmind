@@ -194,7 +194,7 @@ DevMind 的核心设计围绕 RAG 链路和后端工程化展开：
 3. chunk 重建时同步生成本地稀疏向量并持久化到向量表，提问时只计算 query 向量，再与已持久化的 chunk 向量做余弦相似度比较。
 4. 混合检索使用 RRF 融合关键词 / FULLTEXT 排名和本地稀疏向量排名，避免直接相加不同量纲的分数。
 5. 当检索不到有效上下文时，系统返回无上下文兜底，避免模型在知识库缺资料时编造答案。
-6. Prompt Preview 与 Ask Log 会记录上下文、模型来源、召回片段、token 用量、耗时和状态，方便定位 RAG 问题。
+6. 完整 Prompt 与 Prompt Preview 分离：模型接收全部召回上下文，日志和 API 只保留最多 2,000 字符的预览；Ask Log 用 schema version 区分历史截断输入与修复后的可信输入，方便定位 RAG 问题。
 7. `LlmClient` 抽象隔离业务流程和模型供应商，支持 Mock、本地测试、DeepSeek 接入和后续 Provider 扩展。
 8. JWT logout 使用 Redis 黑名单保存未过期 token 的剩余 TTL，解决无状态 token 退出后仍可能可用的问题。
 9. AI 问答入口使用 Redis Lua 原子执行 `INCR + EXPIRE`，按用户限制固定窗口内的请求次数；默认每分钟 10 次，超限返回 HTTP 429，Redis 故障策略可配置。

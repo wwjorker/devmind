@@ -15,6 +15,7 @@ public class AiAskLog {
     private String question;
     private String retrievalKeyword;
     private String promptPreview;
+    private Integer promptSchemaVersion;
     private String answer;
     private String modelProvider;
     private Boolean mock;
@@ -65,6 +66,14 @@ public class AiAskLog {
 
     public void setPromptPreview(String promptPreview) {
         this.promptPreview = promptPreview;
+    }
+
+    public Integer getPromptSchemaVersion() {
+        return promptSchemaVersion;
+    }
+
+    public void setPromptSchemaVersion(Integer promptSchemaVersion) {
+        this.promptSchemaVersion = promptSchemaVersion;
     }
 
     public String getAnswer() {

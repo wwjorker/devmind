@@ -17,6 +17,13 @@ public class PromptBuilderService {
                 : buildEnglishPrompt(question, chunks);
     }
 
+    public String buildPromptPreview(String prompt) {
+        if (prompt == null || prompt.length() <= MAX_PROMPT_PREVIEW_CHARS) {
+            return prompt;
+        }
+        return prompt.substring(0, MAX_PROMPT_PREVIEW_CHARS - 3) + "...";
+    }
+
     private String buildChinesePrompt(String question, List<ChunkSearchResponse> chunks) {
         StringBuilder prompt = new StringBuilder();
         prompt.append("你是 DevMind，一名面向开发者学习笔记的 AI 助手。\n");
@@ -31,7 +38,7 @@ public class PromptBuilderService {
         prompt.append("- 关键要点\n");
         prompt.append("- 引用依据：实际使用的 chunkId\n");
 
-        return limit(prompt.toString(), MAX_PROMPT_PREVIEW_CHARS);
+        return prompt.toString();
     }
 
     private String buildEnglishPrompt(String question, List<ChunkSearchResponse> chunks) {
@@ -49,7 +56,7 @@ public class PromptBuilderService {
         prompt.append("- Key points\n");
         prompt.append("- Citations: chunk ids used\n");
 
-        return limit(prompt.toString(), MAX_PROMPT_PREVIEW_CHARS);
+        return prompt.toString();
     }
 
     private void appendQuestionAndContext(StringBuilder prompt,
