@@ -16,6 +16,8 @@ import com.devmind.module.search.vo.ChunkSearchResponse;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -85,6 +87,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<ChunkSearchResponse> retrieve(Long userId, List<String> keywords, Integer limit) {
         EmbeddingClient currentClient = embeddingClientRouter.currentClient();
         // Serve the vector arm from pgvector only when the store is enabled AND the
@@ -94,6 +97,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
         return retrieveInternal(userId, keywords, limit, currentClient, true, usePgStore);
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<ChunkSearchResponse> retrieveWithEmbeddingProvider(Long userId,
                                                                    List<String> keywords,
                                                                    Integer limit,
@@ -105,6 +109,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
      * Evaluation entry point that forces the vector arm through the pgvector store,
      * so the same gold-label cases can compare MySQL-JSON brute force vs HNSW serving.
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<ChunkSearchResponse> retrieveWithEmbeddingProviderAndPgStore(Long userId,
                                                                              List<String> keywords,
                                                                              Integer limit,

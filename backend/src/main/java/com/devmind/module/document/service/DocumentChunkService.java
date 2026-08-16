@@ -5,8 +5,8 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.vo.DocumentChunkResponse;
-import com.devmind.module.search.service.ChunkVectorService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -22,16 +22,13 @@ public class DocumentChunkService {
     private static final int CHUNK_OVERLAP_CHARS = 120;
 
     private final DocumentChunkMapper chunkMapper;
-    private final ChunkVectorService chunkVectorService;
 
-    public DocumentChunkService(DocumentChunkMapper chunkMapper,
-                                ChunkVectorService chunkVectorService) {
+    public DocumentChunkService(DocumentChunkMapper chunkMapper) {
         this.chunkMapper = chunkMapper;
-        this.chunkVectorService = chunkVectorService;
     }
 
-    @Transactional
-    public void rebuildChunks(Long userId, Long documentId, String content) {
+    @Transactional(propagation = Propagation.MANDATORY)
+    public List<DocumentChunk> replaceChunks(Long userId, Long documentId, String content) {
         archiveByDocument(userId, documentId);
 
         List<String> chunks = splitContent(content);
@@ -47,7 +44,7 @@ public class DocumentChunkService {
             chunkMapper.insert(chunk);
             insertedChunks.add(chunk);
         }
-        chunkVectorService.rebuildVectors(userId, documentId, insertedChunks);
+        return insertedChunks;
     }
 
     public List<DocumentChunkResponse> listActiveChunks(Long userId, Long documentId) {
@@ -63,7 +60,7 @@ public class DocumentChunkService {
                 .toList();
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.MANDATORY)
     public void archiveByDocument(Long userId, Long documentId) {
         LambdaUpdateWrapper<DocumentChunk> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(DocumentChunk::getUserId, userId)
@@ -71,7 +68,6 @@ public class DocumentChunkService {
                 .eq(DocumentChunk::getStatus, STATUS_ACTIVE)
                 .set(DocumentChunk::getStatus, STATUS_ARCHIVED);
         chunkMapper.update(updateWrapper);
-        chunkVectorService.archiveByDocument(userId, documentId);
     }
 
     private List<String> splitContent(String content) {
