@@ -1,8 +1,5 @@
 package com.devmind.module.ai.service;
 
-import com.devmind.common.api.ResultCode;
-import com.devmind.common.exception.BizException;
-import com.devmind.module.ai.agent.AgentBudgetRejection;
 import com.devmind.module.ai.agent.AgentModelClient;
 import com.devmind.module.ai.agent.AgentModelRequest;
 import com.devmind.module.ai.agent.AgentModelResponse;
@@ -40,7 +37,7 @@ public class AgentModelStepExecutor {
                 AgentAuditSummaries.modelRequest(request)
         );
         if (!reservation.permitted()) {
-            throw rejectedRun(reservation);
+            throw AgentStepExecutionErrors.rejectedRun(reservation);
         }
 
         long startedNanos = System.nanoTime();
@@ -66,33 +63,8 @@ public class AgentModelStepExecutor {
                 elapsedMillis(startedNanos),
                 AgentAuditSummaries.modelResponse(response)
         );
-        if (status == AgentRunStatus.TIMED_OUT) {
-            throw new BizException(ResultCode.SERVICE_UNAVAILABLE, "agent run timed out");
-        }
-        if (status != AgentRunStatus.RUNNING) {
-            throw new BizException(ResultCode.CONFLICT, "agent run is no longer active: " + status);
-        }
+        AgentStepExecutionErrors.requireActive(status);
         return response;
-    }
-
-    private BizException rejectedRun(AgentStepReservation reservation) {
-        if (reservation.rejection() == AgentBudgetRejection.DEADLINE_EXCEEDED
-                || reservation.runStatus() == AgentRunStatus.TIMED_OUT) {
-            return new BizException(ResultCode.SERVICE_UNAVAILABLE, "agent run timed out");
-        }
-        if (reservation.runStatus() == AgentRunStatus.BUDGET_EXHAUSTED
-                || reservation.rejection() == AgentBudgetRejection.MAX_STEPS
-                || reservation.rejection() == AgentBudgetRejection.MAX_MODEL_CALLS
-                || reservation.rejection() == AgentBudgetRejection.MAX_TOTAL_TOKENS) {
-            return new BizException(
-                    ResultCode.TOO_MANY_REQUESTS,
-                    "agent budget exhausted: " + reservation.rejection().name().toLowerCase()
-            );
-        }
-        return new BizException(
-                ResultCode.CONFLICT,
-                "agent run is not active: " + reservation.runStatus()
-        );
     }
 
     private long elapsedMillis(long startedNanos) {

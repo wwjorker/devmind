@@ -17,6 +17,7 @@ public class AgentStep {
     private String roleName;
     private String stepType;
     private String toolName;
+    private String toolCallId;
     private String status;
     private String inputSummary;
     private String outputSummary;
@@ -84,6 +85,14 @@ public class AgentStep {
 
     public void setToolName(String toolName) {
         this.toolName = toolName;
+    }
+
+    public String getToolCallId() {
+        return toolCallId;
+    }
+
+    public void setToolCallId(String toolCallId) {
+        this.toolCallId = toolCallId;
     }
 
     public String getStatus() {

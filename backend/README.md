@@ -338,13 +338,22 @@ summary    optional
 ## Agent 运行审计（Phase B 基础设施）
 
 V6 migration 新增 `agent_run` 与 `agent_step`，用于持久化实验臂、预算、
-累计用量、有序模型/工具步骤和终态。目前只接入内部模型步骤执行器，尚未
-开放 Agent API，也没有知识库写工具。
+累计用量、有序模型/工具步骤和终态；V7 为工具步骤补充 Provider
+`tool_call_id`，使返回消息和审计步骤可以稳定关联。目前尚未开放 Agent API，
+也没有知识库写工具。
 
 步骤预留和完成分别使用短事务；外部模型调用在事务外执行。步数、模型调用
 次数和调用前 deadline 会在请求发出前阻断；总 token 以 Provider 返回的
-usage 记账，达到阈值后禁止下一次调用。审计仅保存角色、工具名、字符数等
-有界摘要，不保存完整 Prompt、模型输出或 tool arguments。
+usage 记账，达到阈值后禁止下一次调用。工具调用同样占用总步数并受 deadline
+与 token 阈值约束，但不占用模型调用次数。审计仅保存角色、工具名、字段名、
+字符数等有界摘要，不保存完整 Prompt、模型输出、工具参数值或工具结果正文。
+
+Phase B 当前只注册三个租户隔离的只读工具：`searchKnowledge`、
+`getChunkEvidence`、`getAskLogEvidence`。`userId` 与 `runId` 由服务端上下文
+注入，不属于模型参数。普通检索只返回 active 数据；历史证据工具允许按已记录
+ID 读取 archived chunk，但会明确声明它是当前数据库行的解析结果，不是不可变
+历史快照。旧 Prompt Schema 日志会标记为不可用于“证据正确但回答错误”判定。
+Triage 输出使用固定六类根因和一一对应的 route，并拒绝未知字段。
 
 ## 本地运行
 

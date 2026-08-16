@@ -81,7 +81,8 @@ class AgentRunPersistenceIntegrationTest {
                 )
                 """);
         new ResourceDatabasePopulator(
-                new ClassPathResource("db/migration/V6__create_agent_run_and_step_tables.sql")
+                new ClassPathResource("db/migration/V6__create_agent_run_and_step_tables.sql"),
+                new ClassPathResource("db/migration/V7__add_agent_step_tool_call_id.sql")
         ).execute(dataSource);
         jdbcTemplate.update("INSERT INTO user_account (id, username) VALUES (?, ?)", USER_ID, "agent-test");
     }
@@ -154,6 +155,43 @@ class AgentRunPersistenceIntegrationTest {
         assertThat(persistenceService.getOwnedRun(USER_ID, run.getId()).getStatus())
                 .isEqualTo(AgentRunStatus.BUDGET_EXHAUSTED.name());
         assertThat(persistenceService.replaySteps(USER_ID, run.getId())).hasSize(1);
+    }
+
+    @Test
+    void shouldAuditToolStepWithoutConsumingModelCallBudget() {
+        AgentRun run = startRun("run-tool-budget", new AgentBudgetLimits(
+                3, 1, 100, Duration.ofSeconds(30)));
+        ScriptedAgentModelClient modelClient = new ScriptedAgentModelClient(List.of(
+                toolCallResponse(5)
+        ));
+        stepExecutor.execute(USER_ID, run.getId(), AgentRole.EVIDENCE_TRIAGE,
+                modelClient, request());
+
+        var reservation = persistenceService.reserveToolStep(
+                USER_ID,
+                run.getId(),
+                AgentRole.EVIDENCE_TRIAGE,
+                "searchKnowledge",
+                "call-after-model-budget",
+                "tool=searchKnowledge;argumentFields=query"
+        );
+        assertThat(reservation.permitted()).isTrue();
+        assertThat(persistenceService.completeToolStep(
+                USER_ID, run.getId(), reservation.stepId(), 2, "resultChars=42"))
+                .isEqualTo(AgentRunStatus.RUNNING);
+
+        AgentRun stored = persistenceService.getOwnedRun(USER_ID, run.getId());
+        assertThat(stored.getUsedSteps()).isEqualTo(2);
+        assertThat(stored.getUsedModelCalls()).isEqualTo(1);
+        assertThat(persistenceService.replaySteps(USER_ID, run.getId()))
+                .hasSize(2)
+                .element(1)
+                .satisfies(step -> {
+                    assertThat(step.getStepType()).isEqualTo("TOOL_CALL");
+                    assertThat(step.getToolName()).isEqualTo("searchKnowledge");
+                    assertThat(step.getToolCallId()).isEqualTo("call-after-model-budget");
+                    assertThat(step.getTotalTokens()).isZero();
+                });
     }
 
     @Test

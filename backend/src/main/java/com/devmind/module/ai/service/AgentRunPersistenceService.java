@@ -100,7 +100,36 @@ public class AgentRunPersistenceService {
                                                  Long runId,
                                                  AgentRole role,
                                                  String inputSummary) {
+        return reserveStep(userId, runId, role, AgentStepType.MODEL_CALL,
+                null, null, inputSummary);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AgentStepReservation reserveToolStep(Long userId,
+                                                Long runId,
+                                                AgentRole role,
+                                                String toolName,
+                                                String toolCallId,
+                                                String inputSummary) {
+        if (!StringUtils.hasText(toolName) || toolName.length() > 64) {
+            throw new BizException(ResultCode.BAD_REQUEST, "invalid agent tool name");
+        }
+        if (!StringUtils.hasText(toolCallId) || toolCallId.length() > 128) {
+            throw new BizException(ResultCode.BAD_REQUEST, "invalid agent tool call id");
+        }
+        return reserveStep(userId, runId, role, AgentStepType.TOOL_CALL,
+                toolName, toolCallId, inputSummary);
+    }
+
+    private AgentStepReservation reserveStep(Long userId,
+                                             Long runId,
+                                             AgentRole role,
+                                             AgentStepType stepType,
+                                             String toolName,
+                                             String toolCallId,
+                                             String inputSummary) {
         Objects.requireNonNull(role, "role must not be null");
+        Objects.requireNonNull(stepType, "stepType must not be null");
         AgentRun run = findOwnedForUpdate(userId, runId);
         AgentRunStatus status = AgentRunStatus.valueOf(run.getStatus());
         if (status != AgentRunStatus.RUNNING) {
@@ -116,7 +145,7 @@ public class AgentRunPersistenceService {
                     AgentRunStatus.TIMED_OUT, AgentBudgetRejection.DEADLINE_EXCEEDED);
         }
 
-        AgentBudgetRejection rejection = exhaustedBudget(run);
+        AgentBudgetRejection rejection = exhaustedBudget(run, stepType);
         if (rejection != AgentBudgetRejection.NONE) {
             if (hasRunningStep(userId, runId)) {
                 return AgentStepReservation.rejected(AgentRunStatus.RUNNING, rejection);
@@ -128,7 +157,9 @@ public class AgentRunPersistenceService {
 
         int sequenceNo = run.getUsedSteps() + 1;
         run.setUsedSteps(sequenceNo);
-        run.setUsedModelCalls(run.getUsedModelCalls() + 1);
+        if (stepType == AgentStepType.MODEL_CALL) {
+            run.setUsedModelCalls(run.getUsedModelCalls() + 1);
+        }
         runMapper.updateById(run);
 
         AgentStep step = new AgentStep();
@@ -136,7 +167,9 @@ public class AgentRunPersistenceService {
         step.setUserId(userId);
         step.setSequenceNo(sequenceNo);
         step.setRoleName(role.name());
-        step.setStepType(AgentStepType.MODEL_CALL.name());
+        step.setStepType(stepType.name());
+        step.setToolName(toolName);
+        step.setToolCallId(toolCallId);
         step.setStatus(AgentStepStatus.RUNNING.name());
         step.setInputSummary(AgentAuditSummaries.result(inputSummary));
         step.setPromptTokens(0);
@@ -191,16 +224,62 @@ public class AgentRunPersistenceService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AgentRunStatus completeToolStep(Long userId,
+                                           Long runId,
+                                           Long stepId,
+                                           long elapsedMs,
+                                           String outputSummary) {
+        AgentRun run = findOwnedForUpdate(userId, runId);
+        AgentStep step = findRunningStep(userId, runId, stepId);
+        LocalDateTime completedAt = now();
+
+        step.setStatus(AgentStepStatus.SUCCEEDED.name());
+        step.setOutputSummary(AgentAuditSummaries.result(outputSummary));
+        step.setElapsedMs(Math.max(elapsedMs, 0));
+        step.setCompletedAt(completedAt);
+        stepMapper.updateById(step);
+
+        AgentRunStatus runStatus = AgentRunStatus.valueOf(run.getStatus());
+        if (runStatus == AgentRunStatus.RUNNING && !completedAt.isBefore(run.getDeadlineAt())) {
+            finishRun(run, AgentRunStatus.TIMED_OUT,
+                    AgentBudgetRejection.DEADLINE_EXCEEDED.name(),
+                    "agent tool call completed after the run deadline", completedAt);
+            return AgentRunStatus.TIMED_OUT;
+        }
+        return runStatus;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public AgentRunStatus failModelStep(Long userId,
                                         Long runId,
                                         Long stepId,
                                         RuntimeException error,
                                         long elapsedMs) {
+        return failStep(userId, runId, stepId, error, elapsedMs, true);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AgentRunStatus failToolStep(Long userId,
+                                       Long runId,
+                                       Long stepId,
+                                       RuntimeException error,
+                                       long elapsedMs) {
+        return failStep(userId, runId, stepId, error, elapsedMs, false);
+    }
+
+    private AgentRunStatus failStep(Long userId,
+                                    Long runId,
+                                    Long stepId,
+                                    RuntimeException error,
+                                    long elapsedMs,
+                                    boolean modelCall) {
         AgentRun run = findOwnedForUpdate(userId, runId);
         AgentStep step = findRunningStep(userId, runId, stepId);
         LocalDateTime completedAt = now();
         String errorCode = AgentAuditSummaries.errorCode(error);
-        String errorMessage = AgentAuditSummaries.errorMessage(error);
+        String errorMessage = modelCall
+                ? AgentAuditSummaries.modelErrorMessage(error)
+                : AgentAuditSummaries.toolErrorMessage(error);
 
         step.setStatus(AgentStepStatus.FAILED.name());
         step.setElapsedMs(Math.max(elapsedMs, 0));
@@ -268,11 +347,12 @@ public class AgentRunPersistenceService {
                 .orderByAsc(AgentStep::getSequenceNo));
     }
 
-    private AgentBudgetRejection exhaustedBudget(AgentRun run) {
+    private AgentBudgetRejection exhaustedBudget(AgentRun run, AgentStepType stepType) {
         if (run.getUsedSteps() >= run.getMaxSteps()) {
             return AgentBudgetRejection.MAX_STEPS;
         }
-        if (run.getUsedModelCalls() >= run.getMaxModelCalls()) {
+        if (stepType == AgentStepType.MODEL_CALL
+                && run.getUsedModelCalls() >= run.getMaxModelCalls()) {
             return AgentBudgetRejection.MAX_MODEL_CALLS;
         }
         if (run.getUsedTotalTokens() >= run.getMaxTotalTokens()) {
