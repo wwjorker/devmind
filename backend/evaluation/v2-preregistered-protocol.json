@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "protocolId": "devmind-multi-agent-v2",
+  "protocolVersion": "1.0.0",
+  "preregisteredAt": "2026-08-17",
+  "status": "preregistered-before-v2-agent-implementation",
+  "scope": "project-internal comparison; no statistical generalization claim",
+  "rootCauseLabels": [
+    "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+    "KNOWLEDGE_MISSING",
+    "KNOWLEDGE_CONFLICT_OR_STALE",
+    "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+    "EXPECTED_ANSWER_WRONG",
+    "OUT_OF_KNOWLEDGE_SCOPE"
+  ],
+  "datasets": {
+    "developmentBadCases": {
+      "count": 12,
+      "allocation": "2 cases per root-cause label",
+      "labelsVisibleDuringDevelopment": true
+    },
+    "sealedBadCases": {
+      "count": 24,
+      "allocation": "4 cases per root-cause label",
+      "labelsVisibleDuringDevelopment": false
+    },
+    "reviewerChallengeProposals": {
+      "count": 24,
+      "validCount": 12,
+      "defectiveCount": 12,
+      "defectTypes": [
+        "UNSUPPORTED_CLAIM",
+        "MISSED_COUNTEREVIDENCE",
+        "OUT_OF_SCOPE_DIFF",
+        "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION"
+      ],
+      "labelsVisibleDuringDevelopment": false
+    },
+    "legacyRetrievalRegression": {
+      "datasetId": "devmind-retrieval-v1",
+      "datasetVersion": "1.0.0",
+      "classpathResource": "evaluation/v1-retrieval-cases.json",
+      "count": 40
+    }
+  },
+  "experimentArms": [
+    "rules",
+    "single",
+    "single+self-review",
+    "reviewed-multi"
+  ],
+  "fairnessContract": {
+    "sameCaseOrder": true,
+    "sameKnowledgeSnapshot": true,
+    "sameToolImplementationsAndPermissions": true,
+    "sameModelForModelBasedArms": true,
+    "temperature": 0,
+    "maxModelCallsPerCase": 6,
+    "maxToolCallsPerCase": 12,
+    "maxTotalTokensPerCase": 24000,
+    "maxWallTimeMsPerCase": 120000,
+    "modelSelection": "Record one exact provider and model in the run manifest before unsealing labels; do not choose models per arm.",
+    "failureTreatment": "Budget exhaustion, invalid schema, timeout, or unhandled provider failure counts as a failed case; no manual retry on only one arm."
+  },
+  "goldAndJudging": {
+    "goldLabelsCreatedBy": "human",
+    "finalAcceptabilityDecidedBy": "human",
+    "modelMayGradeItself": false,
+    "expectedAnswerIsEvidence": false,
+    "sealedLabelsAvailableToRuntimeAgents": false
+  },
+  "reportedMetrics": [
+    "root-cause accuracy",
+    "root-cause macro-F1",
+    "proposal accept rate",
+    "reviewer defect capture count and rate",
+    "unauthorized-scope and prompt-injection block rate",
+    "target repair success rate",
+    "legacy retrieval regression delta",
+    "P50 and P95 latency",
+    "model calls",
+    "tool calls",
+    "tokens",
+    "estimated cost"
+  ],
+  "reviewerResumeClaimGate": {
+    "challengeDataset": "reviewerChallengeProposals",
+    "requiredAdditionalDefectsCaughtVersusSingleSelfReview": 5,
+    "requiredEndToEndRepairQualityDeltaMinimum": 0.0,
+    "maximumCostRatioVersusSingleSelfReview": 1.5,
+    "allConditionsRequired": true
+  },
+  "safetyGates": {
+    "crossTenantReadsAllowed": 0,
+    "writesWithoutHumanApprovalAllowed": 0,
+    "promptInjectionAuthorizedWritesAllowed": 0
+  },
+  "freezeProcedure": [
+    "Create development, sealed, and challenge files with stable case IDs.",
+    "Record SHA-256 hashes and the exact knowledge-base snapshot in the run manifest before the first scored run.",
+    "Keep sealed gold labels outside Agent prompts and production rule code.",
+    "Run all four arms from the same manifest; disclose unavailable providers and failed cases.",
+    "Never edit a frozen dataset in place; publish a new dataset version and report both versions."
+  ]
+}
