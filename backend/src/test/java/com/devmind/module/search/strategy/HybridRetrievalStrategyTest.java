@@ -23,6 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class HybridRetrievalStrategyTest {
@@ -162,6 +165,86 @@ class HybridRetrievalStrategyTest {
         assertThat(responses).hasSize(1);
         assertThat(responses.get(0).getChunkId()).isEqualTo(20L);
         assertThat(responses.get(0).getScore()).isPositive();
+    }
+
+    @Test
+    void remoteProviderWithoutPersistedVectorsShouldUseKeywordOnlyAndMakeNoEmbeddingCalls() {
+        KeywordRetrievalStrategy keywordStrategy = mock(KeywordRetrievalStrategy.class);
+        DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
+        EmbeddingClientRouter embeddingClientRouter = mock(EmbeddingClientRouter.class);
+        EmbeddingClient remoteClient = mock(EmbeddingClient.class);
+        ChunkVectorService chunkVectorService = mock(ChunkVectorService.class);
+        when(embeddingClientRouter.currentClient()).thenReturn(remoteClient);
+        when(remoteClient.providerName()).thenReturn("remote-dense");
+        when(keywordStrategy.retrieve(eq(1L), eq(List.of("Redis")), eq(3)))
+                .thenReturn(List.of(new ChunkSearchResponse(
+                        10L,
+                        100L,
+                        "Redis note",
+                        "java_note",
+                        "redis",
+                        0,
+                        "Redis stores cache data.",
+                        20,
+                        30
+                )));
+        when(chunkVectorService.listActiveVectors(1L, "remote-dense", 512)).thenReturn(List.of());
+        HybridRetrievalStrategy strategy = new HybridRetrievalStrategy(
+                keywordStrategy,
+                chunkMapper,
+                mock(KnowledgeDocumentMapper.class),
+                embeddingClientRouter,
+                new EmbeddingTextBuilder(),
+                chunkVectorService,
+                emptyPgVectorStoreProvider()
+        );
+
+        List<ChunkSearchResponse> responses = strategy.retrieve(1L, List.of("Redis"), 1);
+
+        assertThat(responses)
+                .extracting(ChunkSearchResponse::getChunkId)
+                .containsExactly(10L);
+        verify(remoteClient, never()).embed(any());
+        verify(chunkMapper, never()).selectList(any());
+    }
+
+    @Test
+    void remoteProviderWithPersistedVectorsShouldEmbedOnlyTheQuery() {
+        KeywordRetrievalStrategy keywordStrategy = mock(KeywordRetrievalStrategy.class);
+        DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        EmbeddingClientRouter embeddingClientRouter = mock(EmbeddingClientRouter.class);
+        EmbeddingClient remoteClient = mock(EmbeddingClient.class);
+        ChunkVectorService chunkVectorService = mock(ChunkVectorService.class);
+        when(embeddingClientRouter.currentClient()).thenReturn(remoteClient);
+        when(remoteClient.providerName()).thenReturn("remote-dense");
+        when(remoteClient.embed(any())).thenReturn(java.util.Map.of("0", 1.0));
+        when(remoteClient.cosineSimilarity(any(), any())).thenReturn(0.9);
+        when(keywordStrategy.retrieve(eq(1L), eq(List.of("Redis")), eq(3))).thenReturn(List.of());
+        when(chunkVectorService.listActiveVectors(1L, "remote-dense", 512))
+                .thenReturn(List.of(vector(10L, 100L, "{\"0\":1.0}")));
+        when(chunkVectorService.decodeVector("{\"0\":1.0}"))
+                .thenReturn(java.util.Map.of("0", 1.0));
+        when(chunkMapper.selectList(any())).thenReturn(List.of(
+                chunk(10L, 100L, "Redis stores cache data.")));
+        when(documentMapper.selectList(any())).thenReturn(List.of(
+                document(100L, "Redis note", "redis")));
+        HybridRetrievalStrategy strategy = new HybridRetrievalStrategy(
+                keywordStrategy,
+                chunkMapper,
+                documentMapper,
+                embeddingClientRouter,
+                new EmbeddingTextBuilder(),
+                chunkVectorService,
+                emptyPgVectorStoreProvider()
+        );
+
+        List<ChunkSearchResponse> responses = strategy.retrieve(1L, List.of("Redis"), 1);
+
+        assertThat(responses)
+                .extracting(ChunkSearchResponse::getChunkId)
+                .containsExactly(10L);
+        verify(remoteClient, times(1)).embed(any());
     }
 
     @Test
