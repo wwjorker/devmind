@@ -2,6 +2,11 @@ package com.devmind;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.devmind.module.document.dto.CreateDocumentRequest;
+import com.devmind.module.ai.agent.AgentBudgetLimits;
+import com.devmind.module.ai.agent.AgentExperimentArm;
+import com.devmind.module.ai.agent.AgentRunStatus;
+import com.devmind.module.ai.entity.AgentRun;
+import com.devmind.module.ai.service.AgentRunPersistenceService;
 import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.service.KnowledgeDocumentService;
@@ -23,6 +28,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -62,24 +68,38 @@ class DevMindMySqlIntegrationTest {
     private final DocumentChunkMapper chunkMapper;
     private final DocumentChunkVectorMapper vectorMapper;
     private final RetrievalStrategy retrievalStrategy;
+    private final AgentRunPersistenceService agentRunPersistenceService;
 
     @Autowired
     DevMindMySqlIntegrationTest(UserAccountMapper userAccountMapper,
                                 KnowledgeDocumentService documentService,
                                 DocumentChunkMapper chunkMapper,
                                 DocumentChunkVectorMapper vectorMapper,
-                                RetrievalStrategy retrievalStrategy) {
+                                RetrievalStrategy retrievalStrategy,
+                                AgentRunPersistenceService agentRunPersistenceService) {
         this.userAccountMapper = userAccountMapper;
         this.documentService = documentService;
         this.chunkMapper = chunkMapper;
         this.vectorMapper = vectorMapper;
         this.retrievalStrategy = retrievalStrategy;
+        this.agentRunPersistenceService = agentRunPersistenceService;
     }
 
     @Test
     void flywayMigratesRealMySqlAndRetrievalUsesChunksVectorsAndFullTextSql() {
         Long userId = createUser();
+        AgentRun agentRun = agentRunPersistenceService.startRun(
+                userId,
+                null,
+                AgentExperimentArm.SINGLE,
+                new AgentBudgetLimits(2, 2, 100, Duration.ofSeconds(30)),
+                "mysql-migration-agent-run"
+        );
         DocumentResponse document = documentService.create(userId, createRedisDocument());
+
+        assertThat(agentRun.getId()).isNotNull();
+        assertThat(agentRunPersistenceService.getOwnedRun(userId, agentRun.getId()).getStatus())
+                .isEqualTo(AgentRunStatus.RUNNING.name());
 
         List<DocumentChunk> chunks = chunkMapper.selectList(new LambdaQueryWrapper<DocumentChunk>()
                 .eq(DocumentChunk::getUserId, userId)

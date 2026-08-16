@@ -335,6 +335,17 @@ summary    optional
 
 导入后，后端会创建一篇正常的知识文档，并走和手动创建文档相同的 `DocumentChunkService` 路径重建 chunk。这样保证 RAG 链路一致，上传的笔记也能立即被检索到。
 
+## Agent 运行审计（Phase B 基础设施）
+
+V6 migration 新增 `agent_run` 与 `agent_step`，用于持久化实验臂、预算、
+累计用量、有序模型/工具步骤和终态。目前只接入内部模型步骤执行器，尚未
+开放 Agent API，也没有知识库写工具。
+
+步骤预留和完成分别使用短事务；外部模型调用在事务外执行。步数、模型调用
+次数和调用前 deadline 会在请求发出前阻断；总 token 以 Provider 返回的
+usage 记账，达到阈值后禁止下一次调用。审计仅保存角色、工具名、字符数等
+有界摘要，不保存完整 Prompt、模型输出或 tool arguments。
+
 ## 本地运行
 
 依赖：
