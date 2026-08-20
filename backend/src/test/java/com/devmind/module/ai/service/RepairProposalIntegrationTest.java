@@ -14,19 +14,31 @@ import com.devmind.module.ai.entity.RepairProposal;
 import com.devmind.module.ai.mapper.AiBadCaseMapper;
 import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
+import com.devmind.module.document.service.KnowledgeDocumentVersionService;
+import com.devmind.module.search.service.ChunkVectorService;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 
 import javax.sql.DataSource;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {
         "spring.datasource.driver-class-name=org.h2.Driver",
@@ -53,6 +65,21 @@ class RepairProposalIntegrationTest {
     private ProposalReviewPersistenceService reviewPersistenceService;
     @Autowired
     private ProposalApprovalService approvalService;
+    @Autowired
+    private RepairExecutor repairExecutor;
+    @Autowired
+    private RepairExecutionStateService executionStateService;
+    @Autowired
+    private RepairDocumentMutationService mutationService;
+    @Autowired
+    private RecoveryService recoveryService;
+    @Autowired
+    private KnowledgeDocumentVersionService versionService;
+
+    @MockBean
+    private ChunkVectorService vectorService;
+    @MockBean
+    private RegressionRunner regressionRunner;
 
     private Long badCaseId;
 
@@ -101,6 +128,19 @@ class RepairProposalIntegrationTest {
                 )
                 """);
         jdbcTemplate.execute("""
+                CREATE TABLE knowledge_document_chunk (
+                    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                    document_id BIGINT NOT NULL,
+                    user_id BIGINT NOT NULL,
+                    chunk_index INT NOT NULL,
+                    content CLOB NOT NULL,
+                    token_count INT NOT NULL,
+                    status TINYINT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+        jdbcTemplate.execute("""
                 CREATE TABLE ai_ask_feedback (
                     id BIGINT PRIMARY KEY AUTO_INCREMENT,
                     user_id BIGINT NOT NULL,
@@ -132,7 +172,29 @@ class RepairProposalIntegrationTest {
                         'java_note', 'private', 'private', 1),
                        (33, 7, 'Stale candidate',
                         'Transaction propagation is documented for the stale test.',
-                        'java_note', 'spring,transaction', 'Stale test', 1)
+                        'java_note', 'spring,transaction', 'Stale test', 1),
+                       (34, 7, 'Executor candidate',
+                        'Retry backoff is documented for the executor test.',
+                        'java_note', 'retry,policy', 'Executor test', 1),
+                       (35, 7, 'Rollback candidate',
+                        'Retry backoff is documented for the rollback test.',
+                        'java_note', 'retry,policy', 'Rollback test', 1),
+                       (36, 7, 'Recovery candidate',
+                        'Retry backoff is documented for the recovery test.',
+                        'java_note', 'retry,policy', 'Recovery test', 1),
+                       (37, 7, 'Rollback recovery candidate',
+                        'Retry backoff is documented for rollback recovery.',
+                        'java_note', 'retry,policy', 'Rollback recovery test', 1)
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO knowledge_document_chunk
+                    (id, document_id, user_id, chunk_index, content, token_count, status)
+                VALUES (301, 31, 7, 0, 'Transaction propagation controls boundaries.', 20, 1),
+                       (303, 33, 7, 0, 'Transaction propagation stale fixture.', 20, 1),
+                       (304, 34, 7, 0, 'Retry backoff executor fixture.', 20, 1),
+                       (305, 35, 7, 0, 'Retry backoff rollback fixture.', 20, 1),
+                       (306, 36, 7, 0, 'Retry backoff recovery fixture.', 20, 1),
+                       (307, 37, 7, 0, 'Retry backoff rollback recovery fixture.', 20, 1)
                 """);
 
         applyMigration("db/migration/V9__version_knowledge_documents.sql");
@@ -353,6 +415,155 @@ class RepairProposalIntegrationTest {
                 .isEqualTo(BadCaseStatus.NO_ACTION.name());
     }
 
+    @Test
+    void shouldExecuteApprovedMetadataIdempotentlyAndResolve() {
+        reset(vectorService, regressionRunner);
+        AiBadCase executionCase = triagedCase("sealed:metadata-execution-success");
+        RepairProposal approved = approvedProposal(
+                executionCase,
+                34L,
+                "proposal:execution-success",
+                "approval:execution-success",
+                "retry,policy,backoff");
+        when(regressionRunner.runTargetRetrieval(eq(7L), any()))
+                .thenAnswer(invocation -> {
+                    assertThat(org.springframework.transaction.support
+                            .TransactionSynchronizationManager.isActualTransactionActive())
+                            .isFalse();
+                    return new RegressionResult(
+                            true, "How does retry backoff work?", 34L, 1,
+                            java.util.List.of(304L), "target document retrieved");
+                });
+        doAnswer(invocation -> {
+            assertThat(org.springframework.transaction.support
+                    .TransactionSynchronizationManager.isActualTransactionActive())
+                    .isFalse();
+            return null;
+        }).when(vectorService).rebuildVectors(eq(7L), eq(34L), any());
+
+        RepairProposal applied = repairExecutor.execute(
+                7L, approved.getId(), "execution:success");
+        RepairProposal retried = repairExecutor.execute(
+                7L, approved.getId(), "execution:success");
+
+        assertThat(retried.getId()).isEqualTo(applied.getId());
+        assertThat(applied.getStatus()).isEqualTo(RepairProposalStatus.APPLIED.name());
+        KnowledgeDocument document = documentMapper.selectById(34L);
+        assertThat(document.getTags()).isEqualTo("retry,policy,backoff");
+        assertThat(document.getVersionNo()).isEqualTo(2);
+        assertThat(versionService.getOwnedVersion(7L, 34L, 2).getProposalId())
+                .isEqualTo(approved.getId());
+        assertThat(badCaseMapper.selectById(executionCase.getId()).getStatus())
+                .isEqualTo(BadCaseStatus.RESOLVED.name());
+        verify(vectorService).rebuildVectors(eq(7L), eq(34L), any());
+    }
+
+    @Test
+    void shouldResumeAStaleReservedExecutionWithoutDuplicatingTheWrite() {
+        reset(vectorService, regressionRunner);
+        AiBadCase recoveryCase = triagedCase("sealed:metadata-execution-recovery");
+        RepairProposal approved = approvedProposal(
+                recoveryCase,
+                36L,
+                "proposal:execution-recovery",
+                "approval:execution-recovery",
+                "retry,policy,recovered");
+        executionStateService.reserve(7L, approved.getId(), "execution:recovery");
+        jdbcTemplate.update(
+                "UPDATE repair_proposal SET updated_at = DATEADD('HOUR', -2, CURRENT_TIMESTAMP) WHERE id = ?",
+                approved.getId());
+        when(regressionRunner.runTargetRetrieval(eq(7L), any()))
+                .thenReturn(new RegressionResult(
+                        true, "How does retry backoff work?", 36L, 1,
+                        java.util.List.of(306L), "target document retrieved"));
+
+        java.util.List<RepairProposal> recovered = recoveryService.recoverStale(
+                7L, Duration.ofMinutes(30));
+
+        assertThat(recovered).extracting(RepairProposal::getId)
+                .contains(approved.getId());
+        RepairProposal result = proposalService.getOwned(7L, approved.getId());
+        assertThat(result.getStatus()).isEqualTo(RepairProposalStatus.APPLIED.name());
+        assertThat(documentMapper.selectById(36L).getVersionNo()).isEqualTo(2);
+        verify(vectorService).rebuildVectors(eq(7L), eq(36L), any());
+    }
+
+    @Test
+    void shouldFinishACompensationThatCrashedAfterTheRollbackWrite() {
+        reset(vectorService, regressionRunner);
+        AiBadCase recoveryCase = triagedCase("sealed:metadata-rollback-recovery");
+        RepairProposal approved = approvedProposal(
+                recoveryCase,
+                37L,
+                "proposal:rollback-recovery",
+                "approval:rollback-recovery",
+                "retry,policy,temporary");
+        String executionKey = "execution:rollback-recovery";
+        RepairProposal executing = executionStateService.reserve(
+                7L, approved.getId(), executionKey);
+        MetadataMutationResult applied = mutationService.applyApprovedMetadata(
+                7L, executing.getId(), executionKey);
+        executionStateService.markVerifying(
+                7L, executing.getId(), executionKey, applied.versionNo());
+        mutationService.rollbackMetadata(
+                7L, executing.getId(), executionKey, applied.versionNo());
+        jdbcTemplate.update(
+                "UPDATE repair_proposal SET updated_at = DATEADD('HOUR', -2, CURRENT_TIMESTAMP) WHERE id = ?",
+                approved.getId());
+        doThrow(new IllegalStateException("force compensation resume"))
+                .when(vectorService).rebuildVectors(eq(7L), eq(37L), any());
+
+        java.util.List<RepairProposal> recovered = recoveryService.recoverStale(
+                7L, Duration.ofMinutes(30));
+
+        assertThat(recovered).extracting(RepairProposal::getId)
+                .contains(approved.getId());
+        RepairProposal result = proposalService.getOwned(7L, approved.getId());
+        assertThat(result.getStatus()).isEqualTo(RepairProposalStatus.ROLLED_BACK.name());
+        assertThat(documentMapper.selectById(37L).getVersionNo()).isEqualTo(3);
+        assertThat(versionService.getOwnedVersion(7L, 37L, 3).getOrigin())
+                .isEqualTo("REPAIR_ROLLBACK");
+    }
+
+    @Test
+    void shouldRollbackDocumentWhenIndexRebuildFails() {
+        reset(vectorService, regressionRunner);
+        AiBadCase rollbackCase = triagedCase("sealed:metadata-execution-rollback");
+        RepairProposal approved = approvedProposal(
+                rollbackCase,
+                35L,
+                "proposal:execution-rollback",
+                "approval:execution-rollback",
+                "retry,policy,temporary");
+        java.util.concurrent.atomic.AtomicInteger rebuildCalls =
+                new java.util.concurrent.atomic.AtomicInteger();
+        doAnswer(invocation -> {
+            int call = rebuildCalls.getAndIncrement();
+            assertThat(jdbcTemplate.queryForObject(
+                    "SELECT version_no FROM knowledge_document WHERE id = 35",
+                    Integer.class)).isEqualTo(call == 0 ? 2 : 3);
+            if (call == 0) {
+                throw new IllegalStateException("embedding unavailable");
+            }
+            return null;
+        }).when(vectorService).rebuildVectors(eq(7L), eq(35L), any());
+
+        RepairProposal rolledBack = repairExecutor.execute(
+                7L, approved.getId(), "execution:rollback");
+
+        assertThat(rolledBack.getStatus()).isEqualTo(RepairProposalStatus.ROLLED_BACK.name());
+        assertThat(rolledBack.getExecutionResultJson())
+                .contains("ROLLED_BACK")
+                .contains("\"indexRecoveryRequired\":false");
+        KnowledgeDocument document = documentMapper.selectById(35L);
+        assertThat(document.getTags()).isEqualTo("retry,policy");
+        assertThat(document.getVersionNo()).isEqualTo(3);
+        assertThat(versionService.getOwnedVersion(7L, 35L, 3).getOrigin())
+                .isEqualTo("REPAIR_ROLLBACK");
+        assertThat(badCaseMapper.selectById(rollbackCase.getId()).getStatus())
+                .isEqualTo(BadCaseStatus.ROLLED_BACK.name());
+    }
+
     private AiBadCase triagedCase(String sourceRef) {
         AiBadCase badCase = new AiBadCase();
         badCase.setUserId(7L);
@@ -422,6 +633,56 @@ class RepairProposalIntegrationTest {
                         "The proposal is supported and remains within metadata scope.",
                         java.util.List.of(),
                         0.9));
+    }
+
+    private RepairProposal approvedProposal(AiBadCase badCase,
+                                            Long documentId,
+                                            String proposalKey,
+                                            String approvalKey,
+                                            String tags) {
+        int baseVersion = documentMapper.selectById(documentId).getVersionNo();
+        RepairProposal proposal = proposalService.create(
+                7L,
+                badCase.getId(),
+                proposalKey,
+                metadataDraftFor(documentId, baseVersion, tags, "Retry backoff"));
+        RepairProposal reviewed = reviewPersistenceService.saveDecision(
+                7L,
+                proposal.getId(),
+                new ReviewerDecision(
+                        ReviewerVerdict.PASS,
+                        "The proposal is supported and remains within metadata scope.",
+                        java.util.List.of(),
+                        0.9));
+        return approvalService.decide(
+                7L,
+                reviewed.getId(),
+                new ProposalApprovalCommand(
+                        ApprovalDecision.APPROVE,
+                        approvalKey,
+                        null,
+                        "Approved for controlled execution."));
+    }
+
+    private RepairProposalDraft metadataDraftFor(Long documentId,
+                                                  int baseVersion,
+                                                  String tags,
+                                                  String excerpt) {
+        return new RepairProposalDraft(
+                RepairProposalType.METADATA_PATCH,
+                documentId,
+                baseVersion,
+                "{\"tags\":\"" + tags + "\"}",
+                "[{\"kind\":\"DOCUMENT_VERSION\",\"documentId\":" + documentId + ","
+                        + "\"documentVersionNo\":" + baseVersion + ","
+                        + "\"excerpt\":\"" + excerpt + "\","
+                        + "\"claim\":\"The source supports the metadata patch.\"}]",
+                "[]",
+                "{\"summary\":\"Improves controlled retrieval.\",\"risk\":\"LOW\","
+                        + "\"affectedQueries\":[\"retry backoff\"]}",
+                "{\"targetQuestion\":\"How does retry backoff work?\","
+                        + "\"relatedKeywords\":[\"retry\",\"backoff\"],"
+                        + "\"fullDatasetVersion\":\"rag-v1\"}");
     }
 
     private void applyMigration(String resource) {

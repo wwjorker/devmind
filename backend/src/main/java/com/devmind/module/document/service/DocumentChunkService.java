@@ -48,6 +48,12 @@ public class DocumentChunkService {
     }
 
     public List<DocumentChunkResponse> listActiveChunks(Long userId, Long documentId) {
+        return listActiveChunkEntities(userId, documentId).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public List<DocumentChunk> listActiveChunkEntities(Long userId, Long documentId) {
         LambdaQueryWrapper<DocumentChunk> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(DocumentChunk::getUserId, userId)
                 .eq(DocumentChunk::getDocumentId, documentId)
@@ -55,9 +61,7 @@ public class DocumentChunkService {
                 .orderByAsc(DocumentChunk::getChunkIndex)
                 .orderByAsc(DocumentChunk::getId);
 
-        return chunkMapper.selectList(queryWrapper).stream()
-                .map(this::toResponse)
-                .toList();
+        return List.copyOf(chunkMapper.selectList(queryWrapper));
     }
 
     @Transactional(propagation = Propagation.MANDATORY)

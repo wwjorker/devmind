@@ -7,5 +7,6 @@ public enum DocumentVersionOrigin {
     USER_UPDATE,
     USER_ARCHIVE,
     USER_RESTORE,
-    REPAIR_PROPOSAL
+    REPAIR_PROPOSAL,
+    REPAIR_ROLLBACK
 }

@@ -17,7 +17,7 @@ import java.util.Objects;
 @Service
 public class KnowledgeDocumentVersionService {
 
-    private static final int MAX_SOURCE_EVIDENCE_CHARS = 16_000;
+    private static final int MAX_SOURCE_EVIDENCE_CHARS = 24_000;
 
     private final KnowledgeDocumentVersionMapper versionMapper;
 
