@@ -329,6 +329,26 @@ public class AgentRunPersistenceService {
         return AgentRunStatus.CANCELLED;
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public AgentRunStatus failRunIfActive(Long userId,
+                                          Long runId,
+                                          String errorCode,
+                                          String errorMessage) {
+        AgentRun run = findOwnedForUpdate(userId, runId);
+        AgentRunStatus current = AgentRunStatus.valueOf(run.getStatus());
+        if (current != AgentRunStatus.RUNNING) {
+            return current;
+        }
+        finishRun(
+                run,
+                AgentRunStatus.FAILED,
+                requireBoundedText(errorCode, 64, "errorCode"),
+                requireBoundedText(errorMessage, 500, "errorMessage"),
+                now()
+        );
+        return AgentRunStatus.FAILED;
+    }
+
     public AgentRun getOwnedRun(Long userId, Long runId) {
         AgentRun run = runMapper.selectOne(new LambdaQueryWrapper<AgentRun>()
                 .eq(AgentRun::getId, runId)
@@ -439,6 +459,13 @@ public class AgentRunPersistenceService {
             throw new BizException(ResultCode.BAD_REQUEST, "agent run idempotency key is too long");
         }
         return value;
+    }
+
+    private String requireBoundedText(String value, int maxLength, String field) {
+        if (!StringUtils.hasText(value) || value.length() > maxLength) {
+            throw new BizException(ResultCode.BAD_REQUEST, field + " is invalid");
+        }
+        return value.trim();
     }
 
     private void requirePositive(Long value, String field) {

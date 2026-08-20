@@ -27,7 +27,8 @@ public record AgentBudgetLimits(
     }
 
     public static AgentBudgetLimits triageDefaults() {
-        return new AgentBudgetLimits(6, 6, 20_000, Duration.ofSeconds(60));
+        // Preregistered fairness budget: at most 6 model calls plus 12 tool calls.
+        return new AgentBudgetLimits(18, 6, 24_000, Duration.ofSeconds(120));
     }
 
     private static void requireRange(int value, int min, int max, String field) {

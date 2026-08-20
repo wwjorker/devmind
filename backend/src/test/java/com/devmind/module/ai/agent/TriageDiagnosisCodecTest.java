@@ -27,13 +27,16 @@ class TriageDiagnosisCodecTest {
     void shouldParseEvidenceAndEnforceRootCauseRouting() {
         TriageDiagnosis diagnosis = codec.parse("""
                 {
-                  "rootCause": "correct_evidence_answer_wrong",
+                  "rootCause": "answer_wrong_with_correct_evidence",
                   "summary": "The cited chunk answers the question, but generation contradicted it.",
                   "evidence": [{
-                    "toolCallId": "call-evidence-1",
+                    "toolCallId": "call-ask-log",
                     "askLogId": 12,
+                    "observation": "Schema v2 log records the answer and cited chunk 33."
+                  }, {
+                    "toolCallId": "call-chunk",
                     "chunkId": 33,
-                    "observation": "Schema v2 log cites chunk 33 and the answer reverses its statement."
+                    "observation": "Chunk 33 contradicts the generated answer."
                   }],
                   "recommendedRoute": "answer_policy_review",
                   "confidence": 0.91
@@ -41,15 +44,14 @@ class TriageDiagnosisCodecTest {
                 """);
 
         assertThat(diagnosis.rootCause())
-                .isEqualTo(TriageRootCause.CORRECT_EVIDENCE_ANSWER_WRONG);
+                .isEqualTo(TriageRootCause.ANSWER_WRONG_WITH_CORRECT_EVIDENCE);
         assertThat(diagnosis.recommendedRoute()).isEqualTo(TriageRoute.ANSWER_POLICY_REVIEW);
-        assertThat(diagnosis.evidence()).singleElement()
-                .extracting(TriageEvidence::chunkId)
-                .isEqualTo(33L);
+        assertThat(diagnosis.evidence()).hasSize(2);
+        assertThat(diagnosis.evidence().get(1).chunkId()).isEqualTo(33L);
 
         assertThatThrownBy(() -> codec.parse("""
                 {
-                  "rootCause": "correct_evidence_answer_wrong",
+                  "rootCause": "answer_wrong_with_correct_evidence",
                   "summary": "Mismatch",
                   "evidence": [{"toolCallId":"c1","observation":"observed"}],
                   "recommendedRoute": "knowledge_gap_ticket",
@@ -64,7 +66,7 @@ class TriageDiagnosisCodecTest {
     void shouldRejectUnknownFieldsAndMissingEvidence() {
         assertThatThrownBy(() -> codec.parse("""
                 {
-                  "rootCause": "knowledge_truly_missing",
+                  "rootCause": "knowledge_missing",
                   "summary": "No owned source covers the topic.",
                   "evidence": [],
                   "recommendedRoute": "knowledge_gap_ticket",

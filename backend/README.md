@@ -355,6 +355,14 @@ ID 读取 archived chunk，但会明确声明它是当前数据库行的解析�
 历史快照。旧 Prompt Schema 日志会标记为不可用于“证据正确但回答错误”判定。
 Triage 输出使用固定六类根因和一一对应的 route，并拒绝未知字段。
 
+`EvidenceTriageAgent` 提供 Phase B 内部技术切片：首轮固定读取目标 ask log，
+随后按模型请求执行只读工具，完整重建 assistant/tool 消息，最终对 diagnosis
+做服务端证据引用校验。未执行的 tool-call ID、工具结果中不存在的记录 ID、
+重复 call ID、目标 ask log 串线，以及使用旧 Prompt Schema 判定“正确证据但
+回答错误”，都会使 run 明确失败。`evaluation/v2-development-bad-cases-v0.1.json`
+的六条 label-visible case 已通过 scripted 编排测试；这只证明协议和控制流可跑，
+不代表真实模型准确率。Phase C 才会加入 bad-case intake、业务状态机和提案。
+
 ## 本地运行
 
 依赖：

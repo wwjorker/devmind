@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "devmind-v2-development-bad-cases",
+  "datasetVersion": "0.1.0",
+  "status": "development-labels-visible",
+  "scope": "Phase B scripted orchestration smoke; not an accuracy or model-quality result",
+  "caseCount": 6,
+  "allocation": "one technical case per preregistered root-cause label",
+  "cases": [
+    {
+      "caseId": "dev-triage-001",
+      "askLogId": 1001,
+      "issueDescription": "The answer claimed the knowledge base had no guidance, but a current note contains it under different terminology.",
+      "expectedAnswer": "Explain the existing guidance.",
+      "goldRootCause": "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+      "secondTool": "searchKnowledge",
+      "returnedChunkIds": [501],
+      "answerGroundingEvaluationEligible": true,
+      "diagnosisSummary": "A current owned chunk answers the question but was absent from the recorded citations.",
+      "confidence": 0.94
+    },
+    {
+      "caseId": "dev-triage-002",
+      "askLogId": 1002,
+      "issueDescription": "The user expected deployment guidance, and targeted searches find no owned source covering it.",
+      "expectedAnswer": "Provide the missing deployment steps.",
+      "goldRootCause": "KNOWLEDGE_MISSING",
+      "secondTool": "searchKnowledge",
+      "returnedChunkIds": [],
+      "answerGroundingEvaluationEligible": true,
+      "diagnosisSummary": "The target log and current search provide no owned knowledge for the requested deployment topic.",
+      "confidence": 0.88
+    },
+    {
+      "caseId": "dev-triage-003",
+      "askLogId": 1003,
+      "issueDescription": "Two cited notes give incompatible timeout values and neither has an authoritative freshness marker.",
+      "expectedAnswer": "Use the correct timeout value.",
+      "goldRootCause": "KNOWLEDGE_CONFLICT_OR_STALE",
+      "secondTool": "getChunkEvidence",
+      "returnedChunkIds": [503, 504],
+      "answerGroundingEvaluationEligible": true,
+      "diagnosisSummary": "The inspected chunks conflict, so a human source decision is required.",
+      "confidence": 0.97
+    },
+    {
+      "caseId": "dev-triage-004",
+      "askLogId": 1004,
+      "issueDescription": "The v2 ask log cited the correct transaction rule, but the generated answer reversed it.",
+      "expectedAnswer": "State the transaction rule contained in the cited chunk.",
+      "goldRootCause": "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+      "secondTool": "getChunkEvidence",
+      "returnedChunkIds": [505],
+      "answerGroundingEvaluationEligible": true,
+      "diagnosisSummary": "Schema-v2 citations contain the correct evidence while the answer contradicts it.",
+      "confidence": 0.99
+    },
+    {
+      "caseId": "dev-triage-005",
+      "askLogId": 1005,
+      "issueDescription": "The supplied expected answer conflicts with a current owned API note.",
+      "expectedAnswer": "Claim that the deprecated endpoint is still required.",
+      "goldRootCause": "EXPECTED_ANSWER_WRONG",
+      "secondTool": "searchKnowledge",
+      "returnedChunkIds": [506],
+      "answerGroundingEvaluationEligible": true,
+      "diagnosisSummary": "Current owned evidence refutes the expected answer rather than the generated answer.",
+      "confidence": 0.93
+    },
+    {
+      "caseId": "dev-triage-006",
+      "askLogId": 1006,
+      "issueDescription": "The question requests a live external market price that the personal knowledge base does not claim to track.",
+      "expectedAnswer": "Return the current external market price.",
+      "goldRootCause": "OUT_OF_KNOWLEDGE_SCOPE",
+      "secondTool": "searchKnowledge",
+      "returnedChunkIds": [],
+      "answerGroundingEvaluationEligible": true,
+      "diagnosisSummary": "The request is for live external data outside the declared knowledge-base scope.",
+      "confidence": 0.98
+    }
+  ]
+}
