@@ -170,6 +170,55 @@ Authorization: Bearer {{authToken}}
 GET {{baseUrl}}/api/v1/ai/evaluation/retrieval
 Authorization: Bearer {{authToken}}
 
+### List Controlled Repair Cases
+GET {{baseUrl}}/api/v1/ai/repair/cases
+Authorization: Bearer {{authToken}}
+
+### Inspect One Controlled Repair Case
+GET {{baseUrl}}/api/v1/ai/repair/cases/{{badCaseId}}
+Authorization: Bearer {{authToken}}
+
+### Triage A Bad Case
+# Requires an explicitly configured real Agent model; the default local profile
+# does not make a paid model call accidentally.
+POST {{baseUrl}}/api/v1/ai/repair/cases/{{badCaseId}}/triage
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "idempotencyKey": "triage-demo-001"
+}
+
+### Review A Repair Proposal
+POST {{baseUrl}}/api/v1/ai/repair/proposals/{{proposalId}}/review
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "idempotencyKey": "review-demo-001"
+}
+
+### Human Approve A Repair Proposal
+POST {{baseUrl}}/api/v1/ai/repair/proposals/{{proposalId}}/decision
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "decision": "APPROVE",
+  "idempotencyKey": "approval-demo-001",
+  "editedDiffJson": null,
+  "comment": "Evidence and scope checked by the current user."
+}
+
+### Execute An Approved Repair Proposal
+POST {{baseUrl}}/api/v1/ai/repair/proposals/{{proposalId}}/execute
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "idempotencyKey": "execute-demo-001"
+}
+
 ### Backfill Chunk Embeddings
 # Safe local example: rebuild or repair the default local sparse vectors for the current user.
 # Do not switch this to remote-dense unless an external embedding provider is intentionally configured.

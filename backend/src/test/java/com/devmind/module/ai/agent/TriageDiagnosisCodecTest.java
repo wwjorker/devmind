@@ -77,4 +77,36 @@ class TriageDiagnosisCodecTest {
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("unsupported fields");
     }
+
+    @Test
+    void shouldParseAnOptionalMetadataProposalWithoutTreatingItAsAuthority() {
+        TriageDiagnosis diagnosis = codec.parse("""
+                {
+                  "rootCause": "knowledge_exists_not_retrieved",
+                  "summary": "A current document was missed because its metadata is too narrow.",
+                  "evidence": [{
+                    "toolCallId": "call-search",
+                    "chunkId": 44,
+                    "observation": "The current document contains the requested rule."
+                  }],
+                  "recommendedRoute": "retrieval_metadata_proposal",
+                  "confidence": 0.9,
+                  "proposal": {
+                    "type": "metadata_patch",
+                    "targetDocumentId": 7,
+                    "baseVersionNo": 3,
+                    "diff": {"tags":"spring,propagation"},
+                    "evidence": [{"kind":"DOCUMENT_VERSION","documentId":7}],
+                    "counterevidence": [],
+                    "impact": {"summary":"Improve alias recall"},
+                    "regressionPlan": {"targetQuestion":"How does propagation work?"}
+                  }
+                }
+                """);
+
+        assertThat(diagnosis.proposal()).isNotNull();
+        assertThat(diagnosis.proposal().type())
+                .isEqualTo(RepairProposalType.METADATA_PATCH);
+        assertThat(diagnosis.proposal().baseVersionNo()).isEqualTo(3);
+    }
 }

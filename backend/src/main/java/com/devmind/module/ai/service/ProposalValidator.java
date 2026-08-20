@@ -67,6 +67,7 @@ public class ProposalValidator {
 
         AiBadCase badCase = findOwnedBadCase(userId, badCaseId);
         if (!Set.of(
+                BadCaseStatus.NEW.name(),
                 BadCaseStatus.TRIAGED.name(),
                 BadCaseStatus.REVIEWED.name(),
                 BadCaseStatus.AWAITING_APPROVAL.name())

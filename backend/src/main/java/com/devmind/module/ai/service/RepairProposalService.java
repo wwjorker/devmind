@@ -90,6 +90,11 @@ public class RepairProposalService {
         return proposal;
     }
 
+    public RepairProposal findOwnedByIdempotencyKey(Long userId, String idempotencyKey) {
+        String safeKey = requireIdempotencyKey(idempotencyKey);
+        return findByIdempotencyKey(userId, safeKey);
+    }
+
     @Transactional
     public RepairProposal revise(Long userId,
                                  Long proposalId,

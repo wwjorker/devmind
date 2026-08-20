@@ -10,8 +10,17 @@ public record TriageDiagnosis(
         String summary,
         List<TriageEvidence> evidence,
         TriageRoute recommendedRoute,
-        double confidence
+        double confidence,
+        TriageProposalCandidate proposal
 ) {
+
+    public TriageDiagnosis(TriageRootCause rootCause,
+                           String summary,
+                           List<TriageEvidence> evidence,
+                           TriageRoute recommendedRoute,
+                           double confidence) {
+        this(rootCause, summary, evidence, recommendedRoute, confidence, null);
+    }
 
     public TriageDiagnosis {
         rootCause = Objects.requireNonNull(rootCause, "rootCause must not be null");
@@ -29,6 +38,11 @@ public record TriageDiagnosis(
         }
         if (!Double.isFinite(confidence) || confidence < 0 || confidence > 1) {
             throw new IllegalArgumentException("triage confidence must be between 0 and 1");
+        }
+        if (proposal != null
+                && rootCause != TriageRootCause.KNOWLEDGE_EXISTS_NOT_RETRIEVED) {
+            throw new IllegalArgumentException(
+                    "only a retrieval miss may include a metadata proposal");
         }
     }
 }

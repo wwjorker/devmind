@@ -87,8 +87,19 @@ public class ProposalReviewService {
                 proposal.getRegressionPlanJson(),
                 currentVersionJson(userId, proposal),
                 proposal.getRevisionNo());
-        ReviewerDecision decision = reviewerAgent.review(context, modelClient, input);
-        return reviewPersistenceService.saveDecision(userId, proposalId, decision);
+        try {
+            ReviewerDecision decision = reviewerAgent.reviewForWorkflow(
+                    context, modelClient, input);
+            return reviewPersistenceService.saveDecisionAndCompleteRun(
+                    userId, proposalId, context.runId(), decision);
+        } catch (RuntimeException ex) {
+            runPersistenceService.failRunIfActive(
+                    userId,
+                    context.runId(),
+                    "PROPOSAL_REVIEW_WORKFLOW_FAILED",
+                    "proposal review workflow failed");
+            throw ex;
+        }
     }
 
     private String currentVersionJson(Long userId, RepairProposal proposal) {

@@ -198,6 +198,13 @@ POST   /api/v1/ai/ask-logs/{logId}/feedback
 GET    /api/v1/ai/ask-feedback?helpful=&askLogId=
 GET    /api/v1/ai/evaluation/summary
 GET    /api/v1/ai/evaluation/dataset
+
+GET    /api/v1/ai/repair/cases
+GET    /api/v1/ai/repair/cases/{badCaseId}
+POST   /api/v1/ai/repair/cases/{badCaseId}/triage
+POST   /api/v1/ai/repair/proposals/{proposalId}/review
+POST   /api/v1/ai/repair/proposals/{proposalId}/decision
+POST   /api/v1/ai/repair/proposals/{proposalId}/execute
 ```
 
 ## 可观测性与评估
@@ -339,8 +346,9 @@ summary    optional
 
 V6 migration 新增 `agent_run` 与 `agent_step`，用于持久化实验臂、预算、
 累计用量、有序模型/工具步骤和终态；V7 为工具步骤补充 Provider
-`tool_call_id`，使返回消息和审计步骤可以稳定关联。目前尚未开放 Agent API，
-也没有知识库写工具。
+`tool_call_id`，使返回消息和审计步骤可以稳定关联。Phase C 已开放受认证保护的
+repair workflow API，但模型仍没有通用知识库写工具；只有 Java 白名单执行器能在
+人工批准后应用 metadata patch。
 
 步骤预留和完成分别使用短事务；外部模型调用在事务外执行。步数、模型调用
 次数和调用前 deadline 会在请求发出前阻断；总 token 以 Provider 返回的
@@ -361,7 +369,7 @@ Triage 输出使用固定六类根因和一一对应的 route，并拒绝未知�
 重复 call ID、目标 ask log 串线，以及使用旧 Prompt Schema 判定“正确证据但
 回答错误”，都会使 run 明确失败。`evaluation/v2-development-bad-cases-v0.1.json`
 的六条 label-visible case 已通过 scripted 编排测试；这只证明协议和控制流可跑，
-不代表真实模型准确率。Phase C 才会加入 bad-case intake、业务状态机和提案。
+不代表真实模型准确率。Phase C 已加入 bad-case intake、业务状态机和受控提案。
 预注册的 6 次模型调用、12 次工具调用、24,000 token 和 120 秒限制均有独立
 持久计数或终态检查；已完成但造成 token 越界的模型调用保留审计记录，同时 run
 立即进入 `BUDGET_EXHAUSTED`，不能再被标为成功。
@@ -395,6 +403,30 @@ HITL 内部契约支持 `APPROVE / APPROVE_WITH_EDIT / REJECT`；人工编辑后
 必须重新通过同一套租户、证据、字段白名单和 base-version 校验。审批请求
 使用租户级幂等键；拒绝必须记录原因。review-only `DOCUMENT_DRAFT` 不能进入
 执行状态。
+
+受控执行把文档 metadata patch、版本快照、chunk 和 MySQL 向量源数据写入保持在
+短事务中；随后才在事务外重建 embedding/pgvector serving index 并执行目标问题
+Hit@3 回归。目标回归或派生索引失败时，执行器按变更前版本补偿 MySQL 源数据，
+再重建 serving index；中断恢复使用幂等执行键继续未完成的执行或补偿。Triage
+诊断、proposal/route 与 AgentRun 成功事实同事务提交，Reviewer 决策与对应
+AgentRun 也同事务提交，但所有远程模型调用始终处于事务外。
+
+前端“受控修复”页与 `/api/v1/ai/repair/**` 提供 case 列表、诊断、proposal diff、
+正反证据、Reviewer findings、人工决定和执行结果。所有查询与动作都从认证主体
+注入 `userId`，请求不能指定其他租户。当前公开动作接口均要求客户端幂等键：
+
+```text
+GET  /api/v1/ai/repair/cases
+GET  /api/v1/ai/repair/cases/{badCaseId}
+POST /api/v1/ai/repair/cases/{badCaseId}/triage
+POST /api/v1/ai/repair/proposals/{proposalId}/review
+POST /api/v1/ai/repair/proposals/{proposalId}/decision
+POST /api/v1/ai/repair/proposals/{proposalId}/execute
+```
+
+冻结的 24 条六类 bad case、24 条 Reviewer challenge 和四臂 manifest 在
+`evaluation/`。它们只建立后续可比评测契约；尚未执行真实 Provider 评分，因此
+不宣称 Multi-Agent 或 Reviewer 已带来统计显著提升。
 
 ## 本地运行
 

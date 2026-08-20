@@ -313,6 +313,19 @@ public class AgentRunPersistenceService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public AgentRunStatus markSucceeded(Long userId, Long runId, String resultSummary) {
+        return markSucceededInternal(userId, runId, resultSummary);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public AgentRunStatus markSucceededInCurrentTransaction(Long userId,
+                                                            Long runId,
+                                                            String resultSummary) {
+        return markSucceededInternal(userId, runId, resultSummary);
+    }
+
+    private AgentRunStatus markSucceededInternal(Long userId,
+                                                 Long runId,
+                                                 String resultSummary) {
         AgentRun run = findOwnedForUpdate(userId, runId);
         AgentRunStatus current = AgentRunStatus.valueOf(run.getStatus());
         if (current != AgentRunStatus.RUNNING) {

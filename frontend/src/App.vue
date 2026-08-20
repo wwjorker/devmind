@@ -17,6 +17,8 @@ import {
   type PageResult,
   type RagEvaluationDataset,
   type RagRetrievalEvaluation,
+  type RepairCaseDetail,
+  type RepairCaseSummary,
   type UserProfile
 } from './api';
 import { icons } from './icons';
@@ -24,7 +26,7 @@ import { icons } from './icons';
 const token = ref(getToken() || '');
 const user = ref<UserProfile | null>(null);
 const apiTargetLabel = import.meta.env.VITE_API_TARGET || 'http://localhost:8081';
-type AppView = 'documents' | 'ask' | 'evaluation' | 'logs';
+type AppView = 'documents' | 'ask' | 'repairs' | 'evaluation' | 'logs';
 const activeView = ref<AppView>('ask');
 const documents = ref<DocumentItem[]>([]);
 const archivedDocuments = ref<DocumentItem[]>([]);
@@ -48,6 +50,9 @@ const evaluation = ref<EvaluationSummary | null>(null);
 const evaluationDataset = ref<RagEvaluationDataset | null>(null);
 const retrievalEvaluation = ref<RagRetrievalEvaluation | null>(null);
 const lastEvaluationRunAt = ref<string | null>(null);
+const repairCases = ref<RepairCaseSummary[]>([]);
+const selectedRepairCase = ref<RepairCaseDetail | null>(null);
+const proposalEditJson = ref('');
 const askElapsedSeconds = ref(0);
 let askTimer: number | null = null;
 let sessionGeneration = 0;
@@ -65,6 +70,7 @@ const loading = reactive({
   askLogs: false,
   feedback: false,
   evaluation: false,
+  repairs: false,
   logDetail: false
 });
 const toast = ref('');
@@ -252,7 +258,95 @@ function addSuggestedTag(target: 'create' | 'import' | 'edit', tag: string) {
 
 function setActiveView(view: AppView) {
   activeView.value = view;
+  if (view === 'repairs') {
+    void loadRepairCases();
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function prettyJson(value: string | null | undefined) {
+  if (!value) return '—';
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
+}
+
+function workflowKey(prefix: string) {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+
+async function loadRepairCases() {
+  if (!isAuthed.value || loading.repairs) return;
+  loading.repairs = true;
+  try {
+    repairCases.value = await apiRequest<RepairCaseSummary[]>('/api/v1/ai/repair/cases');
+    if (selectedRepairCase.value) {
+      await openRepairCase(selectedRepairCase.value.id);
+    }
+  } catch (err) {
+    setError(friendlyError(err, '修复工单加载失败。'));
+  } finally {
+    loading.repairs = false;
+  }
+}
+
+async function openRepairCase(id: number) {
+  selectedRepairCase.value = await apiRequest<RepairCaseDetail>(`/api/v1/ai/repair/cases/${id}`);
+  proposalEditJson.value = selectedRepairCase.value.proposals[0]?.approvedDiffJson
+    || selectedRepairCase.value.proposals[0]?.diffJson
+    || '';
+}
+
+async function runRepairAction(path: string, body: Record<string, unknown>) {
+  if (!selectedRepairCase.value || loading.repairs) return;
+  loading.repairs = true;
+  error.value = '';
+  try {
+    await apiRequest(path, { method: 'POST', body: JSON.stringify(body) });
+    await openRepairCase(selectedRepairCase.value.id);
+    repairCases.value = await apiRequest<RepairCaseSummary[]>('/api/v1/ai/repair/cases');
+    showToast('修复流程状态已更新');
+  } catch (err) {
+    setError(friendlyError(err, '修复流程操作失败。'));
+  } finally {
+    loading.repairs = false;
+  }
+}
+
+function triageRepairCase() {
+  if (!selectedRepairCase.value) return;
+  return runRepairAction(
+    `/api/v1/ai/repair/cases/${selectedRepairCase.value.id}/triage`,
+    { idempotencyKey: workflowKey('triage') }
+  );
+}
+
+function reviewProposal(proposalId: number) {
+  return runRepairAction(
+    `/api/v1/ai/repair/proposals/${proposalId}/review`,
+    { idempotencyKey: workflowKey('review') }
+  );
+}
+
+function decideProposal(proposalId: number, decision: 'APPROVE' | 'APPROVE_WITH_EDIT' | 'REJECT') {
+  return runRepairAction(
+    `/api/v1/ai/repair/proposals/${proposalId}/decision`,
+    {
+      decision,
+      idempotencyKey: workflowKey('decision'),
+      editedDiffJson: decision === 'APPROVE_WITH_EDIT' ? proposalEditJson.value : null,
+      comment: decision === 'REJECT' ? '知识库维护者拒绝此提案。' : '知识库维护者已检查 diff 与来源。'
+    }
+  );
+}
+
+function executeProposal(proposalId: number) {
+  return runRepairAction(
+    `/api/v1/ai/repair/proposals/${proposalId}/execute`,
+    { idempotencyKey: workflowKey('execute') }
+  );
 }
 
 async function checkBackendHealth() {
@@ -361,6 +455,9 @@ function clearLocalSession() {
   evaluation.value = null;
   evaluationDataset.value = null;
   retrievalEvaluation.value = null;
+  repairCases.value = [];
+  selectedRepairCase.value = null;
+  proposalEditJson.value = '';
   lastEvaluationRunAt.value = null;
   loading.auth = false;
   loading.initialData = false;
@@ -372,6 +469,7 @@ function clearLocalSession() {
   loading.importDocument = false;
   loading.askLogs = false;
   loading.evaluation = false;
+  loading.repairs = false;
   loading.ask = false;
   loading.feedback = false;
   loading.logDetail = false;
@@ -400,6 +498,7 @@ async function loadInitialData() {
       loadDocuments(session.generation, session.signal),
       loadArchivedDocuments(session.generation, session.signal),
       loadEvaluationOverview(session.generation, session.signal),
+      loadRepairCases(),
       loadAskLogs(true, session.generation, session.signal)
     ]);
   } finally {
@@ -965,6 +1064,10 @@ onUnmounted(() => {
           <span v-html="icons.chart"></span>
           评估看板
         </button>
+        <button aria-label="受控修复" title="受控修复" :class="{ active: activeView === 'repairs' }" @click="setActiveView('repairs')">
+          <span v-html="icons.documents"></span>
+          受控修复
+        </button>
         <button aria-label="问答日志" title="问答日志" :class="{ active: activeView === 'logs' }" @click="setActiveView('logs')">
           <span v-html="icons.ask"></span>
           问答日志
@@ -1392,6 +1495,113 @@ onUnmounted(() => {
 
             </div>
             <div v-else class="empty-answer">提出一个问题后，这里会展示回答、召回来源、token 用量和反馈控件。</div>
+          </div>
+        </section>
+
+        <section v-show="activeView === 'repairs'" class="panel repair-panel">
+          <div class="panel-header">
+            <div>
+              <h2>受控修复</h2>
+              <p>查看 bad case、证据、Reviewer 结论与实际 diff；写入必须人工批准。</p>
+            </div>
+            <button class="secondary-button" :disabled="loading.repairs" @click="loadRepairCases()">
+              {{ loading.repairs ? '处理中...' : '刷新工单' }}
+            </button>
+          </div>
+
+          <div class="repair-layout">
+            <div class="repair-case-list">
+              <button
+                v-for="item in repairCases"
+                :key="item.id"
+                type="button"
+                :class="['repair-case-button', { active: selectedRepairCase?.id === item.id }]"
+                @click="openRepairCase(item.id)"
+              >
+                <strong>#{{ item.id }} · {{ item.rootCause || '待诊断' }}</strong>
+                <span>{{ item.sourceRef }}</span>
+                <small>{{ item.status }}</small>
+              </button>
+              <div v-if="!repairCases.length" class="empty-state compact">
+                暂无 bad case。先在 AI 问答中保存一条“无帮助”反馈。
+              </div>
+            </div>
+
+            <div v-if="selectedRepairCase" class="repair-detail">
+              <div class="repair-detail-heading">
+                <div>
+                  <span class="state-pill ready">{{ selectedRepairCase.status }}</span>
+                  <h3>Bad case #{{ selectedRepairCase.id }}</h3>
+                  <p>{{ selectedRepairCase.rootCause || '等待 Evidence Triage 调查' }}</p>
+                </div>
+                <button
+                  v-if="selectedRepairCase.status === 'NEW'"
+                  class="primary-button"
+                  :disabled="loading.repairs"
+                  @click="triageRepairCase()"
+                >运行 Triage</button>
+              </div>
+
+              <details open class="repair-evidence-card">
+                <summary>问答快照与诊断</summary>
+                <pre>{{ prettyJson(selectedRepairCase.askSnapshotJson) }}</pre>
+                <pre v-if="selectedRepairCase.diagnosisJson">{{ prettyJson(selectedRepairCase.diagnosisJson) }}</pre>
+              </details>
+
+              <article v-for="proposal in selectedRepairCase.proposals" :key="proposal.id" class="proposal-card">
+                <div class="repair-detail-heading">
+                  <div>
+                    <span class="state-pill ready">{{ proposal.status }}</span>
+                    <h3>Proposal #{{ proposal.id }} · {{ proposal.proposalType }}</h3>
+                    <p>文档 #{{ proposal.targetDocumentId }} · base version {{ proposal.baseVersionNo }} · revision {{ proposal.revisionNo }}</p>
+                  </div>
+                  <button
+                    v-if="proposal.status === 'DRAFT'"
+                    class="secondary-button"
+                    :disabled="loading.repairs"
+                    @click="reviewProposal(proposal.id)"
+                  >独立 Reviewer</button>
+                </div>
+
+                <div class="repair-grid">
+                  <section><h4>提议 diff</h4><pre>{{ prettyJson(proposal.diffJson) }}</pre></section>
+                  <section><h4>来源证据</h4><pre>{{ prettyJson(proposal.evidenceJson) }}</pre></section>
+                  <section><h4>反证</h4><pre>{{ prettyJson(proposal.counterevidenceJson) }}</pre></section>
+                  <section><h4>影响与回归计划</h4><pre>{{ prettyJson(proposal.impactJson) }}\n{{ prettyJson(proposal.regressionPlanJson) }}</pre></section>
+                </div>
+
+                <details v-if="proposal.reviewerFindingsJson" class="repair-evidence-card">
+                  <summary>Reviewer · {{ proposal.reviewerVerdict }}</summary>
+                  <pre>{{ prettyJson(proposal.reviewerFindingsJson) }}</pre>
+                </details>
+
+                <div v-if="proposal.status === 'AWAITING_APPROVAL'" class="approval-box">
+                  <label>
+                    人工编辑后的 JSON diff
+                    <textarea v-model="proposalEditJson" rows="5"></textarea>
+                  </label>
+                  <div class="feedback-actions">
+                    <button class="primary-button" :disabled="loading.repairs" @click="decideProposal(proposal.id, 'APPROVE')">批准原 diff</button>
+                    <button class="secondary-button" :disabled="loading.repairs" @click="decideProposal(proposal.id, 'APPROVE_WITH_EDIT')">编辑后批准</button>
+                    <button class="danger-button" :disabled="loading.repairs" @click="decideProposal(proposal.id, 'REJECT')">拒绝</button>
+                  </div>
+                </div>
+
+                <button
+                  v-if="proposal.status === 'APPROVED'"
+                  class="primary-button"
+                  :disabled="loading.repairs"
+                  @click="executeProposal(proposal.id)"
+                >执行版本化发布、索引重建与目标复测</button>
+
+                <details v-if="proposal.executionResultJson || proposal.errorMessage" class="repair-evidence-card">
+                  <summary>执行与回归结果</summary>
+                  <pre>{{ prettyJson(proposal.executionResultJson) }}</pre>
+                  <p v-if="proposal.errorMessage" class="error-text">{{ proposal.errorCode }} · {{ proposal.errorMessage }}</p>
+                </details>
+              </article>
+            </div>
+            <div v-else class="empty-state">选择一个 bad case 查看受控修复详情。</div>
           </div>
         </section>
 

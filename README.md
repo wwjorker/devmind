@@ -8,8 +8,8 @@ DevMind 是一个面向个人开发学习、项目复盘和知识沉淀的 AI �
 
 这是一个前后端分离的完整 monorepo 项目：
 
-- `backend`：Spring Boot 后端，已实现认证、知识文档、检索、AI 问答、日志、反馈和评估接口。
-- `frontend`：Vue 3 前端，已实现中文工作台、文档创建/编辑/归档与导入、AI 问答、召回上下文、日志分页详情和评估看板。
+- `backend`：Spring Boot 后端，已实现认证、知识文档、检索、AI 问答、日志、反馈、评估和受控 bad-case 修复接口。
+- `frontend`：Vue 3 前端，已实现中文工作台、文档管理、AI 问答、日志与评估看板，以及提案 diff、Reviewer 意见和人工审批界面。
 - `CI`：GitHub Actions 已配置后端测试和前端构建。
 
 已验证：
@@ -21,6 +21,31 @@ GitHub Actions: main 分支 CI 通过
 ```
 
 当前版本已实现真实 dense embedding 接入（OpenAI 兼容 API，可插拔 provider）、rerank 精排（离线评估）、多策略检索评估，以及可选的 pgvector 向量存储：dense 向量双写 MySQL JSON（源数据，兼对照组）与 Postgres + pgvector HNSW（serving 索引，`docker compose` 一键启动，默认关闭）。仍不宣称实现 rerank 线上问答链路、PDF/OCR 或生产级部署。默认配置全本地运行、零外部调用，不配置 API key 不产生任何费用。
+
+## Multi-Agent 受控修复闭环
+
+Phase C 把 bad case 从一条反馈记录推进为可审计的受控修复流程：Evidence
+Triage 只读历史问答与知识证据并归因，Change Reviewer 独立检查提案的证据、
+反证、影响范围和回归计划，Java 服务负责 schema 校验、状态迁移、幂等、版本冲突
+与最终执行。Reviewer 通过不等于执行；任何写入都必须经过当前用户的
+`APPROVE / APPROVE_WITH_EDIT / REJECT` 决策。
+
+```text
+bad case -> triage -> metadata proposal -> independent review
+         -> human approval -> short MySQL write transaction
+         -> rebuild derived vectors -> target regression
+         -> applied or compensating rollback
+```
+
+首版有意只执行白名单内的 metadata patch；需要改正文的 `DOCUMENT_DRAFT`
+只能作为人工审阅材料，不能自动发布。MySQL 中的文档、不可变版本、chunk 和向量
+源数据是可恢复事实，pgvector 只是可重建 serving index。embedding、模型调用和
+pgvector 同步都不在数据库事务中。执行失败会保留明确失败阶段；源数据已变更但
+索引或目标回归失败时，系统按执行前版本补偿回滚，并允许幂等恢复中断的补偿。
+
+这套闭环验证的是个人知识库中可复现的团队知识维护模式，不宣称已经成为生产级
+企业自治 Agent 平台。四臂对照的冻结数据集和预算协议已经落库，但尚未完成真实
+Provider 评分，因此 README 不报告 Multi-Agent 准确率或 Reviewer 提升结论。
 
 ## 项目亮点
 

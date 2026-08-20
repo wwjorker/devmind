@@ -18,9 +18,12 @@ import java.util.Set;
 public class TriageDiagnosisCodec {
 
     private static final Set<String> ROOT_FIELDS = Set.of(
-            "rootCause", "summary", "evidence", "recommendedRoute", "confidence");
+            "rootCause", "summary", "evidence", "recommendedRoute", "confidence", "proposal");
     private static final Set<String> EVIDENCE_FIELDS = Set.of(
             "toolCallId", "askLogId", "chunkId", "observation");
+    private static final Set<String> PROPOSAL_FIELDS = Set.of(
+            "type", "targetDocumentId", "baseVersionNo", "diff", "evidence",
+            "counterevidence", "impact", "regressionPlan");
 
     private final ObjectMapper objectMapper;
     private final JsonNode schema;
@@ -76,7 +79,12 @@ public class TriageDiagnosisCodec {
         }
         try {
             return new TriageDiagnosis(
-                    rootCause, summary, evidence, route, confidenceNode.doubleValue());
+                    rootCause,
+                    summary,
+                    evidence,
+                    route,
+                    confidenceNode.doubleValue(),
+                    optionalProposal(root.get("proposal")));
         } catch (IllegalArgumentException ex) {
             throw badOutput(ex.getMessage());
         }
@@ -111,10 +119,68 @@ public class TriageDiagnosisCodec {
         }
         properties.putObject("confidence")
                 .put("type", "number").put("minimum", 0).put("maximum", 1);
+        ObjectNode proposal = properties.putObject("proposal");
+        proposal.put("type", "object").put("additionalProperties", false);
+        ObjectNode proposalProperties = proposal.putObject("properties");
+        proposalProperties.putObject("type")
+                .put("type", "string").putArray("enum").add("metadata_patch");
+        proposalProperties.putObject("targetDocumentId")
+                .put("type", "integer").put("minimum", 1);
+        proposalProperties.putObject("baseVersionNo")
+                .put("type", "integer").put("minimum", 1);
+        for (String field : List.of(
+                "diff", "impact", "regressionPlan")) {
+            proposalProperties.putObject(field).put("type", "object");
+        }
+        for (String field : List.of("evidence", "counterevidence")) {
+            proposalProperties.putObject(field).put("type", "array");
+        }
+        proposal.putArray("required")
+                .add("type").add("targetDocumentId").add("baseVersionNo")
+                .add("diff").add("evidence").add("counterevidence")
+                .add("impact").add("regressionPlan");
         schema.putArray("required")
                 .add("rootCause").add("summary").add("evidence")
                 .add("recommendedRoute").add("confidence");
         return schema;
+    }
+
+    private TriageProposalCandidate optionalProposal(JsonNode node) {
+        if (node == null || node.isNull()) return null;
+        requireObjectWithOnly(node, PROPOSAL_FIELDS, "triage proposal");
+        try {
+            return new TriageProposalCandidate(
+                    RepairProposalType.fromWireValue(requiredText(node, "type", 64)),
+                    requiredPositiveLong(node, "targetDocumentId"),
+                    requiredPositiveInt(node, "baseVersionNo"),
+                    requiredJson(node, "diff", true),
+                    requiredJson(node, "evidence", false),
+                    requiredJson(node, "counterevidence", false),
+                    requiredJson(node, "impact", true),
+                    requiredJson(node, "regressionPlan", true));
+        } catch (IllegalArgumentException ex) {
+            throw badOutput(ex.getMessage());
+        }
+    }
+
+    private static String requiredJson(JsonNode node, String field, boolean object) {
+        JsonNode value = node.get(field);
+        if (value == null || (object ? !value.isObject() : !value.isArray())) {
+            throw badOutput(field + " has an invalid JSON shape");
+        }
+        return value.toString();
+    }
+
+    private static Long requiredPositiveLong(JsonNode node, String field) {
+        Long value = optionalPositiveLong(node, field);
+        if (value == null) throw badOutput(field + " is required");
+        return value;
+    }
+
+    private static Integer requiredPositiveInt(JsonNode node, String field) {
+        Long value = requiredPositiveLong(node, field);
+        if (value > Integer.MAX_VALUE) throw badOutput(field + " is too large");
+        return value.intValue();
     }
 
     private static void requireObjectWithOnly(JsonNode node,

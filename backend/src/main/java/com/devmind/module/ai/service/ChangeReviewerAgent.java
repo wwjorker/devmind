@@ -74,6 +74,19 @@ public class ChangeReviewerAgent {
     public ReviewerDecision review(AgentToolContext context,
                                    AgentModelClient modelClient,
                                    ChangeReviewInput input) {
+        return review(context, modelClient, input, true);
+    }
+
+    ReviewerDecision reviewForWorkflow(AgentToolContext context,
+                                       AgentModelClient modelClient,
+                                       ChangeReviewInput input) {
+        return review(context, modelClient, input, false);
+    }
+
+    private ReviewerDecision review(AgentToolContext context,
+                                    AgentModelClient modelClient,
+                                    ChangeReviewInput input,
+                                    boolean completeRun) {
         Objects.requireNonNull(context, "context must not be null");
         Objects.requireNonNull(modelClient, "modelClient must not be null");
         Objects.requireNonNull(input, "input must not be null");
@@ -115,11 +128,13 @@ public class ChangeReviewerAgent {
                 }
                 ReviewerDecision decision = decisionCodec.parse(assistant.content());
                 validateFindings(decision, trace);
-                AgentRunStatus status = persistenceService.markSucceeded(
-                        context.userId(), context.runId(), resultSummary(decision));
-                if (status != AgentRunStatus.SUCCEEDED) {
-                    throw new BizException(ResultCode.CONFLICT,
-                            "agent run could not be completed: " + status);
+                if (completeRun) {
+                    AgentRunStatus status = persistenceService.markSucceeded(
+                            context.userId(), context.runId(), resultSummary(decision));
+                    if (status != AgentRunStatus.SUCCEEDED) {
+                        throw new BizException(ResultCode.CONFLICT,
+                                "agent run could not be completed: " + status);
+                    }
                 }
                 return decision;
             }

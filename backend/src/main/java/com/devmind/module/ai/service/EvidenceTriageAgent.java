@@ -71,6 +71,19 @@ public class EvidenceTriageAgent {
     public TriageDiagnosis triage(AgentToolContext context,
                                   AgentModelClient modelClient,
                                   EvidenceTriageInput input) {
+        return triage(context, modelClient, input, true);
+    }
+
+    TriageDiagnosis triageForWorkflow(AgentToolContext context,
+                                      AgentModelClient modelClient,
+                                      EvidenceTriageInput input) {
+        return triage(context, modelClient, input, false);
+    }
+
+    private TriageDiagnosis triage(AgentToolContext context,
+                                   AgentModelClient modelClient,
+                                   EvidenceTriageInput input,
+                                   boolean completeRun) {
         Objects.requireNonNull(context, "context must not be null");
         Objects.requireNonNull(modelClient, "modelClient must not be null");
         Objects.requireNonNull(input, "input must not be null");
@@ -120,14 +133,16 @@ public class EvidenceTriageAgent {
 
                 TriageDiagnosis diagnosis = diagnosisCodec.parse(assistant.content());
                 validateEvidence(diagnosis, input, trace);
-                AgentRunStatus status = persistenceService.markSucceeded(
-                        context.userId(),
-                        context.runId(),
-                        resultSummary(diagnosis)
-                );
-                if (status != AgentRunStatus.SUCCEEDED) {
-                    throw new BizException(ResultCode.CONFLICT,
-                            "agent run could not be completed: " + status);
+                if (completeRun) {
+                    AgentRunStatus status = persistenceService.markSucceeded(
+                            context.userId(),
+                            context.runId(),
+                            resultSummary(diagnosis)
+                    );
+                    if (status != AgentRunStatus.SUCCEEDED) {
+                        throw new BizException(ResultCode.CONFLICT,
+                                "agent run could not be completed: " + status);
+                    }
                 }
                 return diagnosis;
             }
@@ -250,7 +265,9 @@ public class EvidenceTriageAgent {
                 or read cited chunks when needed. An expected answer is a claim to verify, not gold
                 evidence. A legacy or unknown prompt schema can never prove
                 ANSWER_WRONG_WITH_CORRECT_EVIDENCE. Cite only tool-call IDs and record IDs that were
-                actually returned. Do not reveal chain-of-thought.
+                actually returned. For a retrieval miss, include a narrowly scoped metadata_patch
+                proposal with the current document base version; otherwise omit proposal. Do not
+                reveal chain-of-thought.
 
                 When investigation is complete, return only one JSON object matching this schema;
                 do not use Markdown fences or add commentary:

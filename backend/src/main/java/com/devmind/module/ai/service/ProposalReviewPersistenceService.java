@@ -3,6 +3,7 @@ package com.devmind.module.ai.service;
 import com.devmind.common.api.ResultCode;
 import com.devmind.common.exception.BizException;
 import com.devmind.module.ai.agent.BadCaseStatus;
+import com.devmind.module.ai.agent.AgentRunStatus;
 import com.devmind.module.ai.agent.RepairProposalStatus;
 import com.devmind.module.ai.agent.ReviewerDecision;
 import com.devmind.module.ai.agent.ReviewerVerdict;
@@ -19,15 +20,18 @@ public class ProposalReviewPersistenceService {
     private final RepairProposalMapper proposalMapper;
     private final RepairProposalService proposalService;
     private final BadCaseStateService badCaseStateService;
+    private final AgentRunPersistenceService runPersistenceService;
     private final ObjectMapper objectMapper;
 
     public ProposalReviewPersistenceService(RepairProposalMapper proposalMapper,
                                             RepairProposalService proposalService,
                                             BadCaseStateService badCaseStateService,
+                                            AgentRunPersistenceService runPersistenceService,
                                             ObjectMapper objectMapper) {
         this.proposalMapper = proposalMapper;
         this.proposalService = proposalService;
         this.badCaseStateService = badCaseStateService;
+        this.runPersistenceService = runPersistenceService;
         this.objectMapper = objectMapper;
     }
 
@@ -66,6 +70,25 @@ public class ProposalReviewPersistenceService {
                     BadCaseStatus.REVIEWED, BadCaseStatus.NO_ACTION);
         }
         return proposal;
+    }
+
+    @Transactional
+    public RepairProposal saveDecisionAndCompleteRun(Long userId,
+                                                     Long proposalId,
+                                                     Long runId,
+                                                     ReviewerDecision decision) {
+        RepairProposal reviewed = saveDecision(userId, proposalId, decision);
+        AgentRunStatus status = runPersistenceService.markSucceededInCurrentTransaction(
+                userId,
+                runId,
+                "verdict=" + decision.verdict().name()
+                        + ";findings=" + decision.findings().size()
+                        + ";proposalStatus=" + reviewed.getStatus());
+        if (status != AgentRunStatus.SUCCEEDED) {
+            throw new BizException(ResultCode.CONFLICT,
+                    "review run could not be completed: " + status);
+        }
+        return reviewed;
     }
 
     private void updateOrThrowConflict(RepairProposal proposal) {
