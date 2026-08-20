@@ -185,6 +185,10 @@ backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql
 4. 查看回答、召回来源、召回片段、Prompt Preview 和 token 用量。
 5. 提问：`Kafka consumer rebalance 为什么会变慢？`，展示无上下文兜底。
 6. 打开评估看板，查看标准问题覆盖率、Hit@3、MRR 和问答日志。
+7. 打开“受控修复”，先查看 `CONFLICT_PENDING` 的只读来源冲突，再批准并执行预置的低风险 metadata patch。
+
+完整的计时话术、fixture 边界和失败降级路径见
+[5 分钟 Multi-Agent v2 演示脚本](docs/guides/multi-agent-v2-5-minute-demo.md)。
 
 ## 核心功能
 
@@ -250,6 +254,8 @@ DevMind 是一个面向开发学习场景的 AI 知识库系统，重点展示 J
 - 架构说明：[backend/docs/architecture.md](backend/docs/architecture.md)
 - API 调试：[backend/docs/api/devmind-api.http](backend/docs/api/devmind-api.http)
 - 部署与运维边界：[docs/operations/production-readiness.md](docs/operations/production-readiness.md)
+- 5 分钟演示：[docs/guides/multi-agent-v2-5-minute-demo.md](docs/guides/multi-agent-v2-5-minute-demo.md)
+- Multi-Agent v2 面试手册：[docs/interview/multi-agent-v2-handbook.md](docs/interview/multi-agent-v2-handbook.md)
 
 ## CI
 

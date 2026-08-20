@@ -23,6 +23,7 @@ import com.devmind.module.ai.service.ProposalApprovalService;
 import com.devmind.module.ai.service.ProposalReviewPersistenceService;
 import com.devmind.module.ai.service.RecoveryService;
 import com.devmind.module.ai.service.RepairDocumentMutationService;
+import com.devmind.module.ai.service.RepairExecutor;
 import com.devmind.module.ai.service.RepairExecutionStateService;
 import com.devmind.module.ai.service.RepairProposalDraft;
 import com.devmind.module.ai.service.RepairProposalService;
@@ -43,7 +44,9 @@ import com.devmind.module.user.mapper.UserAccountMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
@@ -76,7 +79,7 @@ class DevMindMySqlIntegrationTest {
 
     @Container
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
-            .withDatabaseName("devmind_integration")
+            .withDatabaseName("devmind")
             .withUsername("devmind")
             .withPassword("devmind");
 
@@ -102,6 +105,7 @@ class DevMindMySqlIntegrationTest {
     private final RepairExecutionStateService executionStateService;
     private final RepairDocumentMutationService mutationService;
     private final RecoveryService recoveryService;
+    private final RepairExecutor repairExecutor;
     private final KnowledgeDocumentVersionService versionService;
     private final JdbcTemplate jdbcTemplate;
 
@@ -120,6 +124,7 @@ class DevMindMySqlIntegrationTest {
                                 RepairExecutionStateService executionStateService,
                                 RepairDocumentMutationService mutationService,
                                 RecoveryService recoveryService,
+                                RepairExecutor repairExecutor,
                                 KnowledgeDocumentVersionService versionService,
                                 JdbcTemplate jdbcTemplate) {
         this.userAccountMapper = userAccountMapper;
@@ -136,6 +141,7 @@ class DevMindMySqlIntegrationTest {
         this.executionStateService = executionStateService;
         this.mutationService = mutationService;
         this.recoveryService = recoveryService;
+        this.repairExecutor = repairExecutor;
         this.versionService = versionService;
         this.jdbcTemplate = jdbcTemplate;
     }
@@ -270,6 +276,54 @@ class DevMindMySqlIntegrationTest {
                 .isEqualTo(BadCaseStatus.ROLLED_BACK.name());
     }
 
+    @Test
+    void resetsAndSeedsTheOfflineV2DemoOnRealMySql() {
+        UserAccount demo = new UserAccount();
+        demo.setUsername("testuser");
+        demo.setPasswordHash("$2a$10$integration-test-password-hash");
+        demo.setNickname("Demo User");
+        demo.setEmail("demo-integration@example.com");
+        demo.setStatus(1);
+        userAccountMapper.insert(demo);
+
+        runDemoSeed();
+        runDemoSeed();
+
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM knowledge_document WHERE user_id = ? AND status = 1",
+                Integer.class, demo.getId())).isEqualTo(14);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM knowledge_document_version WHERE user_id = ?",
+                Integer.class, demo.getId())).isEqualTo(14);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ai_bad_case WHERE user_id = ?",
+                Integer.class, demo.getId())).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ai_bad_case WHERE user_id = ? AND status = 'CONFLICT_PENDING'",
+                Integer.class, demo.getId())).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM repair_proposal WHERE user_id = ? AND status = 'AWAITING_APPROVAL'",
+                Integer.class, demo.getId())).isEqualTo(1);
+
+        Long proposalId = jdbcTemplate.queryForObject(
+                "SELECT id FROM repair_proposal WHERE user_id = ? AND status = 'AWAITING_APPROVAL'",
+                Long.class, demo.getId());
+        RepairProposal approved = approvalService.decide(
+                demo.getId(),
+                proposalId,
+                new ProposalApprovalCommand(
+                        ApprovalDecision.APPROVE,
+                        "approval:mysql-demo-seed",
+                        null,
+                        "Approved during real MySQL demo integration test."));
+        RepairProposal applied = repairExecutor.execute(
+                demo.getId(), approved.getId(), "execution:mysql-demo-seed");
+
+        assertThat(applied.getStatus()).isEqualTo(RepairProposalStatus.APPLIED.name());
+        assertThat(documentMapper.selectById(applied.getTargetDocumentId()).getVersionNo())
+                .isEqualTo(2);
+    }
+
     private Long createUser() {
         int sequence = USER_SEQUENCE.incrementAndGet();
         UserAccount user = new UserAccount();
@@ -344,6 +398,13 @@ class DevMindMySqlIntegrationTest {
                         + "SET updated_at = DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 2 HOUR) "
                         + "WHERE id = ?",
                 proposalId)).isEqualTo(1);
+    }
+
+    private void runDemoSeed() {
+        ResourceDatabasePopulator populator = new ResourceDatabasePopulator(
+                new FileSystemResource("docs/sql/reset-and-seed-demo-data-for-testuser.sql"));
+        populator.setContinueOnError(false);
+        populator.execute(jdbcTemplate.getDataSource());
     }
 
     private CreateDocumentRequest createRedisDocument() {
