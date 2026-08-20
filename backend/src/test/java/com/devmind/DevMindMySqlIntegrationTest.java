@@ -5,11 +5,33 @@ import com.devmind.module.document.dto.CreateDocumentRequest;
 import com.devmind.module.ai.agent.AgentBudgetLimits;
 import com.devmind.module.ai.agent.AgentExperimentArm;
 import com.devmind.module.ai.agent.AgentRunStatus;
+import com.devmind.module.ai.agent.ApprovalDecision;
+import com.devmind.module.ai.agent.BadCaseStatus;
+import com.devmind.module.ai.agent.RepairProposalStatus;
+import com.devmind.module.ai.agent.RepairProposalType;
+import com.devmind.module.ai.agent.ReviewerDecision;
+import com.devmind.module.ai.agent.ReviewerVerdict;
+import com.devmind.module.ai.entity.AiBadCase;
 import com.devmind.module.ai.entity.AgentRun;
+import com.devmind.module.ai.entity.RepairProposal;
+import com.devmind.module.ai.mapper.AiBadCaseMapper;
 import com.devmind.module.ai.service.AgentRunPersistenceService;
+import com.devmind.module.ai.service.MetadataMutationResult;
+import com.devmind.module.ai.service.PromptSchemaVersions;
+import com.devmind.module.ai.service.ProposalApprovalCommand;
+import com.devmind.module.ai.service.ProposalApprovalService;
+import com.devmind.module.ai.service.ProposalReviewPersistenceService;
+import com.devmind.module.ai.service.RecoveryService;
+import com.devmind.module.ai.service.RepairDocumentMutationService;
+import com.devmind.module.ai.service.RepairExecutionStateService;
+import com.devmind.module.ai.service.RepairProposalDraft;
+import com.devmind.module.ai.service.RepairProposalService;
 import com.devmind.module.document.entity.DocumentChunk;
+import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.mapper.DocumentChunkMapper;
+import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
 import com.devmind.module.document.service.KnowledgeDocumentService;
+import com.devmind.module.document.service.KnowledgeDocumentVersionService;
 import com.devmind.module.document.vo.DocumentResponse;
 import com.devmind.module.search.dto.ChunkFullTextMatch;
 import com.devmind.module.search.entity.DocumentChunkVector;
@@ -21,6 +43,7 @@ import com.devmind.module.user.mapper.UserAccountMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.MySQLContainer;
@@ -29,6 +52,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.List;
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -48,6 +72,7 @@ class DevMindMySqlIntegrationTest {
             Redis \u7f13\u5b58\u7a7f\u900f\u662f\u6307\u5927\u91cf\u8bf7\u6c42\u67e5\u8be2\u4e0d\u5b58\u5728\u7684\u6570\u636e\uff0c\u7f13\u5b58\u65e0\u6cd5\u547d\u4e2d\uff0c\u8bf7\u6c42\u4f1a\u53cd\u590d\u6253\u5230\u6570\u636e\u5e93\u3002
             \u5e38\u89c1\u89e3\u51b3\u65b9\u6848\u5305\u62ec\u7f13\u5b58\u7a7a\u503c\u3001\u53c2\u6570\u6821\u9a8c\u3001\u63a5\u53e3\u9650\u6d41\u548c\u5e03\u9686\u8fc7\u6ee4\u5668\uff0c\u76ee\u6807\u662f\u4fdd\u62a4 MySQL\u3002
             """;
+    private static final AtomicInteger USER_SEQUENCE = new AtomicInteger();
 
     @Container
     static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
@@ -69,6 +94,16 @@ class DevMindMySqlIntegrationTest {
     private final DocumentChunkVectorMapper vectorMapper;
     private final RetrievalStrategy retrievalStrategy;
     private final AgentRunPersistenceService agentRunPersistenceService;
+    private final AiBadCaseMapper badCaseMapper;
+    private final KnowledgeDocumentMapper documentMapper;
+    private final RepairProposalService proposalService;
+    private final ProposalReviewPersistenceService reviewPersistenceService;
+    private final ProposalApprovalService approvalService;
+    private final RepairExecutionStateService executionStateService;
+    private final RepairDocumentMutationService mutationService;
+    private final RecoveryService recoveryService;
+    private final KnowledgeDocumentVersionService versionService;
+    private final JdbcTemplate jdbcTemplate;
 
     @Autowired
     DevMindMySqlIntegrationTest(UserAccountMapper userAccountMapper,
@@ -76,13 +111,33 @@ class DevMindMySqlIntegrationTest {
                                 DocumentChunkMapper chunkMapper,
                                 DocumentChunkVectorMapper vectorMapper,
                                 RetrievalStrategy retrievalStrategy,
-                                AgentRunPersistenceService agentRunPersistenceService) {
+                                AgentRunPersistenceService agentRunPersistenceService,
+                                AiBadCaseMapper badCaseMapper,
+                                KnowledgeDocumentMapper documentMapper,
+                                RepairProposalService proposalService,
+                                ProposalReviewPersistenceService reviewPersistenceService,
+                                ProposalApprovalService approvalService,
+                                RepairExecutionStateService executionStateService,
+                                RepairDocumentMutationService mutationService,
+                                RecoveryService recoveryService,
+                                KnowledgeDocumentVersionService versionService,
+                                JdbcTemplate jdbcTemplate) {
         this.userAccountMapper = userAccountMapper;
         this.documentService = documentService;
         this.chunkMapper = chunkMapper;
         this.vectorMapper = vectorMapper;
         this.retrievalStrategy = retrievalStrategy;
         this.agentRunPersistenceService = agentRunPersistenceService;
+        this.badCaseMapper = badCaseMapper;
+        this.documentMapper = documentMapper;
+        this.proposalService = proposalService;
+        this.reviewPersistenceService = reviewPersistenceService;
+        this.approvalService = approvalService;
+        this.executionStateService = executionStateService;
+        this.mutationService = mutationService;
+        this.recoveryService = recoveryService;
+        this.versionService = versionService;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Test
@@ -146,15 +201,149 @@ class DevMindMySqlIntegrationTest {
                 .allSatisfy(match -> assertThat(match.getContent()).contains(CACHE_PENETRATION_CN));
     }
 
+    @Test
+    void recoversAStaleReservedRepairOnRealMySql() {
+        Long userId = createUser();
+        DocumentResponse document = documentService.create(userId, createRedisDocument());
+        RepairProposal approved = approvedMetadataProposal(
+                userId,
+                document.getId(),
+                "mysql-recovery-success",
+                "Redis,cache,penetration,mysql,recovered",
+                "How does Redis cache penetration reach MySQL?");
+        String executionKey = "execution:mysql-recovery-success:" + approved.getId();
+        executionStateService.reserve(userId, approved.getId(), executionKey);
+        ageProposal(approved.getId());
+
+        List<RepairProposal> recovered = recoveryService.recoverStale(
+                userId, Duration.ofMinutes(30));
+
+        assertThat(recovered).extracting(RepairProposal::getId).contains(approved.getId());
+        RepairProposal result = proposalService.getOwned(userId, approved.getId());
+        assertThat(result.getStatus()).isEqualTo(RepairProposalStatus.APPLIED.name());
+        assertThat(result.getExecutionResultJson()).contains("RESOLVED");
+        KnowledgeDocument storedDocument = documentMapper.selectById(document.getId());
+        assertThat(storedDocument.getVersionNo()).isEqualTo(2);
+        assertThat(storedDocument.getTags()).contains("recovered");
+        assertThat(versionService.getOwnedVersion(userId, document.getId(), 2).getProposalId())
+                .isEqualTo(approved.getId());
+        assertThat(badCaseMapper.selectById(approved.getBadCaseId()).getStatus())
+                .isEqualTo(BadCaseStatus.RESOLVED.name());
+    }
+
+    @Test
+    void finishesCompensationAfterRollbackWriteOnRealMySql() {
+        Long userId = createUser();
+        DocumentResponse document = documentService.create(userId, createRedisDocument());
+        RepairProposal approved = approvedMetadataProposal(
+                userId,
+                document.getId(),
+                "mysql-compensation-resume",
+                "Redis,cache,temporary",
+                "How does Redis cache penetration reach MySQL?");
+        String executionKey = "execution:mysql-compensation-resume:" + approved.getId();
+        RepairProposal executing = executionStateService.reserve(
+                userId, approved.getId(), executionKey);
+        MetadataMutationResult applied = mutationService.applyApprovedMetadata(
+                userId, executing.getId(), executionKey);
+        executionStateService.markVerifying(
+                userId, executing.getId(), executionKey, applied.versionNo());
+        MetadataMutationResult rolledBack = mutationService.rollbackMetadata(
+                userId, executing.getId(), executionKey, applied.versionNo());
+        ageProposal(approved.getId());
+
+        List<RepairProposal> recovered = recoveryService.recoverStale(
+                userId, Duration.ofMinutes(30));
+
+        assertThat(recovered).extracting(RepairProposal::getId).contains(approved.getId());
+        RepairProposal result = proposalService.getOwned(userId, approved.getId());
+        assertThat(result.getStatus()).isEqualTo(RepairProposalStatus.ROLLED_BACK.name());
+        assertThat(result.getExecutionResultJson())
+                .contains("ROLLED_BACK")
+                .contains("\"indexRecoveryRequired\":false");
+        KnowledgeDocument storedDocument = documentMapper.selectById(document.getId());
+        assertThat(storedDocument.getVersionNo()).isEqualTo(rolledBack.versionNo()).isEqualTo(3);
+        assertThat(storedDocument.getTags()).doesNotContain("temporary");
+        assertThat(versionService.getOwnedVersion(userId, document.getId(), 3).getOrigin())
+                .isEqualTo("REPAIR_ROLLBACK");
+        assertThat(badCaseMapper.selectById(approved.getBadCaseId()).getStatus())
+                .isEqualTo(BadCaseStatus.ROLLED_BACK.name());
+    }
+
     private Long createUser() {
+        int sequence = USER_SEQUENCE.incrementAndGet();
         UserAccount user = new UserAccount();
-        user.setUsername("mysql_integration_user");
+        user.setUsername("mysql_integration_user_" + sequence);
         user.setPasswordHash("$2a$10$integration-test-password-hash");
         user.setNickname("MySQL Integration User");
-        user.setEmail("mysql-integration@example.com");
+        user.setEmail("mysql-integration-" + sequence + "@example.com");
         user.setStatus(1);
         userAccountMapper.insert(user);
         return user.getId();
+    }
+
+    private RepairProposal approvedMetadataProposal(Long userId,
+                                                    Long documentId,
+                                                    String keySuffix,
+                                                    String tags,
+                                                    String targetQuestion) {
+        AiBadCase badCase = new AiBadCase();
+        badCase.setUserId(userId);
+        badCase.setSourceType("EVALUATION");
+        badCase.setSourceRef("sealed:" + keySuffix);
+        badCase.setAskSnapshotJson("{}");
+        badCase.setChunkSnapshotJson("[]");
+        badCase.setPromptSchemaVersion(PromptSchemaVersions.CURRENT);
+        badCase.setRootCause("knowledge_exists_not_retrieved");
+        badCase.setDiagnosisJson("{}");
+        badCase.setStatus(BadCaseStatus.TRIAGED.name());
+        badCase.setStatusVersion(0);
+        badCaseMapper.insert(badCase);
+
+        int baseVersion = documentMapper.selectById(documentId).getVersionNo();
+        RepairProposal proposal = proposalService.create(
+                userId,
+                badCase.getId(),
+                "proposal:" + keySuffix,
+                new RepairProposalDraft(
+                        RepairProposalType.METADATA_PATCH,
+                        documentId,
+                        baseVersion,
+                        "{\"tags\":\"" + tags + "\"}",
+                        "[{\"kind\":\"DOCUMENT_VERSION\",\"documentId\":" + documentId
+                                + ",\"documentVersionNo\":" + baseVersion
+                                + ",\"excerpt\":\"Redis\","
+                                + "\"claim\":\"The source explains Redis cache penetration.\"}]",
+                        "[]",
+                        "{\"summary\":\"Improves controlled retrieval.\",\"risk\":\"LOW\","
+                                + "\"affectedQueries\":[\"cache penetration\"]}",
+                        "{\"targetQuestion\":\"" + targetQuestion + "\","
+                                + "\"relatedKeywords\":[\"Redis\",\"cache penetration\",\"MySQL\"],"
+                                + "\"fullDatasetVersion\":\"rag-v1\"}"));
+        RepairProposal reviewed = reviewPersistenceService.saveDecision(
+                userId,
+                proposal.getId(),
+                new ReviewerDecision(
+                        ReviewerVerdict.PASS,
+                        "The metadata patch is supported by the cited document version.",
+                        List.of(),
+                        0.9));
+        return approvalService.decide(
+                userId,
+                reviewed.getId(),
+                new ProposalApprovalCommand(
+                        ApprovalDecision.APPROVE,
+                        "approval:" + keySuffix,
+                        null,
+                        "Approved for MySQL recovery integration testing."));
+    }
+
+    private void ageProposal(Long proposalId) {
+        assertThat(jdbcTemplate.update(
+                "UPDATE repair_proposal "
+                        + "SET updated_at = DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 2 HOUR) "
+                        + "WHERE id = ?",
+                proposalId)).isEqualTo(1);
     }
 
     private CreateDocumentRequest createRedisDocument() {
