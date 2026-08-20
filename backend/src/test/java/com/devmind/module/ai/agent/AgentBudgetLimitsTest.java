@@ -14,6 +14,7 @@ class AgentBudgetLimitsTest {
 
         assertThat(limits.maxSteps()).isEqualTo(18);
         assertThat(limits.maxModelCalls()).isEqualTo(6);
+        assertThat(limits.maxToolCalls()).isEqualTo(12);
         assertThat(limits.maxTotalTokens()).isEqualTo(24_000);
         assertThat(limits.timeout()).isEqualTo(Duration.ofSeconds(120));
     }

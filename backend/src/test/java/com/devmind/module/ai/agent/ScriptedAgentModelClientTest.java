@@ -40,7 +40,7 @@ class ScriptedAgentModelClientTest {
                 message,
                 finishReason,
                 "scripted:test",
-                new AgentTokenUsage(null, null, null)
+                new AgentTokenUsage(0, 0, 0)
         );
     }
 }

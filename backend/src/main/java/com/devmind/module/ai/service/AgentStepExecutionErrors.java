@@ -19,6 +19,7 @@ final class AgentStepExecutionErrors {
         if (reservation.runStatus() == AgentRunStatus.BUDGET_EXHAUSTED
                 || reservation.rejection() == AgentBudgetRejection.MAX_STEPS
                 || reservation.rejection() == AgentBudgetRejection.MAX_MODEL_CALLS
+                || reservation.rejection() == AgentBudgetRejection.MAX_TOOL_CALLS
                 || reservation.rejection() == AgentBudgetRejection.MAX_TOTAL_TOKENS) {
             return new BizException(
                     ResultCode.TOO_MANY_REQUESTS,

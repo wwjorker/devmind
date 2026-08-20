@@ -13,6 +13,7 @@ public record AgentModelResponse(
 
     public AgentModelResponse {
         assistantMessage = Objects.requireNonNull(assistantMessage, "assistantMessage must not be null");
+        usage = Objects.requireNonNull(usage, "usage must not be null");
         if (assistantMessage.role() != AgentMessage.Role.ASSISTANT) {
             throw new IllegalArgumentException("model response message must have assistant role");
         }

@@ -362,6 +362,9 @@ Triage 输出使用固定六类根因和一一对应的 route，并拒绝未知�
 回答错误”，都会使 run 明确失败。`evaluation/v2-development-bad-cases-v0.1.json`
 的六条 label-visible case 已通过 scripted 编排测试；这只证明协议和控制流可跑，
 不代表真实模型准确率。Phase C 才会加入 bad-case intake、业务状态机和提案。
+预注册的 6 次模型调用、12 次工具调用、24,000 token 和 120 秒限制均有独立
+持久计数或终态检查；已完成但造成 token 越界的模型调用保留审计记录，同时 run
+立即进入 `BUDGET_EXHAUSTED`，不能再被标为成功。
 
 ## 本地运行
 

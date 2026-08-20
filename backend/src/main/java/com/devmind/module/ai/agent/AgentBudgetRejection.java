@@ -6,5 +6,6 @@ public enum AgentBudgetRejection {
     DEADLINE_EXCEEDED,
     MAX_STEPS,
     MAX_MODEL_CALLS,
+    MAX_TOOL_CALLS,
     MAX_TOTAL_TOKENS
 }

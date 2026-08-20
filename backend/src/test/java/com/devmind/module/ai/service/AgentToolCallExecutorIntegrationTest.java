@@ -82,7 +82,8 @@ class AgentToolCallExecutorIntegrationTest {
                 """);
         new ResourceDatabasePopulator(
                 new ClassPathResource("db/migration/V6__create_agent_run_and_step_tables.sql"),
-                new ClassPathResource("db/migration/V7__add_agent_step_tool_call_id.sql")
+                new ClassPathResource("db/migration/V7__add_agent_step_tool_call_id.sql"),
+                new ClassPathResource("db/migration/V8__add_agent_tool_call_budget.sql")
         ).execute(dataSource);
         jdbcTemplate.update("INSERT INTO user_account (id, username) VALUES (?, ?)",
                 USER_ID, "tool-test");
@@ -157,7 +158,7 @@ class AgentToolCallExecutorIntegrationTest {
                 USER_ID,
                 null,
                 AgentExperimentArm.SINGLE,
-                new AgentBudgetLimits(3, 1, 100, Duration.ofSeconds(30)),
+                new AgentBudgetLimits(3, 1, 2, 100, Duration.ofSeconds(30)),
                 key
         );
     }

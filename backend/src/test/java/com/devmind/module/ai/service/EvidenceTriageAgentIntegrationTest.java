@@ -103,7 +103,8 @@ class EvidenceTriageAgentIntegrationTest {
                 """);
         new ResourceDatabasePopulator(
                 new ClassPathResource("db/migration/V6__create_agent_run_and_step_tables.sql"),
-                new ClassPathResource("db/migration/V7__add_agent_step_tool_call_id.sql")
+                new ClassPathResource("db/migration/V7__add_agent_step_tool_call_id.sql"),
+                new ClassPathResource("db/migration/V8__add_agent_tool_call_budget.sql")
         ).execute(dataSource);
         jdbcTemplate.update("INSERT INTO user_account (id, username) VALUES (?, ?)",
                 USER_ID, "triage-agent-test");
@@ -183,6 +184,26 @@ class EvidenceTriageAgentIntegrationTest {
                 new CapturingClient(scriptFor(legacy)),
                 inputFor(legacy)))
                 .hasMessageContaining("legacy or unknown prompt schema");
+        assertFailedRun(run);
+    }
+
+    @Test
+    void shouldRejectAnAskLogResultForAnotherTarget() {
+        DevelopmentCase developmentCase = dataset.cases().get(0);
+        activeCase.set(developmentCase);
+        AgentRun run = startRun("phase-b-wrong-ask-log");
+        List<AgentModelResponse> script = List.of(
+                toolCallResponse(
+                        "ask-wrong-target",
+                        GetAskLogEvidenceReadTool.NAME,
+                        "{\"askLogId\":" + (developmentCase.askLogId() + 1) + "}")
+        );
+
+        assertThatThrownBy(() -> triageAgent.triage(
+                new AgentToolContext(USER_ID, run.getId()),
+                new CapturingClient(script),
+                inputFor(developmentCase)))
+                .hasMessageContaining("only its target ask log");
         assertFailedRun(run);
     }
 
@@ -281,7 +302,7 @@ class EvidenceTriageAgentIntegrationTest {
                 USER_ID,
                 null,
                 AgentExperimentArm.SINGLE,
-                new AgentBudgetLimits(6, 3, 1_000, Duration.ofSeconds(30)),
+                new AgentBudgetLimits(6, 3, 3, 1_000, Duration.ofSeconds(30)),
                 idempotencyKey
         );
     }

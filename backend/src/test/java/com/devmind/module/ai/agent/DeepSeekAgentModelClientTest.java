@@ -170,7 +170,8 @@ class DeepSeekAgentModelClientTest {
                           "choices":[{
                             "finish_reason":"stop",
                             "message":{"role":"assistant","content":"Redis is a cache; MySQL is relational."}
-                          }]
+                          }],
+                          "usage":{"prompt_tokens":21,"completion_tokens":7,"total_tokens":28}
                         }
                         """, MediaType.APPLICATION_JSON));
 
@@ -179,7 +180,7 @@ class DeepSeekAgentModelClientTest {
         assertThat(response.assistantMessage().content())
                 .isEqualTo("Redis is a cache; MySQL is relational.");
         assertThat(response.assistantMessage().toolCalls()).isEmpty();
-        assertThat(response.usage()).isEqualTo(new AgentTokenUsage(null, null, null));
+        assertThat(response.usage()).isEqualTo(new AgentTokenUsage(21, 7, 28));
         server.verify();
     }
 
@@ -248,7 +249,8 @@ class DeepSeekAgentModelClientTest {
                         "function":{"name":"search_knowledge","arguments":"not-json"}
                       }]
                     }
-                  }]
+                  }],
+                  "usage":{"prompt_tokens":10,"completion_tokens":3,"total_tokens":13}
                 }
                 """));
 

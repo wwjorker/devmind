@@ -92,14 +92,16 @@ class DevMindMySqlIntegrationTest {
                 userId,
                 null,
                 AgentExperimentArm.SINGLE,
-                new AgentBudgetLimits(2, 2, 100, Duration.ofSeconds(30)),
+                new AgentBudgetLimits(2, 2, 2, 100, Duration.ofSeconds(30)),
                 "mysql-migration-agent-run"
         );
         DocumentResponse document = documentService.create(userId, createRedisDocument());
 
         assertThat(agentRun.getId()).isNotNull();
-        assertThat(agentRunPersistenceService.getOwnedRun(userId, agentRun.getId()).getStatus())
-                .isEqualTo(AgentRunStatus.RUNNING.name());
+        AgentRun storedRun = agentRunPersistenceService.getOwnedRun(userId, agentRun.getId());
+        assertThat(storedRun.getStatus()).isEqualTo(AgentRunStatus.RUNNING.name());
+        assertThat(storedRun.getMaxToolCalls()).isEqualTo(2);
+        assertThat(storedRun.getUsedToolCalls()).isZero();
 
         List<DocumentChunk> chunks = chunkMapper.selectList(new LambdaQueryWrapper<DocumentChunk>()
                 .eq(DocumentChunk::getUserId, userId)

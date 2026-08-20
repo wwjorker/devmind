@@ -17,4 +17,14 @@ public interface AgentRunMapper extends BaseMapper<AgentRun> {
             FOR UPDATE
             """)
     AgentRun selectOwnedForUpdate(@Param("userId") Long userId, @Param("runId") Long runId);
+
+    @Select("""
+            SELECT *
+            FROM agent_run
+            WHERE user_id = #{userId}
+              AND idempotency_key = #{idempotencyKey}
+            FOR UPDATE
+            """)
+    AgentRun selectByIdempotencyKeyForUpdate(@Param("userId") Long userId,
+                                             @Param("idempotencyKey") String idempotencyKey);
 }

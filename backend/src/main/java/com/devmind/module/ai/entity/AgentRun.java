@@ -17,10 +17,12 @@ public class AgentRun {
     private String status;
     private Integer maxSteps;
     private Integer maxModelCalls;
+    private Integer maxToolCalls;
     private Integer maxTotalTokens;
     private Long timeoutMs;
     private Integer usedSteps;
     private Integer usedModelCalls;
+    private Integer usedToolCalls;
     private Integer usedPromptTokens;
     private Integer usedCompletionTokens;
     private Integer usedTotalTokens;
@@ -90,6 +92,14 @@ public class AgentRun {
         this.maxModelCalls = maxModelCalls;
     }
 
+    public Integer getMaxToolCalls() {
+        return maxToolCalls;
+    }
+
+    public void setMaxToolCalls(Integer maxToolCalls) {
+        this.maxToolCalls = maxToolCalls;
+    }
+
     public Integer getMaxTotalTokens() {
         return maxTotalTokens;
     }
@@ -120,6 +130,14 @@ public class AgentRun {
 
     public void setUsedModelCalls(Integer usedModelCalls) {
         this.usedModelCalls = usedModelCalls;
+    }
+
+    public Integer getUsedToolCalls() {
+        return usedToolCalls;
+    }
+
+    public void setUsedToolCalls(Integer usedToolCalls) {
+        this.usedToolCalls = usedToolCalls;
     }
 
     public Integer getUsedPromptTokens() {

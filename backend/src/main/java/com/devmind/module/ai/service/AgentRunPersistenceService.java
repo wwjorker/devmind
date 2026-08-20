@@ -72,10 +72,12 @@ public class AgentRunPersistenceService {
         run.setStatus(AgentRunStatus.RUNNING.name());
         run.setMaxSteps(limits.maxSteps());
         run.setMaxModelCalls(limits.maxModelCalls());
+        run.setMaxToolCalls(limits.maxToolCalls());
         run.setMaxTotalTokens(limits.maxTotalTokens());
         run.setTimeoutMs(limits.timeout().toMillis());
         run.setUsedSteps(0);
         run.setUsedModelCalls(0);
+        run.setUsedToolCalls(0);
         run.setUsedPromptTokens(0);
         run.setUsedCompletionTokens(0);
         run.setUsedTotalTokens(0);
@@ -86,7 +88,8 @@ public class AgentRunPersistenceService {
             runMapper.insert(run);
             return run;
         } catch (DuplicateKeyException ex) {
-            AgentRun concurrent = findByIdempotencyKey(userId, safeIdempotencyKey);
+            AgentRun concurrent = runMapper.selectByIdempotencyKeyForUpdate(
+                    userId, safeIdempotencyKey);
             if (concurrent == null) {
                 throw ex;
             }
@@ -159,6 +162,8 @@ public class AgentRunPersistenceService {
         run.setUsedSteps(sequenceNo);
         if (stepType == AgentStepType.MODEL_CALL) {
             run.setUsedModelCalls(run.getUsedModelCalls() + 1);
+        } else if (stepType == AgentStepType.TOOL_CALL) {
+            run.setUsedToolCalls(run.getUsedToolCalls() + 1);
         }
         runMapper.updateById(run);
 
@@ -218,6 +223,13 @@ public class AgentRunPersistenceService {
                     AgentBudgetRejection.DEADLINE_EXCEEDED.name(),
                     "agent model call completed after the run deadline", completedAt);
             return AgentRunStatus.TIMED_OUT;
+        }
+        if (runStatus == AgentRunStatus.RUNNING
+                && run.getUsedTotalTokens() > run.getMaxTotalTokens()) {
+            finishRun(run, AgentRunStatus.BUDGET_EXHAUSTED,
+                    AgentBudgetRejection.MAX_TOTAL_TOKENS.name(),
+                    "agent run token budget exceeded by completed model call", completedAt);
+            return AgentRunStatus.BUDGET_EXHAUSTED;
         }
         runMapper.updateById(run);
         return runStatus;
@@ -375,6 +387,10 @@ public class AgentRunPersistenceService {
                 && run.getUsedModelCalls() >= run.getMaxModelCalls()) {
             return AgentBudgetRejection.MAX_MODEL_CALLS;
         }
+        if (stepType == AgentStepType.TOOL_CALL
+                && run.getUsedToolCalls() >= run.getMaxToolCalls()) {
+            return AgentBudgetRejection.MAX_TOOL_CALLS;
+        }
         if (run.getUsedTotalTokens() >= run.getMaxTotalTokens()) {
             return AgentBudgetRejection.MAX_TOTAL_TOKENS;
         }
@@ -426,6 +442,7 @@ public class AgentRunPersistenceService {
                 && experimentArm.wireValue().equals(existing.getExperimentArm())
                 && existing.getMaxSteps() == limits.maxSteps()
                 && existing.getMaxModelCalls() == limits.maxModelCalls()
+                && existing.getMaxToolCalls() == limits.maxToolCalls()
                 && existing.getMaxTotalTokens() == limits.maxTotalTokens()
                 && existing.getTimeoutMs() == limits.timeout().toMillis();
         if (!equivalent) {

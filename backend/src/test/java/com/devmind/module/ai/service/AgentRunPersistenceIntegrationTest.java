@@ -82,7 +82,8 @@ class AgentRunPersistenceIntegrationTest {
                 """);
         new ResourceDatabasePopulator(
                 new ClassPathResource("db/migration/V6__create_agent_run_and_step_tables.sql"),
-                new ClassPathResource("db/migration/V7__add_agent_step_tool_call_id.sql")
+                new ClassPathResource("db/migration/V7__add_agent_step_tool_call_id.sql"),
+                new ClassPathResource("db/migration/V8__add_agent_tool_call_budget.sql")
         ).execute(dataSource);
         jdbcTemplate.update("INSERT INTO user_account (id, username) VALUES (?, ?)", USER_ID, "agent-test");
     }
@@ -90,7 +91,7 @@ class AgentRunPersistenceIntegrationTest {
     @Test
     void shouldPersistReplayAndSuspendAnExistingTransactionAroundModelCall() {
         AgentRun run = startRun("run-transaction-boundary", new AgentBudgetLimits(
-                3, 2, 100, Duration.ofSeconds(30)));
+                3, 2, 2, 100, Duration.ofSeconds(30)));
         AgentModelResponse expected = textResponse("completed", 10, 5, 15);
         TransactionProbeModelClient modelClient = new TransactionProbeModelClient(expected);
         AgentModelRequest request = new AgentModelRequest(
@@ -117,6 +118,7 @@ class AgentRunPersistenceIntegrationTest {
         assertThat(stored.getStatus()).isEqualTo(AgentRunStatus.SUCCEEDED.name());
         assertThat(stored.getUsedSteps()).isEqualTo(1);
         assertThat(stored.getUsedModelCalls()).isEqualTo(1);
+        assertThat(stored.getUsedToolCalls()).isZero();
         assertThat(stored.getUsedPromptTokens()).isEqualTo(10);
         assertThat(stored.getUsedCompletionTokens()).isEqualTo(5);
         assertThat(stored.getUsedTotalTokens()).isEqualTo(15);
@@ -139,7 +141,7 @@ class AgentRunPersistenceIntegrationTest {
     @Test
     void shouldHardStopBeforeASecondCallWhenStepBudgetIsExhausted() {
         AgentRun run = startRun("run-step-budget", new AgentBudgetLimits(
-                1, 2, 100, Duration.ofSeconds(30)));
+                1, 2, 1, 100, Duration.ofSeconds(30)));
         ScriptedAgentModelClient modelClient = new ScriptedAgentModelClient(List.of(
                 toolCallResponse(5)
         ));
@@ -160,7 +162,7 @@ class AgentRunPersistenceIntegrationTest {
     @Test
     void shouldAuditToolStepWithoutConsumingModelCallBudget() {
         AgentRun run = startRun("run-tool-budget", new AgentBudgetLimits(
-                3, 1, 100, Duration.ofSeconds(30)));
+                3, 1, 2, 100, Duration.ofSeconds(30)));
         ScriptedAgentModelClient modelClient = new ScriptedAgentModelClient(List.of(
                 toolCallResponse(5)
         ));
@@ -183,6 +185,7 @@ class AgentRunPersistenceIntegrationTest {
         AgentRun stored = persistenceService.getOwnedRun(USER_ID, run.getId());
         assertThat(stored.getUsedSteps()).isEqualTo(2);
         assertThat(stored.getUsedModelCalls()).isEqualTo(1);
+        assertThat(stored.getUsedToolCalls()).isEqualTo(1);
         assertThat(persistenceService.replaySteps(USER_ID, run.getId()))
                 .hasSize(2)
                 .element(1)
@@ -195,35 +198,91 @@ class AgentRunPersistenceIntegrationTest {
     }
 
     @Test
-    void shouldRecordLastUsageAndBlockTheNextCallAfterTokenThresholdIsCrossed() {
+    void shouldRecordLastUsageAndFailImmediatelyWhenTokenThresholdIsCrossed() {
         AgentRun run = startRun("run-token-budget", new AgentBudgetLimits(
-                3, 3, 10, Duration.ofSeconds(30)));
+                3, 3, 3, 10, Duration.ofSeconds(30)));
         ScriptedAgentModelClient modelClient = new ScriptedAgentModelClient(List.of(
                 toolCallResponse(12)
         ));
         AgentModelRequest request = request();
 
-        stepExecutor.execute(USER_ID, run.getId(), AgentRole.EVIDENCE_TRIAGE, modelClient, request);
-
-        AgentRun afterFirstCall = persistenceService.getOwnedRun(USER_ID, run.getId());
-        assertThat(afterFirstCall.getUsedTotalTokens()).isEqualTo(12);
         assertThatThrownBy(() -> stepExecutor.execute(
                 USER_ID, run.getId(), AgentRole.EVIDENCE_TRIAGE, modelClient, request))
                 .isInstanceOf(BizException.class)
-                .hasMessageContaining("max_total_tokens");
+                .hasMessageContaining("BUDGET_EXHAUSTED");
+
+        AgentRun afterFirstCall = persistenceService.getOwnedRun(USER_ID, run.getId());
+        assertThat(afterFirstCall.getUsedTotalTokens()).isEqualTo(12);
+        assertThat(afterFirstCall.getStatus()).isEqualTo(AgentRunStatus.BUDGET_EXHAUSTED.name());
+        assertThat(afterFirstCall.getErrorCode()).isEqualTo("MAX_TOTAL_TOKENS");
         assertThat(modelClient.consumedResponses()).isEqualTo(1);
     }
 
     @Test
+    void shouldAllowSuccessAtTheExactTokenLimit() {
+        AgentRun run = startRun("run-exact-token-budget", new AgentBudgetLimits(
+                2, 2, 2, 10, Duration.ofSeconds(30)));
+        ScriptedAgentModelClient modelClient = new ScriptedAgentModelClient(List.of(
+                toolCallResponse(10)
+        ));
+
+        stepExecutor.execute(
+                USER_ID, run.getId(), AgentRole.EVIDENCE_TRIAGE, modelClient, request());
+
+        assertThat(persistenceService.markSucceeded(USER_ID, run.getId(), "exact limit"))
+                .isEqualTo(AgentRunStatus.SUCCEEDED);
+        AgentRun stored = persistenceService.getOwnedRun(USER_ID, run.getId());
+        assertThat(stored.getUsedTotalTokens()).isEqualTo(10);
+        assertThat(stored.getStatus()).isEqualTo(AgentRunStatus.SUCCEEDED.name());
+    }
+
+    @Test
+    void shouldPersistentlyRejectTheThirteenthToolCall() {
+        AgentRun run = startRun("run-tool-call-budget", new AgentBudgetLimits(
+                18, 6, 12, 24_000, Duration.ofSeconds(30)));
+
+        for (int index = 1; index <= 12; index++) {
+            var reservation = persistenceService.reserveToolStep(
+                    USER_ID,
+                    run.getId(),
+                    AgentRole.EVIDENCE_TRIAGE,
+                    "searchKnowledge",
+                    "tool-budget-" + index,
+                    "tool=searchKnowledge;argumentFields=query"
+            );
+            assertThat(reservation.permitted()).isTrue();
+            assertThat(persistenceService.completeToolStep(
+                    USER_ID, run.getId(), reservation.stepId(), 1, "resultChars=2"))
+                    .isEqualTo(AgentRunStatus.RUNNING);
+        }
+
+        var rejected = persistenceService.reserveToolStep(
+                USER_ID,
+                run.getId(),
+                AgentRole.EVIDENCE_TRIAGE,
+                "searchKnowledge",
+                "tool-budget-13",
+                "tool=searchKnowledge;argumentFields=query"
+        );
+
+        assertThat(rejected.permitted()).isFalse();
+        assertThat(rejected.rejection().name()).isEqualTo("MAX_TOOL_CALLS");
+        AgentRun stored = persistenceService.getOwnedRun(USER_ID, run.getId());
+        assertThat(stored.getStatus()).isEqualTo(AgentRunStatus.BUDGET_EXHAUSTED.name());
+        assertThat(stored.getUsedToolCalls()).isEqualTo(12);
+        assertThat(persistenceService.replaySteps(USER_ID, run.getId())).hasSize(12);
+    }
+
+    @Test
     void shouldReuseAnEquivalentIdempotencyKeyAndRejectDifferentBudgets() {
-        AgentBudgetLimits limits = new AgentBudgetLimits(3, 2, 100, Duration.ofSeconds(30));
+        AgentBudgetLimits limits = new AgentBudgetLimits(3, 2, 2, 100, Duration.ofSeconds(30));
         AgentRun first = startRun("run-idempotent", limits);
         AgentRun repeated = startRun("run-idempotent", limits);
 
         assertThat(repeated.getId()).isEqualTo(first.getId());
         assertThatThrownBy(() -> startRun(
                 "run-idempotent",
-                new AgentBudgetLimits(4, 2, 100, Duration.ofSeconds(30))))
+                new AgentBudgetLimits(4, 2, 2, 100, Duration.ofSeconds(30))))
                 .isInstanceOf(BizException.class)
                 .hasMessageContaining("different agent run request");
     }
@@ -231,7 +290,7 @@ class AgentRunPersistenceIntegrationTest {
     @Test
     void shouldPersistAProviderFailureWithoutStoringItsUntrustedMessage() {
         AgentRun run = startRun("run-provider-failure", new AgentBudgetLimits(
-                3, 2, 100, Duration.ofSeconds(30)));
+                3, 2, 2, 100, Duration.ofSeconds(30)));
         AgentModelClient failingClient = new AgentModelClient() {
             @Override
             public boolean supports(String provider) {
@@ -266,7 +325,7 @@ class AgentRunPersistenceIntegrationTest {
     @Test
     void shouldNotOversubscribeBudgetWhenModelCallsOverlap() throws Exception {
         AgentRun run = startRun("run-concurrent-budget", new AgentBudgetLimits(
-                1, 1, 100, Duration.ofSeconds(30)));
+                1, 1, 1, 100, Duration.ofSeconds(30)));
         CountDownLatch firstCallEntered = new CountDownLatch(1);
         CountDownLatch releaseFirstCall = new CountDownLatch(1);
         AgentModelClient blockingClient = new AgentModelClient() {
@@ -312,7 +371,7 @@ class AgentRunPersistenceIntegrationTest {
     @Test
     void shouldCancelIdempotentlyAndBlockFutureModelCalls() {
         AgentRun run = startRun("run-cancelled", new AgentBudgetLimits(
-                3, 2, 100, Duration.ofSeconds(30)));
+                3, 2, 2, 100, Duration.ofSeconds(30)));
         ScriptedAgentModelClient modelClient = new ScriptedAgentModelClient(List.of(
                 textResponse("must not run", 1, 1, 2)
         ));
