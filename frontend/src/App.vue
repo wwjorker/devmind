@@ -1548,6 +1548,21 @@ onUnmounted(() => {
                 <pre v-if="selectedRepairCase.diagnosisJson">{{ prettyJson(selectedRepairCase.diagnosisJson) }}</pre>
               </details>
 
+              <aside v-if="selectedRepairCase.status === 'CONFLICT_PENDING'" class="conflict-review-box">
+                <strong>检测到来源冲突，自动修复已停止</strong>
+                <p>系统不会替你选择哪条来源更可信。请人工核对下方模型可见证据与用户提供的可信来源，再通过新的知识库版本处理冲突。</p>
+              </aside>
+
+              <details class="repair-evidence-card">
+                <summary>模型可见的检索证据快照</summary>
+                <pre>{{ prettyJson(selectedRepairCase.chunkSnapshotJson) }}</pre>
+              </details>
+
+              <details v-if="selectedRepairCase.trustedSourceJson" class="repair-evidence-card">
+                <summary>用户提供的可信来源</summary>
+                <pre>{{ prettyJson(selectedRepairCase.trustedSourceJson) }}</pre>
+              </details>
+
               <article v-for="proposal in selectedRepairCase.proposals" :key="proposal.id" class="proposal-card">
                 <div class="repair-detail-heading">
                   <div>
