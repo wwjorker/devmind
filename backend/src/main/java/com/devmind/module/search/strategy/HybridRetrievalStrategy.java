@@ -357,7 +357,8 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                 chunk.getChunkIndex(),
                 chunk.getContent(),
                 chunk.getTokenCount(),
-                Math.max(1, (int) Math.round(similarity * VECTOR_SCORE_WEIGHT))
+                Math.max(1, (int) Math.round(similarity * VECTOR_SCORE_WEIGHT)),
+                document.getVersionNo()
         );
     }
 
@@ -389,7 +390,8 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                 source.getChunkIndex(),
                 source.getContent(),
                 source.getTokenCount(),
-                score
+                score,
+                source.getDocumentVersionNo()
         );
     }
 

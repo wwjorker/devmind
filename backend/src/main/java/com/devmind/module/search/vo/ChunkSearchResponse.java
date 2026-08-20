@@ -1,5 +1,7 @@
 package com.devmind.module.search.vo;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 public class ChunkSearchResponse {
 
     private Long chunkId;
@@ -11,6 +13,7 @@ public class ChunkSearchResponse {
     private String content;
     private Integer tokenCount;
     private Integer score;
+    private Integer documentVersionNo;
 
     public ChunkSearchResponse() {
     }
@@ -24,6 +27,20 @@ public class ChunkSearchResponse {
                                String content,
                                Integer tokenCount,
                                Integer score) {
+        this(chunkId, documentId, documentTitle, sourceType, tags, chunkIndex,
+                content, tokenCount, score, null);
+    }
+
+    public ChunkSearchResponse(Long chunkId,
+                               Long documentId,
+                               String documentTitle,
+                               String sourceType,
+                               String tags,
+                               Integer chunkIndex,
+                               String content,
+                               Integer tokenCount,
+                               Integer score,
+                               Integer documentVersionNo) {
         this.chunkId = chunkId;
         this.documentId = documentId;
         this.documentTitle = documentTitle;
@@ -33,6 +50,7 @@ public class ChunkSearchResponse {
         this.content = content;
         this.tokenCount = tokenCount;
         this.score = score;
+        this.documentVersionNo = documentVersionNo;
     }
 
     public Long getChunkId() {
@@ -105,5 +123,14 @@ public class ChunkSearchResponse {
 
     public void setScore(Integer score) {
         this.score = score;
+    }
+
+    @JsonIgnore
+    public Integer getDocumentVersionNo() {
+        return documentVersionNo;
+    }
+
+    public void setDocumentVersionNo(Integer documentVersionNo) {
+        this.documentVersionNo = documentVersionNo;
     }
 }

@@ -278,7 +278,8 @@ public class ChunkSearchService {
                 chunk.getChunkIndex(),
                 chunk.getContent(),
                 chunk.getTokenCount(),
-                calculateScore(chunk, document, keywords, fullTextScore)
+                calculateScore(chunk, document, keywords, fullTextScore),
+                document.getVersionNo()
         );
     }
 

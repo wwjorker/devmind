@@ -24,6 +24,7 @@ public class AiAskLog {
     private Integer totalTokens;
     private Integer retrievedChunkCount;
     private String retrievedChunkIds;
+    private String retrievalSnapshotJson;
     private Long elapsedMs;
     private Integer status;
     private LocalDateTime createdAt;
@@ -138,6 +139,14 @@ public class AiAskLog {
 
     public void setRetrievedChunkIds(String retrievedChunkIds) {
         this.retrievedChunkIds = retrievedChunkIds;
+    }
+
+    public String getRetrievalSnapshotJson() {
+        return retrievalSnapshotJson;
+    }
+
+    public void setRetrievalSnapshotJson(String retrievalSnapshotJson) {
+        this.retrievalSnapshotJson = retrievalSnapshotJson;
     }
 
     public Long getElapsedMs() {

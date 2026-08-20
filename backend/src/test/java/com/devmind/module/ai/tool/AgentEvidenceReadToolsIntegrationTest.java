@@ -91,6 +91,7 @@ class AgentEvidenceReadToolsIntegrationTest {
                     total_tokens INT,
                     retrieved_chunk_count INT NOT NULL,
                     retrieved_chunk_ids VARCHAR(500),
+                    retrieval_snapshot_json CLOB,
                     elapsed_ms BIGINT NOT NULL,
                     status TINYINT NOT NULL,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP

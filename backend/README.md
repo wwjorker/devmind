@@ -372,6 +372,12 @@ Phase C 的知识写入以 `knowledge_document.version_no` 作为乐观锁，并
 版本快照、chunk 替换和 MySQL 向量失效保持同一短事务；embedding 与 pgvector
 同步仍在提交后执行。repair proposal 的来源证据和 proposal ID 将复用同一版本表。
 
+新的 ask log 会额外保存结构化 retrieval snapshot：内容是模型实际可见的
+有界 chunk 文本，并带当时的 document version。`helpful=false` 与问答快照
+在同一短事务内生成去重的 `ai_bad_case`；旧日志缺少该快照时只保留
+空证据并沿用原 prompt schema 标记，不伪装成新 schema 证据。bad case 状态
+迁移受 Java 白名单和 `status_version` 乐观锁双重保护。
+
 ## 本地运行
 
 依赖：

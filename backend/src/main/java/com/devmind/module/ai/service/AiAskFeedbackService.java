@@ -32,11 +32,14 @@ public class AiAskFeedbackService {
 
     private final AiAskFeedbackMapper feedbackMapper;
     private final AiAskLogMapper askLogMapper;
+    private final BadCaseIntakeService badCaseIntakeService;
 
     public AiAskFeedbackService(AiAskFeedbackMapper feedbackMapper,
-                                AiAskLogMapper askLogMapper) {
+                                AiAskLogMapper askLogMapper,
+                                BadCaseIntakeService badCaseIntakeService) {
         this.feedbackMapper = feedbackMapper;
         this.askLogMapper = askLogMapper;
+        this.badCaseIntakeService = badCaseIntakeService;
     }
 
     @Transactional
@@ -57,6 +60,9 @@ public class AiAskFeedbackService {
         feedback.setStatus(STATUS_ACTIVE);
         feedback.setCreatedAt(LocalDateTime.now());
         feedbackMapper.insert(feedback);
+        if (!Boolean.TRUE.equals(feedback.getHelpful())) {
+            badCaseIntakeService.intakeFeedback(feedback, askLog);
+        }
         return toResponse(feedback);
     }
 

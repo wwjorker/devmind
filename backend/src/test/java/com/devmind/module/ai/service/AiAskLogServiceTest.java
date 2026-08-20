@@ -3,6 +3,7 @@ package com.devmind.module.ai.service;
 import com.devmind.module.ai.entity.AiAskLog;
 import com.devmind.module.ai.mapper.AiAskLogMapper;
 import com.devmind.module.search.vo.ChunkSearchResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
@@ -24,7 +25,7 @@ class AiAskLogServiceTest {
             log.setId(99L);
             return 1;
         });
-        AiAskLogService askLogService = new AiAskLogService(askLogMapper);
+        AiAskLogService askLogService = new AiAskLogService(askLogMapper, snapshotCodec());
         List<ChunkSearchResponse> chunks = List.of(
                 new ChunkSearchResponse(10L, 1L, "Redis note", "bug_review", "redis", 0, "content", 20, 18),
                 new ChunkSearchResponse(11L, 1L, "Redis note", "bug_review", "redis", 1, "content", 22, 12)
@@ -55,6 +56,7 @@ class AiAskLogServiceTest {
         assertThat(savedLog.getPromptSchemaVersion()).isEqualTo(PromptSchemaVersions.CURRENT);
         assertThat(savedLog.getRetrievedChunkCount()).isEqualTo(2);
         assertThat(savedLog.getRetrievedChunkIds()).isEqualTo("10,11");
+        assertThat(savedLog.getRetrievalSnapshotJson()).contains("modelVisibleContent");
         assertThat(savedLog.getElapsedMs()).isEqualTo(123L);
     }
 
@@ -62,7 +64,7 @@ class AiAskLogServiceTest {
     void saveSuccessLogShouldPersistCurrentPromptSchemaVersion() {
         AiAskLogMapper askLogMapper = mock(AiAskLogMapper.class);
         when(askLogMapper.insert(any(AiAskLog.class))).thenReturn(1);
-        AiAskLogService askLogService = new AiAskLogService(askLogMapper);
+        AiAskLogService askLogService = new AiAskLogService(askLogMapper, snapshotCodec());
 
         askLogService.saveSuccessLog(
                 1L,
@@ -82,5 +84,10 @@ class AiAskLogServiceTest {
         ArgumentCaptor<AiAskLog> captor = ArgumentCaptor.forClass(AiAskLog.class);
         verify(askLogMapper).insert(captor.capture());
         assertThat(captor.getValue().getPromptSchemaVersion()).isEqualTo(PromptSchemaVersions.CURRENT);
+        assertThat(captor.getValue().getRetrievalSnapshotJson()).isEqualTo("[]");
+    }
+
+    private RetrievedEvidenceSnapshotCodec snapshotCodec() {
+        return new RetrievedEvidenceSnapshotCodec(new ObjectMapper(), new PromptBuilderService());
     }
 }

@@ -82,9 +82,13 @@ public class PromptBuilderService {
                         .append(", score=")
                         .append(chunk.getScore())
                         .append("]\n");
-                prompt.append(limit(chunk.getContent(), MAX_CONTEXT_CHARS_PER_CHUNK)).append("\n\n");
+                prompt.append(modelVisibleChunkContent(chunk.getContent())).append("\n\n");
             }
         }
+    }
+
+    public String modelVisibleChunkContent(String content) {
+        return limit(content, MAX_CONTEXT_CHARS_PER_CHUNK);
     }
 
     private String limit(String text, int maxChars) {
