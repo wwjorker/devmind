@@ -32,6 +32,7 @@ class KnowledgeDocumentServiceTest {
     @Test
     void importFromFileShouldCreateDocumentAndRebuildChunks() {
         KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        KnowledgeDocumentVersionService versionService = mock(KnowledgeDocumentVersionService.class);
         DocumentChunkService chunkService = mock(DocumentChunkService.class);
         ChunkVectorService chunkVectorService = mock(ChunkVectorService.class);
         TrackingTransactionOperations transactions = new TrackingTransactionOperations();
@@ -55,7 +56,7 @@ class KnowledgeDocumentServiceTest {
             return null;
         }).when(chunkVectorService).rebuildVectors(any(), any(), any());
         KnowledgeDocumentService documentService = new KnowledgeDocumentService(
-                documentMapper, chunkService, chunkVectorService, transactions);
+                documentMapper, versionService, chunkService, chunkVectorService, transactions);
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "redis-note.md",
@@ -78,6 +79,11 @@ class KnowledgeDocumentServiceTest {
         assertThat(response.getTags()).isEqualTo("redis,cache");
         assertThat(response.getContent()).contains("Redis cache penetration");
         verify(chunkService).replaceChunks(eq(1L), eq(42L), eq(response.getContent()));
+        verify(versionService).snapshot(
+                any(KnowledgeDocument.class),
+                eq(DocumentVersionOrigin.FILE_IMPORT),
+                eq(null),
+                eq(null));
         verify(chunkVectorService).archiveMySqlByDocument(1L, 42L);
         verify(chunkVectorService).archiveServingIndexByDocument(1L, 42L);
         verify(chunkVectorService).rebuildVectors(1L, 42L, List.of(chunk));
@@ -87,6 +93,7 @@ class KnowledgeDocumentServiceTest {
     void importFromFileShouldRejectUnsupportedFileType() {
         KnowledgeDocumentService documentService = new KnowledgeDocumentService(
                 mock(KnowledgeDocumentMapper.class),
+                mock(KnowledgeDocumentVersionService.class),
                 mock(DocumentChunkService.class),
                 mock(ChunkVectorService.class),
                 new TrackingTransactionOperations()
@@ -106,20 +113,30 @@ class KnowledgeDocumentServiceTest {
     @Test
     void archiveShouldArchiveOwnedDocumentAndItsChunks() {
         KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        KnowledgeDocumentVersionService versionService = mock(KnowledgeDocumentVersionService.class);
         DocumentChunkService chunkService = mock(DocumentChunkService.class);
         ChunkVectorService chunkVectorService = mock(ChunkVectorService.class);
         KnowledgeDocument document = new KnowledgeDocument();
         document.setId(42L);
         document.setUserId(7L);
         document.setStatus(1);
+        document.setVersionNo(1);
         when(documentMapper.selectOne(any())).thenReturn(document);
+        when(documentMapper.updateById(document)).thenAnswer(invocation -> {
+            document.setVersionNo(document.getVersionNo() + 1);
+            return 1;
+        });
         KnowledgeDocumentService documentService = new KnowledgeDocumentService(
-                documentMapper, chunkService, chunkVectorService, new TrackingTransactionOperations());
+                documentMapper, versionService, chunkService, chunkVectorService,
+                new TrackingTransactionOperations());
 
         documentService.archive(7L, 42L);
 
         assertThat(document.getStatus()).isZero();
+        assertThat(document.getVersionNo()).isEqualTo(2);
         verify(documentMapper).updateById(document);
+        verify(versionService).snapshot(
+                document, DocumentVersionOrigin.USER_ARCHIVE, null, null);
         verify(chunkService).archiveByDocument(7L, 42L);
         verify(chunkVectorService).archiveMySqlByDocument(7L, 42L);
         verify(chunkVectorService).archiveServingIndexByDocument(7L, 42L);
@@ -128,6 +145,7 @@ class KnowledgeDocumentServiceTest {
     @Test
     void restoreShouldReactivateOwnedDocumentAndRebuildChunks() {
         KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        KnowledgeDocumentVersionService versionService = mock(KnowledgeDocumentVersionService.class);
         DocumentChunkService chunkService = mock(DocumentChunkService.class);
         ChunkVectorService chunkVectorService = mock(ChunkVectorService.class);
         KnowledgeDocument document = new KnowledgeDocument();
@@ -135,16 +153,25 @@ class KnowledgeDocumentServiceTest {
         document.setUserId(7L);
         document.setContent("restored content");
         document.setStatus(0);
+        document.setVersionNo(1);
         when(documentMapper.selectOne(any())).thenReturn(document);
+        when(documentMapper.updateById(document)).thenAnswer(invocation -> {
+            document.setVersionNo(document.getVersionNo() + 1);
+            return 1;
+        });
         DocumentChunk chunk = chunk(10L, 42L, "restored content");
         when(chunkService.replaceChunks(7L, 42L, "restored content")).thenReturn(List.of(chunk));
         KnowledgeDocumentService documentService = new KnowledgeDocumentService(
-                documentMapper, chunkService, chunkVectorService, new TrackingTransactionOperations());
+                documentMapper, versionService, chunkService, chunkVectorService,
+                new TrackingTransactionOperations());
 
         DocumentResponse response = documentService.restore(7L, 42L);
 
         assertThat(response.getStatus()).isEqualTo(1);
+        assertThat(document.getVersionNo()).isEqualTo(2);
         verify(documentMapper).updateById(document);
+        verify(versionService).snapshot(
+                document, DocumentVersionOrigin.USER_RESTORE, null, null);
         verify(chunkService).replaceChunks(7L, 42L, "restored content");
         verify(chunkVectorService).rebuildVectors(7L, 42L, List.of(chunk));
     }
@@ -152,6 +179,7 @@ class KnowledgeDocumentServiceTest {
     @Test
     void updateShouldKeepCommittedContentWhenVectorIndexingFails() {
         KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        KnowledgeDocumentVersionService versionService = mock(KnowledgeDocumentVersionService.class);
         DocumentChunkService chunkService = mock(DocumentChunkService.class);
         ChunkVectorService chunkVectorService = mock(ChunkVectorService.class);
         TrackingTransactionOperations transactions = new TrackingTransactionOperations();
@@ -159,7 +187,12 @@ class KnowledgeDocumentServiceTest {
         document.setId(42L);
         document.setUserId(7L);
         document.setStatus(1);
+        document.setVersionNo(1);
         when(documentMapper.selectOne(any())).thenReturn(document);
+        when(documentMapper.updateById(document)).thenAnswer(invocation -> {
+            document.setVersionNo(document.getVersionNo() + 1);
+            return 1;
+        });
         DocumentChunk chunk = chunk(11L, 42L, "new searchable content");
         when(chunkService.replaceChunks(7L, 42L, "new searchable content")).thenReturn(List.of(chunk));
         doAnswer(invocation -> {
@@ -167,7 +200,7 @@ class KnowledgeDocumentServiceTest {
             throw new IllegalStateException("embedding unavailable");
         }).when(chunkVectorService).rebuildVectors(7L, 42L, List.of(chunk));
         KnowledgeDocumentService documentService = new KnowledgeDocumentService(
-                documentMapper, chunkService, chunkVectorService, transactions);
+                documentMapper, versionService, chunkService, chunkVectorService, transactions);
         UpdateDocumentRequest request = new UpdateDocumentRequest();
         request.setTitle("updated");
         request.setContent("new searchable content");
@@ -179,7 +212,10 @@ class KnowledgeDocumentServiceTest {
 
         assertThat(response.getContent()).isEqualTo("new searchable content");
         assertThat(response.getStatus()).isEqualTo(1);
+        assertThat(document.getVersionNo()).isEqualTo(2);
         verify(documentMapper).updateById(document);
+        verify(versionService).snapshot(
+                document, DocumentVersionOrigin.USER_UPDATE, null, null);
         verify(chunkService).replaceChunks(7L, 42L, "new searchable content");
         verify(chunkVectorService).archiveMySqlByDocument(7L, 42L);
         verify(chunkVectorService).archiveServingIndexByDocument(7L, 42L);

@@ -366,6 +366,12 @@ Triage 输出使用固定六类根因和一一对应的 route，并拒绝未知�
 持久计数或终态检查；已完成但造成 token 越界的模型调用保留审计记录，同时 run
 立即进入 `BUDGET_EXHAUSTED`，不能再被标为成功。
 
+Phase C 的知识写入以 `knowledge_document.version_no` 作为乐观锁，并在
+`knowledge_document_version` 保存创建、导入、用户更新、归档和恢复后的不可变
+全文及 metadata 快照。V9 会为已有文档补一条 version 1 baseline。文档当前态、
+版本快照、chunk 替换和 MySQL 向量失效保持同一短事务；embedding 与 pgvector
+同步仍在提交后执行。repair proposal 的来源证据和 proposal ID 将复用同一版本表。
+
 ## 本地运行
 
 依赖：

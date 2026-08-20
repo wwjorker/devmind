@@ -3,26 +3,27 @@ package com.devmind.module.document.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.annotation.Version;
 
 import java.time.LocalDateTime;
 
-@TableName("knowledge_document")
-public class KnowledgeDocument {
+@TableName("knowledge_document_version")
+public class KnowledgeDocumentVersion {
 
     @TableId(type = IdType.AUTO)
     private Long id;
+    private Long documentId;
     private Long userId;
+    private Integer versionNo;
     private String title;
     private String content;
     private String sourceType;
     private String tags;
     private String summary;
-    private Integer status;
-    @Version
-    private Integer versionNo;
+    private Integer documentStatus;
+    private String origin;
+    private String sourceEvidenceJson;
+    private Long proposalId;
     private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 
     public Long getId() {
         return id;
@@ -32,12 +33,28 @@ public class KnowledgeDocument {
         this.id = id;
     }
 
+    public Long getDocumentId() {
+        return documentId;
+    }
+
+    public void setDocumentId(Long documentId) {
+        this.documentId = documentId;
+    }
+
     public Long getUserId() {
         return userId;
     }
 
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+
+    public Integer getVersionNo() {
+        return versionNo;
+    }
+
+    public void setVersionNo(Integer versionNo) {
+        this.versionNo = versionNo;
     }
 
     public String getTitle() {
@@ -80,20 +97,36 @@ public class KnowledgeDocument {
         this.summary = summary;
     }
 
-    public Integer getStatus() {
-        return status;
+    public Integer getDocumentStatus() {
+        return documentStatus;
     }
 
-    public void setStatus(Integer status) {
-        this.status = status;
+    public void setDocumentStatus(Integer documentStatus) {
+        this.documentStatus = documentStatus;
     }
 
-    public Integer getVersionNo() {
-        return versionNo;
+    public String getOrigin() {
+        return origin;
     }
 
-    public void setVersionNo(Integer versionNo) {
-        this.versionNo = versionNo;
+    public void setOrigin(String origin) {
+        this.origin = origin;
+    }
+
+    public String getSourceEvidenceJson() {
+        return sourceEvidenceJson;
+    }
+
+    public void setSourceEvidenceJson(String sourceEvidenceJson) {
+        this.sourceEvidenceJson = sourceEvidenceJson;
+    }
+
+    public Long getProposalId() {
+        return proposalId;
+    }
+
+    public void setProposalId(Long proposalId) {
+        this.proposalId = proposalId;
     }
 
     public LocalDateTime getCreatedAt() {
@@ -102,13 +135,5 @@ public class KnowledgeDocument {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
     }
 }

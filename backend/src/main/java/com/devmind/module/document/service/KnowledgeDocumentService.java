@@ -37,21 +37,30 @@ public class KnowledgeDocumentService {
     private static final String DEFAULT_IMPORTED_SOURCE_TYPE = "learning_note";
 
     private final KnowledgeDocumentMapper documentMapper;
+    private final KnowledgeDocumentVersionService versionService;
     private final DocumentChunkService chunkService;
     private final ChunkVectorService chunkVectorService;
     private final TransactionOperations transactionOperations;
 
     public KnowledgeDocumentService(KnowledgeDocumentMapper documentMapper,
+                                    KnowledgeDocumentVersionService versionService,
                                     DocumentChunkService chunkService,
                                     ChunkVectorService chunkVectorService,
                                     TransactionOperations transactionOperations) {
         this.documentMapper = documentMapper;
+        this.versionService = versionService;
         this.chunkService = chunkService;
         this.chunkVectorService = chunkVectorService;
         this.transactionOperations = transactionOperations;
     }
 
     public DocumentResponse create(Long userId, CreateDocumentRequest request) {
+        return create(userId, request, DocumentVersionOrigin.USER_CREATE);
+    }
+
+    private DocumentResponse create(Long userId,
+                                    CreateDocumentRequest request,
+                                    DocumentVersionOrigin origin) {
         validateCreateRequest(request);
         DocumentWriteResult result = transactionOperations.execute(status -> {
             KnowledgeDocument document = new KnowledgeDocument();
@@ -62,7 +71,9 @@ public class KnowledgeDocumentService {
             document.setTags(request.getTags());
             document.setSummary(request.getSummary());
             document.setStatus(STATUS_ACTIVE);
+            document.setVersionNo(1);
             documentMapper.insert(document);
+            versionService.snapshot(document, origin, null, null);
             List<DocumentChunk> chunks = replaceChunksAndArchiveVectors(
                     userId, document.getId(), request.getContent());
             return new DocumentWriteResult(document, chunks);
@@ -94,7 +105,7 @@ public class KnowledgeDocumentService {
         request.setSourceType(StringUtils.hasText(sourceType) ? sourceType.trim() : DEFAULT_IMPORTED_SOURCE_TYPE);
         request.setTags(StringUtils.hasText(tags) ? tags.trim() : "");
         request.setSummary(StringUtils.hasText(summary) ? summary.trim() : "导入文件：" + filename);
-        return create(userId, request);
+        return create(userId, request, DocumentVersionOrigin.FILE_IMPORT);
     }
 
     public DocumentResponse getDetail(Long userId, Long documentId) {
@@ -151,6 +162,7 @@ public class KnowledgeDocumentService {
     }
 
     public DocumentResponse update(Long userId, Long documentId, UpdateDocumentRequest request) {
+        validateUpdateRequest(request);
         DocumentWriteResult result = transactionOperations.execute(status -> {
             KnowledgeDocument document = findOwnedActiveDocument(userId, documentId);
             document.setTitle(request.getTitle());
@@ -158,7 +170,8 @@ public class KnowledgeDocumentService {
             document.setSourceType(request.getSourceType());
             document.setTags(request.getTags());
             document.setSummary(request.getSummary());
-            documentMapper.updateById(document);
+            updateDocumentOrThrowConflict(document);
+            versionService.snapshot(document, DocumentVersionOrigin.USER_UPDATE, null, null);
             List<DocumentChunk> chunks = replaceChunksAndArchiveVectors(
                     userId, documentId, request.getContent());
             return new DocumentWriteResult(document, chunks);
@@ -170,7 +183,8 @@ public class KnowledgeDocumentService {
         transactionOperations.executeWithoutResult(status -> {
             KnowledgeDocument document = findOwnedActiveDocument(userId, documentId);
             document.setStatus(STATUS_ARCHIVED);
-            documentMapper.updateById(document);
+            updateDocumentOrThrowConflict(document);
+            versionService.snapshot(document, DocumentVersionOrigin.USER_ARCHIVE, null, null);
             chunkService.archiveByDocument(userId, documentId);
             chunkVectorService.archiveMySqlByDocument(userId, documentId);
         });
@@ -181,7 +195,8 @@ public class KnowledgeDocumentService {
         DocumentWriteResult result = transactionOperations.execute(status -> {
             KnowledgeDocument document = findOwnedDocumentByStatus(userId, documentId, STATUS_ARCHIVED);
             document.setStatus(STATUS_ACTIVE);
-            documentMapper.updateById(document);
+            updateDocumentOrThrowConflict(document);
+            versionService.snapshot(document, DocumentVersionOrigin.USER_RESTORE, null, null);
             List<DocumentChunk> chunks = replaceChunksAndArchiveVectors(
                     userId, documentId, document.getContent());
             return new DocumentWriteResult(document, chunks);
@@ -313,6 +328,26 @@ public class KnowledgeDocumentService {
                 document.getCreatedAt(),
                 document.getUpdatedAt()
         );
+    }
+
+    private void validateUpdateRequest(UpdateDocumentRequest request) {
+        if (request == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "document request is required");
+        }
+        CreateDocumentRequest equivalent = new CreateDocumentRequest();
+        equivalent.setTitle(request.getTitle());
+        equivalent.setContent(request.getContent());
+        equivalent.setSourceType(request.getSourceType());
+        equivalent.setTags(request.getTags());
+        equivalent.setSummary(request.getSummary());
+        validateCreateRequest(equivalent);
+    }
+
+    private void updateDocumentOrThrowConflict(KnowledgeDocument document) {
+        if (documentMapper.updateById(document) != 1) {
+            throw new BizException(ResultCode.CONFLICT,
+                    "document changed concurrently; reload the latest version");
+        }
     }
 
     private record DocumentWriteResult(KnowledgeDocument document, List<DocumentChunk> chunks) {

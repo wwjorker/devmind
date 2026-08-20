@@ -57,6 +57,7 @@ class AgentEvidenceReadToolsIntegrationTest {
                     tags VARCHAR(255),
                     summary VARCHAR(500),
                     status TINYINT NOT NULL,
+                    version_no INT NOT NULL DEFAULT 1,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
