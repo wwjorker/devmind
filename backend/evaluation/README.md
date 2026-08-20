@@ -44,3 +44,42 @@ derived index is rebuilt. The existing 40-case retrieval suite remains the
 separate full regression report. A before/after global delta is not synthesized
 inside one repair execution because no comparable pre-change baseline is stored
 there; Phase D must run and record both sides under the frozen manifest.
+
+## Phase D reproducible checks
+
+The real MySQL merge gate uses the normal Testcontainers test. Docker Engine 29
+raises its minimum client API above the docker-java default used here, so pass an
+explicit compatible API version instead of editing a developer's private Docker
+or Testcontainers configuration:
+
+```powershell
+$env:JAVA_HOME='C:\path\to\jdk-17'
+$env:DOCKER_HOST='npipe:////./pipe/dockerDesktopLinuxEngine'
+.\mvnw.cmd "-Dapi.version=1.44" "-Dtest=DevMindMySqlIntegrationTest" test
+```
+
+`V2DeepSeekProviderEvaluationTest` is the opt-in four-arm runner. It reads the
+frozen files, hashes their exact bytes, strips gold fields from model messages,
+uses temperature zero, counts invalid/provider failures as failed cases, and
+writes only to `target/evaluation/v2-four-arm-provider-report.json`. A full run
+attempts at most 240 model calls (48 single, 96 self-review, 96 reviewed-multi),
+so estimate cost before enabling it. The test remains skipped unless all of the
+following are set:
+
+- `DEVMIND_RUN_V2_EVALUATION=true`
+- `DEVMIND_DEEPSEEK_API_KEY`
+- `DEVMIND_DEEPSEEK_MODEL` (an exact frozen model name, not chosen per arm)
+- `DEVMIND_EVAL_KNOWLEDGE_SNAPSHOT`
+- `DEVMIND_DEEPSEEK_INPUT_USD_PER_MILLION`
+- `DEVMIND_DEEPSEEK_OUTPUT_USD_PER_MILLION`
+
+Run it with:
+
+```powershell
+.\mvnw.cmd "-Dtest=V2DeepSeekProviderEvaluationTest" test
+```
+
+The v1 frozen text is deliberately retained even though the rules baseline
+reaches a ceiling score on it. This is a dataset-difficulty limitation, not a
+Multi-Agent improvement claim. Any harder dataset must receive a new version;
+the v1 files and their prior reports must not be rewritten.
