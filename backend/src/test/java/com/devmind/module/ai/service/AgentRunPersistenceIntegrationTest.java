@@ -139,6 +139,24 @@ class AgentRunPersistenceIntegrationTest {
     }
 
     @Test
+    void shouldRecordTimeoutWhenFailureHandlingRunsAfterTheDeadline() {
+        AgentRun run = startRun("run-timeout-on-failure", new AgentBudgetLimits(
+                3, 2, 2, 100, Duration.ofSeconds(30)));
+        jdbcTemplate.update(
+                "UPDATE agent_run SET deadline_at = ? WHERE id = ?",
+                java.time.LocalDateTime.of(2000, 1, 1, 0, 0),
+                run.getId());
+
+        assertThat(persistenceService.failRunIfActive(
+                USER_ID, run.getId(), "WORKFLOW_FAILED", "workflow failed"))
+                .isEqualTo(AgentRunStatus.TIMED_OUT);
+
+        AgentRun stored = persistenceService.getOwnedRun(USER_ID, run.getId());
+        assertThat(stored.getStatus()).isEqualTo(AgentRunStatus.TIMED_OUT.name());
+        assertThat(stored.getErrorCode()).isEqualTo("DEADLINE_EXCEEDED");
+    }
+
+    @Test
     void shouldHardStopBeforeASecondCallWhenStepBudgetIsExhausted() {
         AgentRun run = startRun("run-step-budget", new AgentBudgetLimits(
                 1, 2, 1, 100, Duration.ofSeconds(30)));

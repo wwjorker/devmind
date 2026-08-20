@@ -55,6 +55,16 @@ public class RepairWorkflowActionService {
                                  AgentModelClient modelClient) {
         String key = requireKey(idempotencyKey) + ":review";
         RepairProposal proposal = proposalService.getOwned(userId, proposalId);
+        if (!RepairProposalStatus.DRAFT.name().equals(proposal.getStatus())) {
+            AgentRun existing = runPersistenceService.findOwnedByIdempotencyKey(userId, key);
+            if (existing != null
+                    && java.util.Objects.equals(existing.getBadCaseId(), proposal.getBadCaseId())
+                    && AgentRunStatus.SUCCEEDED.name().equals(existing.getStatus())) {
+                return proposal;
+            }
+            throw new BizException(ResultCode.CONFLICT,
+                    "repair proposal is not awaiting review");
+        }
         AgentRun run = runPersistenceService.startRun(
                 userId,
                 proposal.getBadCaseId(),
@@ -68,10 +78,6 @@ public class RepairWorkflowActionService {
         if (status != AgentRunStatus.RUNNING) {
             throw new BizException(ResultCode.CONFLICT,
                     "review workflow is already terminal: " + status);
-        }
-        if (!RepairProposalStatus.DRAFT.name().equals(proposal.getStatus())) {
-            throw new BizException(ResultCode.CONFLICT,
-                    "repair proposal is not awaiting review");
         }
         return reviewService.review(
                 userId,

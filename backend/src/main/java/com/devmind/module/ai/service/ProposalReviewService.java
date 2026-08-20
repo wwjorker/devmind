@@ -72,22 +72,22 @@ public class ProposalReviewService {
                     "review run must belong to this bad case and reviewed-multi arm");
         }
 
-        ChangeReviewInput input = new ChangeReviewInput(
-                proposal.getId(),
-                badCase.getId(),
-                badCase.getRootCause(),
-                badCase.getDiagnosisJson(),
-                proposal.getProposalType(),
-                proposal.getTargetDocumentId(),
-                proposal.getBaseVersionNo(),
-                proposal.getDiffJson(),
-                proposal.getEvidenceJson(),
-                proposal.getCounterevidenceJson(),
-                proposal.getImpactJson(),
-                proposal.getRegressionPlanJson(),
-                currentVersionJson(userId, proposal),
-                proposal.getRevisionNo());
         try {
+            ChangeReviewInput input = new ChangeReviewInput(
+                    proposal.getId(),
+                    badCase.getId(),
+                    badCase.getRootCause(),
+                    badCase.getDiagnosisJson(),
+                    proposal.getProposalType(),
+                    proposal.getTargetDocumentId(),
+                    proposal.getBaseVersionNo(),
+                    proposal.getDiffJson(),
+                    proposal.getEvidenceJson(),
+                    proposal.getCounterevidenceJson(),
+                    proposal.getImpactJson(),
+                    proposal.getRegressionPlanJson(),
+                    currentVersionJson(userId, proposal),
+                    proposal.getRevisionNo());
             ReviewerDecision decision = reviewerAgent.reviewForWorkflow(
                     context, modelClient, input);
             return reviewPersistenceService.saveDecisionAndCompleteRun(

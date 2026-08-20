@@ -364,12 +364,23 @@ public class AgentRunPersistenceService {
         if (current != AgentRunStatus.RUNNING) {
             return current;
         }
+        LocalDateTime completedAt = now();
+        if (!completedAt.isBefore(run.getDeadlineAt())) {
+            finishRun(
+                    run,
+                    AgentRunStatus.TIMED_OUT,
+                    AgentBudgetRejection.DEADLINE_EXCEEDED.name(),
+                    "agent run deadline exceeded before failure was recorded",
+                    completedAt
+            );
+            return AgentRunStatus.TIMED_OUT;
+        }
         finishRun(
                 run,
                 AgentRunStatus.FAILED,
                 requireBoundedText(errorCode, 64, "errorCode"),
                 requireBoundedText(errorMessage, 500, "errorMessage"),
-                now()
+                completedAt
         );
         return AgentRunStatus.FAILED;
     }
@@ -382,6 +393,10 @@ public class AgentRunPersistenceService {
             throw new BizException(ResultCode.NOT_FOUND, "agent run not found");
         }
         return run;
+    }
+
+    public AgentRun findOwnedByIdempotencyKey(Long userId, String idempotencyKey) {
+        return findByIdempotencyKey(userId, requireIdempotencyKey(idempotencyKey));
     }
 
     public List<AgentStep> replaySteps(Long userId, Long runId) {

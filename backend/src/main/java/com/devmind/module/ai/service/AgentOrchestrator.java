@@ -59,6 +59,17 @@ public class AgentOrchestrator {
         String safeKey = requireKey(idempotencyKey);
         Objects.requireNonNull(modelClient, "modelClient must not be null");
         AiBadCase candidate = badCaseIntakeService.getOwned(userId, badCaseId);
+        if (!BadCaseStatus.NEW.name().equals(candidate.getStatus())) {
+            AgentRun existing = runPersistenceService.findOwnedByIdempotencyKey(
+                    userId, safeKey + ":triage");
+            if (existing != null
+                    && Objects.equals(existing.getBadCaseId(), badCaseId)
+                    && AgentRunStatus.SUCCEEDED.name().equals(existing.getStatus())) {
+                return existingResult(userId, safeKey, existing);
+            }
+            throw new BizException(ResultCode.CONFLICT,
+                    "bad case is not awaiting triage");
+        }
         AgentRun run = runPersistenceService.startRun(
                 userId,
                 badCaseId,
@@ -73,18 +84,12 @@ public class AgentOrchestrator {
             throw new BizException(ResultCode.CONFLICT,
                     "triage workflow is already terminal: " + existingStatus);
         }
-        if (!BadCaseStatus.NEW.name().equals(candidate.getStatus())) {
-            throw new BizException(ResultCode.CONFLICT,
-                    "bad case is not awaiting triage");
-        }
-
-        AskSnapshot snapshot = readSnapshot(candidate);
-        if (!Objects.equals(candidate.getAskLogId(), snapshot.askLogId())) {
-            failRun(userId, run.getId(), "BAD_CASE_SNAPSHOT_MISMATCH");
-            throw new BizException(ResultCode.CONFLICT,
-                    "bad-case snapshot does not match its ask log");
-        }
         try {
+            AskSnapshot snapshot = readSnapshot(candidate);
+            if (!Objects.equals(candidate.getAskLogId(), snapshot.askLogId())) {
+                throw new BizException(ResultCode.CONFLICT,
+                        "bad-case snapshot does not match its ask log");
+            }
             TriageDiagnosis diagnosis = triageAgent.triageForWorkflow(
                     new AgentToolContext(userId, run.getId()),
                     modelClient,

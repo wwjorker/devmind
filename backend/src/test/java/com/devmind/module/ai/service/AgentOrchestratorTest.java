@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -128,6 +129,39 @@ class AgentOrchestratorTest {
         verify(proposalService, never()).create(any(), any(), any(), any());
         verify(workflowPersistenceService).persist(
                 7L, 10L, 21L, "wf-2:proposal", diagnosis);
+    }
+
+    @Test
+    void shouldRejectATerminalCaseWithoutCreatingAnOrphanRun() {
+        AiBadCase badCase = badCase(11L, BadCaseStatus.NO_ACTION);
+        when(intakeService.getOwned(7L, 11L)).thenReturn(badCase);
+
+        assertThatThrownBy(() -> orchestrator.triageAndRoute(
+                7L, 11L, "wf-terminal", modelClient))
+                .isInstanceOf(com.devmind.common.exception.BizException.class)
+                .hasMessageContaining("not awaiting triage");
+
+        verify(runService, never()).startRun(any(), any(), any(), any(), any());
+        verify(triageAgent, never()).triageForWorkflow(any(), any(), any());
+    }
+
+    @Test
+    void shouldCloseTheRunWhenSnapshotPreparationFails() {
+        AiBadCase badCase = badCase(12L, BadCaseStatus.NEW);
+        badCase.setAskSnapshotJson("not-json");
+        AgentRun run = runningRun(22L, 12L);
+        when(intakeService.getOwned(7L, 12L)).thenReturn(badCase);
+        when(runService.startRun(eq(7L), eq(12L), any(), any(), eq("wf-invalid:triage")))
+                .thenReturn(run);
+
+        assertThatThrownBy(() -> orchestrator.triageAndRoute(
+                7L, 12L, "wf-invalid", modelClient))
+                .isInstanceOf(com.devmind.common.exception.BizException.class)
+                .hasMessageContaining("snapshot is invalid");
+
+        verify(runService).failRunIfActive(
+                7L, 22L, "TRIAGE_WORKFLOW_FAILED", "triage workflow failed");
+        verify(triageAgent, never()).triageForWorkflow(any(), any(), any());
     }
 
     private AiBadCase badCase(Long id, BadCaseStatus status) {
