@@ -2,6 +2,7 @@ package com.devmind.module.ai.service;
 
 import com.devmind.common.exception.BizException;
 import com.devmind.module.ai.agent.BadCaseStatus;
+import com.devmind.module.ai.agent.ApprovalDecision;
 import com.devmind.module.ai.agent.RepairProposalStatus;
 import com.devmind.module.ai.agent.RepairProposalType;
 import com.devmind.module.ai.agent.ReviewerDecision;
@@ -50,6 +51,8 @@ class RepairProposalIntegrationTest {
     private RepairProposalService proposalService;
     @Autowired
     private ProposalReviewPersistenceService reviewPersistenceService;
+    @Autowired
+    private ProposalApprovalService approvalService;
 
     private Long badCaseId;
 
@@ -136,6 +139,7 @@ class RepairProposalIntegrationTest {
         applyMigration("db/migration/V10__create_bad_case_intake.sql");
         applyMigration("db/migration/V11__create_repair_proposal.sql");
         applyMigration("db/migration/V12__add_proposal_revision_idempotency.sql");
+        applyMigration("db/migration/V13__add_proposal_approval_decision.sql");
 
         AiBadCase badCase = new AiBadCase();
         badCase.setUserId(7L);
@@ -295,6 +299,60 @@ class RepairProposalIntegrationTest {
                 .isEqualTo(BadCaseStatus.AWAITING_APPROVAL.name());
     }
 
+    @Test
+    void shouldApproveEditedDiffIdempotently() {
+        AiBadCase approvalCase = triagedCase("sealed:metadata-approval");
+        RepairProposal proposal = awaitingProposal(
+                approvalCase, "proposal:approval", "spring,transaction,candidate");
+        ProposalApprovalCommand command = new ProposalApprovalCommand(
+                ApprovalDecision.APPROVE_WITH_EDIT,
+                "approval:metadata-1",
+                "{\"tags\":\"spring,transaction,human-approved\"}",
+                "Narrowed the tags before execution.");
+
+        RepairProposal approved = approvalService.decide(7L, proposal.getId(), command);
+        RepairProposal retried = approvalService.decide(7L, proposal.getId(), command);
+
+        assertThat(retried.getId()).isEqualTo(approved.getId());
+        assertThat(approved.getStatus()).isEqualTo(RepairProposalStatus.APPROVED.name());
+        assertThat(approved.getApprovalDecision())
+                .isEqualTo(ApprovalDecision.APPROVE_WITH_EDIT.name());
+        assertThat(approved.getApprovedDiffJson()).contains("human-approved");
+        assertThat(badCaseMapper.selectById(approvalCase.getId()).getStatus())
+                .isEqualTo(BadCaseStatus.APPROVED.name());
+
+        ProposalApprovalCommand changedRetry = new ProposalApprovalCommand(
+                ApprovalDecision.APPROVE_WITH_EDIT,
+                "approval:metadata-1",
+                "{\"tags\":\"different\"}",
+                "Narrowed the tags before execution.");
+        assertThatThrownBy(() -> approvalService.decide(
+                7L, proposal.getId(), changedRetry))
+                .isInstanceOf(BizException.class)
+                .hasMessageContaining("reused with different input");
+    }
+
+    @Test
+    void shouldRecordHumanRejectionWithoutExecuting() {
+        AiBadCase rejectionCase = triagedCase("sealed:metadata-rejection");
+        RepairProposal proposal = awaitingProposal(
+                rejectionCase, "proposal:rejection", "spring,transaction,reject");
+
+        RepairProposal rejected = approvalService.decide(
+                7L,
+                proposal.getId(),
+                new ProposalApprovalCommand(
+                        ApprovalDecision.REJECT,
+                        "approval:reject-1",
+                        null,
+                        "The change is not appropriate for this knowledge base."));
+
+        assertThat(rejected.getStatus()).isEqualTo(RepairProposalStatus.REJECTED.name());
+        assertThat(rejected.getApprovedDiffJson()).isNull();
+        assertThat(badCaseMapper.selectById(rejectionCase.getId()).getStatus())
+                .isEqualTo(BadCaseStatus.NO_ACTION.name());
+    }
+
     private AiBadCase triagedCase(String sourceRef) {
         AiBadCase badCase = new AiBadCase();
         badCase.setUserId(7L);
@@ -349,6 +407,21 @@ class RepairProposalIntegrationTest {
                         null,
                         null)),
                 0.85);
+    }
+
+    private RepairProposal awaitingProposal(AiBadCase badCase,
+                                            String key,
+                                            String tags) {
+        RepairProposal proposal = proposalService.create(
+                7L, badCase.getId(), key, metadataDraft(31L, 1, tags));
+        return reviewPersistenceService.saveDecision(
+                7L,
+                proposal.getId(),
+                new ReviewerDecision(
+                        ReviewerVerdict.PASS,
+                        "The proposal is supported and remains within metadata scope.",
+                        java.util.List.of(),
+                        0.9));
     }
 
     private void applyMigration(String resource) {

@@ -390,6 +390,12 @@ Phase C 的知识写入以 `knowledge_document.version_no` 作为乐观锁，并
 REJECT` 严格 schema。`REVISE` 只能消耗一次幂等修订，第二次仍要求修订时
 确定性终止为拒绝，避免 Agent 循环。
 
+Reviewer `PASS` 只会把 proposal 送到 `AWAITING_APPROVAL`，不等于用户同意。
+HITL 内部契约支持 `APPROVE / APPROVE_WITH_EDIT / REJECT`；人工编辑后的 diff
+必须重新通过同一套租户、证据、字段白名单和 base-version 校验。审批请求
+使用租户级幂等键；拒绝必须记录原因。review-only `DOCUMENT_DRAFT` 不能进入
+执行状态。
+
 ## 本地运行
 
 依赖：

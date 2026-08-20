@@ -66,9 +66,12 @@ public class ProposalValidator {
         Objects.requireNonNull(draft.type(), "proposal type must not be null");
 
         AiBadCase badCase = findOwnedBadCase(userId, badCaseId);
-        if (!Set.of(BadCaseStatus.TRIAGED.name(), BadCaseStatus.REVIEWED.name())
+        if (!Set.of(
+                BadCaseStatus.TRIAGED.name(),
+                BadCaseStatus.REVIEWED.name(),
+                BadCaseStatus.AWAITING_APPROVAL.name())
                 .contains(badCase.getStatus())) {
-            throw conflict("bad case must be TRIAGED or REVIEWED before proposal validation");
+            throw conflict("bad case status does not allow proposal validation");
         }
 
         JsonNode diff = parseObject(draft.diffJson(), "proposal diff", 24_000);
