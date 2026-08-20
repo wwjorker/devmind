@@ -25,6 +25,7 @@ public class RepairProposal {
     private String reviewerVerdict;
     private String reviewerFindingsJson;
     private Integer revisionNo;
+    private String revisionIdempotencyKey;
     private String status;
     private String approvalIdempotencyKey;
     private String approvedDiffJson;
@@ -67,6 +68,8 @@ public class RepairProposal {
     public void setReviewerFindingsJson(String reviewerFindingsJson) { this.reviewerFindingsJson = reviewerFindingsJson; }
     public Integer getRevisionNo() { return revisionNo; }
     public void setRevisionNo(Integer revisionNo) { this.revisionNo = revisionNo; }
+    public String getRevisionIdempotencyKey() { return revisionIdempotencyKey; }
+    public void setRevisionIdempotencyKey(String revisionIdempotencyKey) { this.revisionIdempotencyKey = revisionIdempotencyKey; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
     public String getApprovalIdempotencyKey() { return approvalIdempotencyKey; }

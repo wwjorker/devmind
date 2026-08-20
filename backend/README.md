@@ -384,6 +384,12 @@ Phase C 的知识写入以 `knowledge_document.version_no` 作为乐观锁，并
 标记为可执行；`DOCUMENT_DRAFT` 必须引用 `USER_SUPPLIED` 可信材料，且只供
 人工复核，不会被自动发布。proposal 创建使用租户级幂等键。
 
+`ChangeReviewerAgent` 是独立的第二角色：它只读结构化 diagnosis、proposal、
+当前 document version 和只读工具结果，首轮必须自主搜索当前用户知识库。
+它不能读 ask log 工具、不能写入、不能审批；输出限定为 `PASS / REVISE /
+REJECT` 严格 schema。`REVISE` 只能消耗一次幂等修订，第二次仍要求修订时
+确定性终止为拒绝，避免 Agent 循环。
+
 ## 本地运行
 
 依赖：

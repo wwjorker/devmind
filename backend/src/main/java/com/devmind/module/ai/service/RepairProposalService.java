@@ -90,6 +90,54 @@ public class RepairProposalService {
         return proposal;
     }
 
+    @Transactional
+    public RepairProposal revise(Long userId,
+                                 Long proposalId,
+                                 String revisionIdempotencyKey,
+                                 RepairProposalDraft revisedDraft) {
+        String safeKey = requireIdempotencyKey(revisionIdempotencyKey);
+        RepairProposal proposal = getOwned(userId, proposalId);
+        if (StringUtils.hasText(proposal.getRevisionIdempotencyKey())) {
+            if (!proposal.getRevisionIdempotencyKey().equals(safeKey)) {
+                throw new BizException(ResultCode.CONFLICT,
+                        "proposal already used its single revision");
+            }
+            ensureRevisionEquivalent(proposal, revisedDraft);
+            return proposal;
+        }
+        if (!RepairProposalStatus.REVIEWED.name().equals(proposal.getStatus())
+                || !"REVISE".equals(proposal.getReviewerVerdict())
+                || !Integer.valueOf(0).equals(proposal.getRevisionNo())) {
+            throw new BizException(ResultCode.CONFLICT,
+                    "proposal is not eligible for revision");
+        }
+        if (revisedDraft == null
+                || revisedDraft.type() == null
+                || !proposal.getProposalType().equals(revisedDraft.type().name())
+                || !Objects.equals(proposal.getTargetDocumentId(), revisedDraft.targetDocumentId())
+                || !Objects.equals(proposal.getBaseVersionNo(), revisedDraft.baseVersionNo())) {
+            throw new BizException(ResultCode.BAD_REQUEST,
+                    "revision cannot change proposal type, target, or base version");
+        }
+
+        ValidatedRepairProposal validated = proposalValidator.validate(
+                userId, proposal.getBadCaseId(), revisedDraft);
+        proposal.setDiffJson(validated.diffJson());
+        proposal.setEvidenceJson(validated.evidenceJson());
+        proposal.setCounterevidenceJson(validated.counterevidenceJson());
+        proposal.setImpactJson(validated.impactJson());
+        proposal.setRegressionPlanJson(validated.regressionPlanJson());
+        proposal.setReviewerVerdict(null);
+        proposal.setReviewerFindingsJson(null);
+        proposal.setRevisionNo(1);
+        proposal.setRevisionIdempotencyKey(safeKey);
+        proposal.setStatus(RepairProposalStatus.DRAFT.name());
+        updateOrThrowConflict(proposal);
+        badCaseStateService.transition(
+                userId, proposal.getBadCaseId(), BadCaseStatus.REVIEWED, BadCaseStatus.PROPOSED);
+        return proposal;
+    }
+
     public List<RepairProposal> listOwnedForBadCase(Long userId, Long badCaseId) {
         return proposalMapper.selectList(new LambdaQueryWrapper<RepairProposal>()
                 .eq(RepairProposal::getUserId, userId)
@@ -121,6 +169,31 @@ public class RepairProposalService {
                 || !jsonEquals(existing.getRegressionPlanJson(), draft.regressionPlanJson())) {
             throw new BizException(ResultCode.CONFLICT,
                     "proposal idempotency key was reused with different input");
+        }
+    }
+
+    private void ensureRevisionEquivalent(RepairProposal existing,
+                                          RepairProposalDraft draft) {
+        if (draft == null
+                || draft.type() == null
+                || !existing.getProposalType().equals(draft.type().name())
+                || !Objects.equals(existing.getTargetDocumentId(), draft.targetDocumentId())
+                || !Objects.equals(existing.getBaseVersionNo(), draft.baseVersionNo())
+                || !jsonEquals(existing.getDiffJson(), draft.diffJson())
+                || !jsonEquals(existing.getEvidenceJson(), draft.evidenceJson())
+                || !jsonEquals(existing.getCounterevidenceJson(),
+                        defaultJson(draft.counterevidenceJson(), "[]"))
+                || !jsonEquals(existing.getImpactJson(), draft.impactJson())
+                || !jsonEquals(existing.getRegressionPlanJson(), draft.regressionPlanJson())) {
+            throw new BizException(ResultCode.CONFLICT,
+                    "revision idempotency key was reused with different input");
+        }
+    }
+
+    private void updateOrThrowConflict(RepairProposal proposal) {
+        if (proposalMapper.updateById(proposal) != 1) {
+            throw new BizException(ResultCode.CONFLICT,
+                    "repair proposal changed concurrently; reload the latest state");
         }
     }
 

@@ -4,6 +4,10 @@ import com.devmind.common.exception.BizException;
 import com.devmind.module.ai.agent.BadCaseStatus;
 import com.devmind.module.ai.agent.RepairProposalStatus;
 import com.devmind.module.ai.agent.RepairProposalType;
+import com.devmind.module.ai.agent.ReviewerDecision;
+import com.devmind.module.ai.agent.ReviewerFinding;
+import com.devmind.module.ai.agent.ReviewerSeverity;
+import com.devmind.module.ai.agent.ReviewerVerdict;
 import com.devmind.module.ai.entity.AiBadCase;
 import com.devmind.module.ai.entity.RepairProposal;
 import com.devmind.module.ai.mapper.AiBadCaseMapper;
@@ -44,6 +48,8 @@ class RepairProposalIntegrationTest {
     private KnowledgeDocumentMapper documentMapper;
     @Autowired
     private RepairProposalService proposalService;
+    @Autowired
+    private ProposalReviewPersistenceService reviewPersistenceService;
 
     private Long badCaseId;
 
@@ -129,6 +135,7 @@ class RepairProposalIntegrationTest {
         applyMigration("db/migration/V9__version_knowledge_documents.sql");
         applyMigration("db/migration/V10__create_bad_case_intake.sql");
         applyMigration("db/migration/V11__create_repair_proposal.sql");
+        applyMigration("db/migration/V12__add_proposal_revision_idempotency.sql");
 
         AiBadCase badCase = new AiBadCase();
         badCase.setUserId(7L);
@@ -234,6 +241,60 @@ class RepairProposalIntegrationTest {
         assertThat(RepairProposalType.valueOf(proposal.getProposalType()).isExecutable()).isFalse();
     }
 
+    @Test
+    void shouldAllowExactlyOneReviewedRevision() {
+        AiBadCase revisionCase = triagedCase("sealed:metadata-revision");
+        RepairProposal original = proposalService.create(
+                7L, revisionCase.getId(), "proposal:revision", metadataDraft(
+                        31L, 1, "spring,transaction,first"));
+        ReviewerDecision revise = blockingDecision(ReviewerVerdict.REVISE);
+
+        RepairProposal reviewed = reviewPersistenceService.saveDecision(
+                7L, original.getId(), revise);
+        assertThat(reviewed.getStatus()).isEqualTo(RepairProposalStatus.REVIEWED.name());
+        assertThat(badCaseMapper.selectById(revisionCase.getId()).getStatus())
+                .isEqualTo(BadCaseStatus.REVIEWED.name());
+
+        RepairProposalDraft revisedDraft = metadataDraft(
+                31L, 1, "spring,transaction,revised");
+        RepairProposal revised = proposalService.revise(
+                7L, original.getId(), "proposal:revision:1", revisedDraft);
+        RepairProposal retried = proposalService.revise(
+                7L, original.getId(), "proposal:revision:1", revisedDraft);
+        assertThat(retried.getId()).isEqualTo(revised.getId());
+        assertThat(revised.getRevisionNo()).isEqualTo(1);
+        assertThat(revised.getStatus()).isEqualTo(RepairProposalStatus.DRAFT.name());
+        assertThat(badCaseMapper.selectById(revisionCase.getId()).getStatus())
+                .isEqualTo(BadCaseStatus.PROPOSED.name());
+
+        RepairProposal rejected = reviewPersistenceService.saveDecision(
+                7L, original.getId(), revise);
+        assertThat(rejected.getReviewerVerdict()).isEqualTo(ReviewerVerdict.REVISE.name());
+        assertThat(rejected.getStatus()).isEqualTo(RepairProposalStatus.REJECTED.name());
+        assertThat(badCaseMapper.selectById(revisionCase.getId()).getStatus())
+                .isEqualTo(BadCaseStatus.NO_ACTION.name());
+    }
+
+    @Test
+    void reviewerPassShouldAdvanceProposalToHumanApproval() {
+        AiBadCase passCase = triagedCase("sealed:metadata-pass");
+        RepairProposal proposal = proposalService.create(
+                7L, passCase.getId(), "proposal:pass",
+                metadataDraft(31L, 1, "spring,transaction,approved-candidate"));
+        ReviewerDecision pass = new ReviewerDecision(
+                ReviewerVerdict.PASS,
+                "The proposal is supported and remains within metadata scope.",
+                java.util.List.of(),
+                0.9);
+
+        RepairProposal reviewed = reviewPersistenceService.saveDecision(
+                7L, proposal.getId(), pass);
+
+        assertThat(reviewed.getStatus()).isEqualTo(RepairProposalStatus.AWAITING_APPROVAL.name());
+        assertThat(badCaseMapper.selectById(passCase.getId()).getStatus())
+                .isEqualTo(BadCaseStatus.AWAITING_APPROVAL.name());
+    }
+
     private AiBadCase triagedCase(String sourceRef) {
         AiBadCase badCase = new AiBadCase();
         badCase.setUserId(7L);
@@ -274,6 +335,20 @@ class RepairProposalIntegrationTest {
         return "{\"targetQuestion\":\"How does propagation work?\","
                 + "\"relatedKeywords\":[\"propagation\"],"
                 + "\"fullDatasetVersion\":\"rag-v1\"}";
+    }
+
+    private ReviewerDecision blockingDecision(ReviewerVerdict verdict) {
+        return new ReviewerDecision(
+                verdict,
+                "The proposal must address a blocking evidence gap.",
+                java.util.List.of(new ReviewerFinding(
+                        "MISSING_COUNTEREVIDENCE",
+                        ReviewerSeverity.BLOCKING,
+                        "The proposal omitted a current source.",
+                        "counterevidence",
+                        null,
+                        null)),
+                0.85);
     }
 
     private void applyMigration(String resource) {
