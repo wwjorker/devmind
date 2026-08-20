@@ -378,6 +378,12 @@ Phase C 的知识写入以 `knowledge_document.version_no` 作为乐观锁，并
 空证据并沿用原 prompt schema 标记，不伪装成新 schema 证据。bad case 状态
 迁移受 Java 白名单和 `status_version` 乐观锁双重保护。
 
+`repair_proposal` 把 diff、document base version、正反证据、影响范围和回归计划
+分字段留痕。确定性 `ProposalValidator` 会拒绝跨租户引用、过期 base version、
+越界 diff 和不存在于来源版本的 excerpt。首版只把 `METADATA_PATCH`
+标记为可执行；`DOCUMENT_DRAFT` 必须引用 `USER_SUPPLIED` 可信材料，且只供
+人工复核，不会被自动发布。proposal 创建使用租户级幂等键。
+
 ## 本地运行
 
 依赖：
