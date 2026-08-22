@@ -68,6 +68,8 @@ final class V2FourArmEvaluationEngine {
         report.put("model", metadata.model());
         report.put("temperature", 0);
         report.put("knowledgeSnapshot", metadata.knowledgeSnapshot());
+        report.put("evaluationMode",
+                "offline prompt-only classification and proposal review; production tool loop not invoked");
         ObjectNode budgets = report.putObject("budgets");
         budgets.put("maxModelCallsPerCase", 6);
         budgets.put("maxToolCallsPerCase", 12);

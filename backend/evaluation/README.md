@@ -68,8 +68,15 @@ frozen files, hashes their exact bytes, strips gold fields from model messages,
 uses temperature zero, counts invalid/provider failures as failed cases, and
 writes only to `target/evaluation/v2-four-arm-provider-report.json`. A full run
 attempts at most 240 model calls (48 single, 96 self-review, 96 reviewed-multi),
-so estimate cost before enabling it. The test remains skipped unless all of the
-following are set:
+so estimate cost before enabling it.
+
+This runner is deliberately an offline prompt-only comparison over root-cause
+classification and reviewer challenges. It gives every arm an empty tool set
+and does not execute the production orchestrator, evidence tools, approval, or
+repair loop. Target repair and retrieval regression remain separate integration
+evidence, so this report must not be presented as an end-to-end Agent score.
+
+The test remains skipped unless all of the following are set:
 
 - `DEVMIND_RUN_V2_EVALUATION=true`
 - `DEVMIND_DEEPSEEK_API_KEY`
