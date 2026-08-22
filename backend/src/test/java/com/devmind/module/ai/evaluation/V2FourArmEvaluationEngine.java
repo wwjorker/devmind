@@ -66,12 +66,14 @@ final class V2FourArmEvaluationEngine {
         report.put("startedAt", Instant.now(clock).toString());
         report.put("provider", metadata.provider());
         report.put("model", metadata.model());
+        report.put("providerEndpoint", metadata.providerEndpoint());
         report.put("temperature", 0);
         report.put("knowledgeSnapshot", metadata.knowledgeSnapshot());
         report.put("evaluationMode",
                 "offline prompt-only classification and proposal review; production tool loop not invoked");
         report.put("claimBoundary",
                 "resume claim is withheld; this offline report alone cannot authorize it");
+        report.put("pricingBasis", metadata.pricingBasis());
         ObjectNode budgets = report.putObject("budgets");
         budgets.put("maxModelCallsPerCase", 6);
         budgets.put("maxToolCallsPerCase", 12);
@@ -472,12 +474,14 @@ final class V2FourArmEvaluationEngine {
     record RunMetadata(String provider,
                        String model,
                        String expectedModelProvider,
+                       String providerEndpoint,
                        String knowledgeSnapshot,
                        String sealedHash,
                        String challengeHash,
                        String legacyHash,
                        BigDecimal inputUsdPerMillion,
-                       BigDecimal outputUsdPerMillion) {
+                       BigDecimal outputUsdPerMillion,
+                       String pricingBasis) {
         boolean hasPricing() {
             return inputUsdPerMillion != null && outputUsdPerMillion != null;
         }

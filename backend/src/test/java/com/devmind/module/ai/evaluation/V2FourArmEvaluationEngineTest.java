@@ -51,12 +51,14 @@ class V2FourArmEvaluationEngineTest {
                         "deepseek",
                         "frozen-test-model",
                         "deepseek:frozen-test-model",
+                        "https://api.example/v1",
                         "git:test",
                         "sealed-hash",
                         "challenge-hash",
                         "legacy-hash",
                         new BigDecimal("1.00"),
-                        new BigDecimal("2.00")));
+                        new BigDecimal("2.00"),
+                        "test list price"));
 
         assertThat(report.path("arms").fieldNames())
                 .toIterable()
@@ -65,6 +67,8 @@ class V2FourArmEvaluationEngineTest {
                 .contains("prompt-only", "tool loop not invoked");
         assertThat(report.path("claimBoundary").asText())
                 .contains("resume claim is withheld", "alone cannot authorize");
+        assertThat(report.path("providerEndpoint").asText()).isEqualTo("https://api.example/v1");
+        assertThat(report.path("pricingBasis").asText()).isEqualTo("test list price");
         assertThat(report.path("arms").path("rules").path("rootCause").path("accuracy").asDouble())
                 .isEqualTo(1.0);
         assertThat(report.path("arms").path("reviewed-multi")
@@ -90,8 +94,8 @@ class V2FourArmEvaluationEngineTest {
                 new FailingClient(),
                 new V2FourArmEvaluationEngine.RunMetadata(
                         "unavailable", "unavailable", "unavailable:model",
-                        "rules-contract-test", "sealed", "challenges", "legacy",
-                        null, null));
+                        "offline", "rules-contract-test", "sealed", "challenges", "legacy",
+                        null, null, "not applicable"));
 
         ObjectNode rules = (ObjectNode) report.path("arms").path("rules");
         assertThat(rules.path("rootCause").path("correctCount").asInt()).isEqualTo(24);

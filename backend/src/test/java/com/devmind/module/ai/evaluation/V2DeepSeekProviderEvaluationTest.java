@@ -23,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @EnabledIfEnvironmentVariable(named = "DEVMIND_EVAL_KNOWLEDGE_SNAPSHOT", matches = ".+")
 @EnabledIfEnvironmentVariable(named = "DEVMIND_DEEPSEEK_INPUT_USD_PER_MILLION", matches = "[0-9]+(\\.[0-9]+)?")
 @EnabledIfEnvironmentVariable(named = "DEVMIND_DEEPSEEK_OUTPUT_USD_PER_MILLION", matches = "[0-9]+(\\.[0-9]+)?")
+@EnabledIfEnvironmentVariable(named = "DEVMIND_EVAL_PRICING_BASIS", matches = ".+")
 class V2DeepSeekProviderEvaluationTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
@@ -54,12 +55,14 @@ class V2DeepSeekProviderEvaluationTest {
                         "deepseek",
                         properties.getDeepseekModel(),
                         "deepseek:" + properties.getDeepseekModel(),
+                        properties.getDeepseekBaseUrl(),
                         System.getenv("DEVMIND_EVAL_KNOWLEDGE_SNAPSHOT"),
                         sha256(sealedBytes),
                         sha256(challengeBytes),
                         sha256(legacyBytes),
                         new BigDecimal(System.getenv("DEVMIND_DEEPSEEK_INPUT_USD_PER_MILLION")),
-                        new BigDecimal(System.getenv("DEVMIND_DEEPSEEK_OUTPUT_USD_PER_MILLION"))));
+                        new BigDecimal(System.getenv("DEVMIND_DEEPSEEK_OUTPUT_USD_PER_MILLION")),
+                        System.getenv("DEVMIND_EVAL_PRICING_BASIS")));
 
         Path output = Path.of("target", "evaluation", "v2-four-arm-provider-report.json");
         Files.createDirectories(output.getParent());

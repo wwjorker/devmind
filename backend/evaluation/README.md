@@ -84,6 +84,8 @@ The test remains skipped unless all of the following are set:
 - `DEVMIND_EVAL_KNOWLEDGE_SNAPSHOT`
 - `DEVMIND_DEEPSEEK_INPUT_USD_PER_MILLION`
 - `DEVMIND_DEEPSEEK_OUTPUT_USD_PER_MILLION`
+- `DEVMIND_EVAL_PRICING_BASIS` (name the list-price source and any endpoint
+  mismatch or estimation limitation; do not present an estimate as a bill)
 
 Run it with:
 
