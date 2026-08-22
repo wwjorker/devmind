@@ -482,7 +482,15 @@ DEVMIND_DB_URL=jdbc:mysql://localhost:3306/devmind?useUnicode=true&characterEnco
 DEVMIND_REDIS_PORT=6379
 ```
 
-IDEA 打开本目录后可选择共享运行配置 `DevMind - Local Mock`。它不包含密钥，并与 `run-local.ps1` 使用同一套 Compose 数据；真实 Provider 配置应保留在未提交的个人运行配置或操作系统环境变量中。
+IDEA 打开本目录后可选择共享运行配置 `DevMind - Local Mock`。它不包含密钥，并与 `run-local.ps1` 使用同一套 Compose 数据。
+
+真实 Provider 按以下边界注入密钥：
+
+- 本地开发：使用未勾选“存储为项目文件”的 IDEA 个人运行配置，或由当前进程环境注入；
+- CI/CD：使用仓库或流水线 Secret，在任务运行时映射为同名环境变量；
+- 部署环境：使用部署平台 Secret 或专用密钥管理服务，不依赖 IDE 配置。
+
+仓库仅提交 `.env.example` 作为变量契约；`.env` 和 `.env.*` 本地文件均被忽略。不得将真实密钥写入 `.env.example`、`application.yml` 或共享 `.run` 配置。密钥曾出现在截图、日志或提交历史时，应立即在 Provider 端轮换，不以删除本地文件代替轮换。
 
 DeepSeek provider：
 

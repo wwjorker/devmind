@@ -3,6 +3,8 @@ target/
 *.iml
 .vscode/
 .env
+.env.*
+!.env.example
 logs/
 data/uploads/
 *.log
