@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,13 +60,32 @@ class RepairWorkflowActionServiceTest {
         run.setBadCaseId(41L);
         run.setStatus(AgentRunStatus.SUCCEEDED.name());
         when(proposalService.getOwned(7L, 31L)).thenReturn(proposal);
-        when(runService.findOwnedByIdempotencyKey(7L, "review-same:review"))
+        when(runService.findOwnedByIdempotencyKey(7L, "review-same:review:31"))
                 .thenReturn(run);
 
         assertThat(service.review(7L, 31L, "review-same", modelClient)).isSameAs(proposal);
 
         verify(runService, never()).startRun(any(), any(), any(), any(), any());
         verify(reviewService, never()).review(any(), any(), any(), any());
+    }
+
+    @Test
+    void shouldBindAReviewRunIdempotencyKeyToTheProposal() {
+        RepairProposal proposal = proposal(RepairProposalStatus.DRAFT);
+        AgentRun run = new AgentRun();
+        run.setId(51L);
+        run.setBadCaseId(41L);
+        run.setStatus(AgentRunStatus.RUNNING.name());
+        when(proposalService.getOwned(7L, 31L)).thenReturn(proposal);
+        when(runService.startRun(eq(7L), eq(41L), any(), any(),
+                eq("review-request:review:31"))).thenReturn(run);
+        when(reviewService.review(eq(7L), eq(31L), any(), eq(modelClient)))
+                .thenReturn(proposal);
+
+        assertThat(service.review(7L, 31L, "review-request", modelClient))
+                .isSameAs(proposal);
+
+        verify(reviewService).review(eq(7L), eq(31L), any(), eq(modelClient));
     }
 
     private RepairProposal proposal(RepairProposalStatus status) {

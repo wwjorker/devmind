@@ -93,7 +93,7 @@ Redis-backed token blacklist
 Spring context wiring for mapper scan safety
 ```
 
-测试集还包含一个受 Docker 控制的 MySQL Testcontainers 集成测试。当 Docker 可用时，它会启动 MySQL 5.7、在真实数据库引擎上执行 Flyway 迁移、经服务层创建一篇文档、验证 chunk 向量持久化、跑一遍混合检索，并检查 MySQL FULLTEXT mapper 的行为。当本地没有 Docker 时，该集成测试会被跳过，而不是阻塞本地开发。
+测试集还包含一个受 Docker 控制的 MySQL Testcontainers 集成测试。当 Docker 可用时，它会启动 MySQL 8.0、在真实数据库引擎上执行 Flyway 迁移、经服务层创建一篇文档、验证 chunk 向量持久化、跑一遍混合检索，并检查 MySQL FULLTEXT mapper 的行为。当本地没有 Docker 时，该集成测试会被跳过，而不是阻塞本地开发。
 
 GitHub Actions 会在每次向 `main` 的 push 和 pull request 上执行同样的 Maven 测试命令，因此 MySQL 集成测试预期会在有 Docker 的 CI 环境里真实运行。
 

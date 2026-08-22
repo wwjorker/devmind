@@ -431,6 +431,7 @@ SELECT
     115,
     1
 WHERE @demo_user_id IS NOT NULL;
+SET @redis_lock_chunk_id := LAST_INSERT_ID();
 
 -- 14. HTTP and TCP basics
 INSERT INTO knowledge_document (user_id, title, content, source_type, tags, summary, status)
@@ -487,15 +488,16 @@ SELECT
         'reason', '当前来源冲突，系统不得自动选择。'
     ),
     JSON_ARRAY(
-        JSON_OBJECT('chunkId', @redis_chunk_id, 'documentTitle', 'Redis 缓存穿透复盘',
-                    'modelVisibleContent', '示例来源 A：固定 TTL。'),
+        JSON_OBJECT('chunkId', @redis_lock_chunk_id, 'documentId', @redis_lock_doc_id,
+                    'documentTitle', 'Redis 分布式锁',
+                    'modelVisibleContent', '长任务需要考虑续期，高可用场景要评估主从切换和 Redlock 取舍。'),
         JSON_OBJECT('chunkId', NULL, 'documentTitle', '用户补充的运行手册',
-                    'modelVisibleContent', '示例来源 B：长任务必须续期。')
+                    'modelVisibleContent', '所有锁固定为 30 秒，不允许续期。')
     ),
     JSON_ARRAY(JSON_OBJECT(
         'sourceId', 'demo-runbook-2026',
         'title', '用户补充的运行手册',
-        'content', '长任务必须续期，固定 TTL 仅适用于短任务。',
+        'content', '所有锁固定为 30 秒，不允许续期。',
         'origin', 'USER_SUPPLIED'
     )),
     2,
@@ -529,7 +531,7 @@ SELECT
         'chunkId', @redis_chunk_id,
         'documentId', @redis_doc_id,
         'documentTitle', 'Redis 缓存穿透复盘',
-        'modelVisibleContent', 'Redis 缓存穿透会让不存在 key 的请求反复打到 MySQL。'
+        'modelVisibleContent', 'Redis 缓存穿透是大量请求查询不存在的数据，导致缓存无法命中并反复打到 MySQL。'
     )),
     2,
     'knowledge_exists_not_retrieved',

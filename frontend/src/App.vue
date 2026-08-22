@@ -52,7 +52,7 @@ const retrievalEvaluation = ref<RagRetrievalEvaluation | null>(null);
 const lastEvaluationRunAt = ref<string | null>(null);
 const repairCases = ref<RepairCaseSummary[]>([]);
 const selectedRepairCase = ref<RepairCaseDetail | null>(null);
-const proposalEditJson = ref('');
+const proposalEditJson = ref<Record<number, string>>({});
 const askElapsedSeconds = ref(0);
 let askTimer: number | null = null;
 let sessionGeneration = 0;
@@ -79,7 +79,7 @@ const error = ref('');
 const authForm = reactive({
   mode: 'login' as 'login' | 'register',
   username: 'testuser',
-  password: '123456',
+  password: '',
   nickname: '测试用户',
   email: 'testuser@example.com'
 });
@@ -294,9 +294,10 @@ async function loadRepairCases() {
 
 async function openRepairCase(id: number) {
   selectedRepairCase.value = await apiRequest<RepairCaseDetail>(`/api/v1/ai/repair/cases/${id}`);
-  proposalEditJson.value = selectedRepairCase.value.proposals[0]?.approvedDiffJson
-    || selectedRepairCase.value.proposals[0]?.diffJson
-    || '';
+  proposalEditJson.value = Object.fromEntries(selectedRepairCase.value.proposals.map(proposal => [
+    proposal.id,
+    proposal.approvedDiffJson || proposal.diffJson || ''
+  ]));
 }
 
 async function runRepairAction(path: string, body: Record<string, unknown>) {
@@ -336,7 +337,7 @@ function decideProposal(proposalId: number, decision: 'APPROVE' | 'APPROVE_WITH_
     {
       decision,
       idempotencyKey: workflowKey('decision'),
-      editedDiffJson: decision === 'APPROVE_WITH_EDIT' ? proposalEditJson.value : null,
+      editedDiffJson: decision === 'APPROVE_WITH_EDIT' ? proposalEditJson.value[proposalId] : null,
       comment: decision === 'REJECT' ? '知识库维护者拒绝此提案。' : '知识库维护者已检查 diff 与来源。'
     }
   );
@@ -457,7 +458,7 @@ function clearLocalSession() {
   retrievalEvaluation.value = null;
   repairCases.value = [];
   selectedRepairCase.value = null;
-  proposalEditJson.value = '';
+  proposalEditJson.value = {};
   lastEvaluationRunAt.value = null;
   loading.auth = false;
   loading.initialData = false;
@@ -1593,7 +1594,7 @@ onUnmounted(() => {
                 <div v-if="proposal.status === 'AWAITING_APPROVAL'" class="approval-box">
                   <label>
                     人工编辑后的 JSON diff
-                    <textarea v-model="proposalEditJson" rows="5"></textarea>
+                    <textarea v-model="proposalEditJson[proposal.id]" rows="5"></textarea>
                   </label>
                   <div class="feedback-actions">
                     <button class="primary-button" :disabled="loading.repairs" @click="decideProposal(proposal.id, 'APPROVE')">批准原 diff</button>

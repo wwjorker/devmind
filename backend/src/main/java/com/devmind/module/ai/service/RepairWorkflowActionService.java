@@ -53,7 +53,7 @@ public class RepairWorkflowActionService {
                                  Long proposalId,
                                  String idempotencyKey,
                                  AgentModelClient modelClient) {
-        String key = requireKey(idempotencyKey) + ":review";
+        String key = requireKey(idempotencyKey) + ":review:" + proposalId;
         RepairProposal proposal = proposalService.getOwned(userId, proposalId);
         if (!RepairProposalStatus.DRAFT.name().equals(proposal.getStatus())) {
             AgentRun existing = runPersistenceService.findOwnedByIdempotencyKey(userId, key);

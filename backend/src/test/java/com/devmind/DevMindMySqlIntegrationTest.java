@@ -29,6 +29,7 @@ import com.devmind.module.ai.service.RepairProposalDraft;
 import com.devmind.module.ai.service.RepairProposalService;
 import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.entity.KnowledgeDocument;
+import com.devmind.module.document.entity.KnowledgeDocumentVersion;
 import com.devmind.module.document.mapper.DocumentChunkMapper;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
 import com.devmind.module.document.service.KnowledgeDocumentService;
@@ -53,8 +54,9 @@ import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import java.util.List;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -304,10 +306,20 @@ class DevMindMySqlIntegrationTest {
         assertThat(jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM repair_proposal WHERE user_id = ? AND status = 'AWAITING_APPROVAL'",
                 Integer.class, demo.getId())).isEqualTo(1);
+        assertSeededChunkSnapshotMatchesSource(demo.getId(), "demo:source-conflict");
+        assertSeededChunkSnapshotMatchesSource(
+                demo.getId(), "demo:metadata-repair-awaiting-approval");
 
         Long proposalId = jdbcTemplate.queryForObject(
                 "SELECT id FROM repair_proposal WHERE user_id = ? AND status = 'AWAITING_APPROVAL'",
                 Long.class, demo.getId());
+        RepairProposal seededProposal = proposalService.getOwned(demo.getId(), proposalId);
+        KnowledgeDocumentVersion evidenceVersion = versionService.getOwnedVersion(
+                demo.getId(),
+                seededProposal.getTargetDocumentId(),
+                seededProposal.getBaseVersionNo());
+        assertThat(evidenceVersion.getTitle()).isEqualTo("Redis 缓存穿透复盘");
+        assertThat(seededProposal.getEvidenceJson()).contains("Redis 缓存穿透");
         RepairProposal approved = approvalService.decide(
                 demo.getId(),
                 proposalId,
@@ -403,8 +415,27 @@ class DevMindMySqlIntegrationTest {
     private void runDemoSeed() {
         ResourceDatabasePopulator populator = new ResourceDatabasePopulator(
                 new FileSystemResource("docs/sql/reset-and-seed-demo-data-for-testuser.sql"));
+        populator.setSqlScriptEncoding(StandardCharsets.UTF_8.name());
         populator.setContinueOnError(false);
         populator.execute(jdbcTemplate.getDataSource());
+    }
+
+    private void assertSeededChunkSnapshotMatchesSource(Long userId, String sourceRef) {
+        Long chunkId = jdbcTemplate.queryForObject("""
+                SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(chunk_snapshot_json, '$[0].chunkId')) AS UNSIGNED)
+                FROM ai_bad_case
+                WHERE user_id = ? AND source_ref = ?
+                """, Long.class, userId, sourceRef);
+        String excerpt = jdbcTemplate.queryForObject("""
+                SELECT JSON_UNQUOTE(JSON_EXTRACT(chunk_snapshot_json, '$[0].modelVisibleContent'))
+                FROM ai_bad_case
+                WHERE user_id = ? AND source_ref = ?
+                """, String.class, userId, sourceRef);
+        String sourceContent = jdbcTemplate.queryForObject(
+                "SELECT content FROM knowledge_document_chunk WHERE id = ? AND user_id = ?",
+                String.class, chunkId, userId);
+
+        assertThat(sourceContent).contains(excerpt);
     }
 
     private CreateDocumentRequest createRedisDocument() {
