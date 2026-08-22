@@ -91,7 +91,10 @@ Run it with:
 .\mvnw.cmd "-Dtest=V2DeepSeekProviderEvaluationTest" test
 ```
 
-The v1 frozen text is deliberately retained even though the rules baseline
-reaches a ceiling score on it. This is a dataset-difficulty limitation, not a
-Multi-Agent improvement claim. Any harder dataset must receive a new version;
-the v1 files and their prior reports must not be rewritten.
+The v1 frozen text is deliberately retained even though the rules baseline is
+keyword-tuned to its exact wording and therefore reaches a ceiling score. This
+is a baseline-overfitting and dataset-difficulty limitation, not a Multi-Agent
+improvement claim. Any harder dataset must receive a new version; the v1 files
+and their prior reports must not be rewritten. The report's component gate
+booleans are diagnostic only: `resumeClaimAllowed` remains false because this
+offline prompt-only run cannot establish end-to-end production quality.

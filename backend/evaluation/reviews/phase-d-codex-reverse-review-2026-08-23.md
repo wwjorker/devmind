@@ -8,11 +8,12 @@ workflow, demo seed, UI, frozen four-arm runner, integration tests, documentatio
 and secret-handling boundaries. Findings were accepted only after checking the
 real code path and adding or strengthening reproducible tests.
 
-Claude was not invoked. The locally available Claude CLI had previously reported
-`claude-opus-4-8`, while the project rule permits a phase review only with the
-exact Claude Opus 5 model and forbids fallback. Substituting another model would
-create misleading provenance and could incur unexpected API usage. Fable 5 was
-also not invoked because the user did not authorize a new paid review.
+At the time of this initial Codex pass, Claude was not invoked because the local
+CLI reported `claude-opus-4-8` while the then-current project rule required exact
+Opus 5. The user later explicitly accepted Opus 4.8. That separate read-only
+review and Codex adjudication are recorded in
+`phase-d-claude-opus-4-8-review-2026-08-23.md`. Fable 5 was not invoked because
+the user did not authorize a new paid review.
 
 ## Confirmed findings and disposition
 
@@ -53,11 +54,12 @@ also not invoked because the user did not authorize a new paid review.
 ## Validation evidence
 
 - Backend full suite with Docker unavailable: 190 tests, 0 failures, 0 errors,
-  12 environment-gated skips. The final Docker-enabled run executed 191 tests
+  12 environment-gated skips. The post-Claude Docker-enabled run executed 192 tests
   with 0 failures, 0 errors, and 3 explicit skips: the private-provider smoke,
   the opt-in 240-call evaluation, and the standalone pgvector benchmark.
 - Real MySQL 8.0 Testcontainers gate after the encoding/evidence corrections:
-  Flyway V1 through V13 applied; 4 tests passed. The full suite also executed the
+  Flyway V1 through V13 applied; 5 tests passed, including direct recovery from
+  a stale `VERIFYING` proposal. The full suite also executed the
   5-test pgvector integration class against a real PostgreSQL/pgvector container.
 - Focused workflow/evaluation regression: 5 tests passed.
 - Frontend clean install audit after the lockfile update: 0 vulnerabilities.

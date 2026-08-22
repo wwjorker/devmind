@@ -240,6 +240,43 @@ class DevMindMySqlIntegrationTest {
     }
 
     @Test
+    void resumesAStaleVerifyingRepairOnRealMySql() {
+        Long userId = createUser();
+        DocumentResponse document = documentService.create(userId, createRedisDocument());
+        RepairProposal approved = approvedMetadataProposal(
+                userId,
+                document.getId(),
+                "mysql-verifying-recovery",
+                "Redis,cache,penetration,mysql,verified",
+                "How does Redis cache penetration reach MySQL?");
+        String executionKey = "execution:mysql-verifying-recovery:" + approved.getId();
+        RepairProposal executing = executionStateService.reserve(
+                userId, approved.getId(), executionKey);
+        MetadataMutationResult applied = mutationService.applyApprovedMetadata(
+                userId, executing.getId(), executionKey);
+        executionStateService.markVerifying(
+                userId, executing.getId(), executionKey, applied.versionNo());
+        ageProposal(approved.getId());
+
+        List<RepairProposal> recovered = recoveryService.recoverStale(
+                userId, Duration.ofMinutes(30));
+
+        assertThat(recovered).extracting(RepairProposal::getId).contains(approved.getId());
+        RepairProposal result = proposalService.getOwned(userId, approved.getId());
+        assertThat(result.getStatus()).isEqualTo(RepairProposalStatus.APPLIED.name());
+        assertThat(result.getExecutionResultJson()).contains("RESOLVED");
+        KnowledgeDocument storedDocument = documentMapper.selectById(document.getId());
+        assertThat(storedDocument.getVersionNo()).isEqualTo(2);
+        assertThat(storedDocument.getTags()).contains("verified");
+        KnowledgeDocumentVersion appliedVersion = versionService.getOwnedVersion(
+                userId, document.getId(), 2);
+        assertThat(appliedVersion.getProposalId()).isEqualTo(approved.getId());
+        assertThat(appliedVersion.getOrigin()).isEqualTo("REPAIR_PROPOSAL");
+        assertThat(badCaseMapper.selectById(approved.getBadCaseId()).getStatus())
+                .isEqualTo(BadCaseStatus.RESOLVED.name());
+    }
+
+    @Test
     void finishesCompensationAfterRollbackWriteOnRealMySql() {
         Long userId = createUser();
         DocumentResponse document = documentService.create(userId, createRedisDocument());

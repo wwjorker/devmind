@@ -63,6 +63,8 @@ class V2FourArmEvaluationEngineTest {
                 .containsExactlyElementsOf(V2FourArmEvaluationEngine.ARMS);
         assertThat(report.path("evaluationMode").asText())
                 .contains("prompt-only", "tool loop not invoked");
+        assertThat(report.path("claimBoundary").asText())
+                .contains("resume claim is withheld", "alone cannot authorize");
         assertThat(report.path("arms").path("rules").path("rootCause").path("accuracy").asDouble())
                 .isEqualTo(1.0);
         assertThat(report.path("arms").path("reviewed-multi")
