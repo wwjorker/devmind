@@ -47,6 +47,11 @@ there; Phase D must run and record both sides under the frozen manifest.
 
 ## Phase D reproducible checks
 
+The first opt-in real-provider protocol check is recorded in
+`results/phase-d-deepseek-tool-calling-smoke-2026-08-23.md`. It proves the
+two-round tool-calling wire path against the configured DeepSeek model, but is
+not a scored four-arm evaluation or a model-quality claim.
+
 The real MySQL merge gate uses the normal Testcontainers test. Docker Engine 29
 raises its minimum client API above the docker-java default used here, so pass an
 explicit compatible API version instead of editing a developer's private Docker
