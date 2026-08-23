@@ -90,6 +90,17 @@ $env:DOCKER_HOST='npipe:////./pipe/dockerDesktopLinuxEngine'
 .\mvnw.cmd "-Dapi.version=1.44" "-Dtest=DevMindMySqlIntegrationTest" test
 ```
 
+The same integration test also writes
+`target/evaluation/phase-d-controlled-repair-report.json`. It seeds the fixed
+offline demo, persists local sparse vectors for every active chunk before the
+baseline, evaluates all 40 frozen retrieval cases, executes the single seeded
+and human-approved metadata repair, and evaluates the same cases again. This
+keeps the MySQL snapshot, case order, embedding provider, K, and retrieval limit
+comparable on both sides. The measured `targetRepairRate` is deliberately scoped
+to one deterministic repair fixture and must not be presented as a generalized
+success rate. Set `DEVMIND_EVAL_KNOWLEDGE_SNAPSHOT` when preserving a report;
+ordinary test runs use the explicit placeholder `git:working-tree`.
+
 `V2DeepSeekProviderEvaluationTest` is the opt-in four-arm runner. It reads the
 2.0.0 frozen files, hashes their exact bytes, strips gold fields from model messages,
 uses temperature zero, counts invalid/provider failures as failed cases, and

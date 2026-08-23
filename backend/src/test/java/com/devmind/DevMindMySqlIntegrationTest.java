@@ -27,6 +27,8 @@ import com.devmind.module.ai.service.RepairExecutor;
 import com.devmind.module.ai.service.RepairExecutionStateService;
 import com.devmind.module.ai.service.RepairProposalDraft;
 import com.devmind.module.ai.service.RepairProposalService;
+import com.devmind.module.ai.service.RagEvaluationDatasetService;
+import com.devmind.module.ai.vo.RagRetrievalEvaluationResponse;
 import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.entity.KnowledgeDocumentVersion;
@@ -38,10 +40,13 @@ import com.devmind.module.document.vo.DocumentResponse;
 import com.devmind.module.search.dto.ChunkFullTextMatch;
 import com.devmind.module.search.entity.DocumentChunkVector;
 import com.devmind.module.search.mapper.DocumentChunkVectorMapper;
+import com.devmind.module.search.service.ChunkVectorService;
 import com.devmind.module.search.strategy.RetrievalStrategy;
 import com.devmind.module.search.vo.ChunkSearchResponse;
 import com.devmind.module.user.entity.UserAccount;
 import com.devmind.module.user.mapper.UserAccountMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -64,6 +69,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(properties = {
         "devmind.ai.provider=mock",
+        "devmind.ai.embedding.provider=local-sparse-vector",
+        "devmind.ai.embedding.remote.api-key=",
+        "devmind.ai.rerank.provider=none",
+        "devmind.ai.rerank.remote.api-key=",
         "devmind.redis.host=127.0.0.1",
         "devmind.redis.port=6390",
         "spring.flyway.clean-disabled=false"
@@ -109,6 +118,9 @@ class DevMindMySqlIntegrationTest {
     private final RecoveryService recoveryService;
     private final RepairExecutor repairExecutor;
     private final KnowledgeDocumentVersionService versionService;
+    private final ChunkVectorService chunkVectorService;
+    private final RagEvaluationDatasetService evaluationDatasetService;
+    private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -128,6 +140,9 @@ class DevMindMySqlIntegrationTest {
                                 RecoveryService recoveryService,
                                 RepairExecutor repairExecutor,
                                 KnowledgeDocumentVersionService versionService,
+                                ChunkVectorService chunkVectorService,
+                                RagEvaluationDatasetService evaluationDatasetService,
+                                ObjectMapper objectMapper,
                                 JdbcTemplate jdbcTemplate) {
         this.userAccountMapper = userAccountMapper;
         this.documentService = documentService;
@@ -145,6 +160,9 @@ class DevMindMySqlIntegrationTest {
         this.recoveryService = recoveryService;
         this.repairExecutor = repairExecutor;
         this.versionService = versionService;
+        this.chunkVectorService = chunkVectorService;
+        this.evaluationDatasetService = evaluationDatasetService;
+        this.objectMapper = objectMapper;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -316,7 +334,7 @@ class DevMindMySqlIntegrationTest {
     }
 
     @Test
-    void resetsAndSeedsTheOfflineV2DemoOnRealMySql() {
+    void resetsSeedsAndEvaluatesTheOfflineV2DemoOnRealMySql() throws Exception {
         UserAccount demo = new UserAccount();
         demo.setUsername("testuser");
         demo.setPasswordHash("$2a$10$integration-test-password-hash");
@@ -357,6 +375,15 @@ class DevMindMySqlIntegrationTest {
                 seededProposal.getBaseVersionNo());
         assertThat(evidenceVersion.getTitle()).isEqualTo("Redis 缓存穿透复盘");
         assertThat(seededProposal.getEvidenceJson()).contains("Redis 缓存穿透");
+
+        chunkVectorService.backfillVectors(demo.getId(), "local-sparse-vector");
+        int activeVectorCountBefore = activeLocalSparseVectorCount(demo.getId());
+        int activeChunkCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM knowledge_document_chunk WHERE user_id = ? AND status = 1",
+                Integer.class, demo.getId());
+        assertThat(activeVectorCountBefore).isEqualTo(activeChunkCount);
+        RagRetrievalEvaluationResponse before = evaluationDatasetService.retrievalEvaluation(demo.getId());
+
         RepairProposal approved = approvalService.decide(
                 demo.getId(),
                 proposalId,
@@ -371,6 +398,47 @@ class DevMindMySqlIntegrationTest {
         assertThat(applied.getStatus()).isEqualTo(RepairProposalStatus.APPLIED.name());
         assertThat(documentMapper.selectById(applied.getTargetDocumentId()).getVersionNo())
                 .isEqualTo(2);
+
+        JsonNode executionResult = objectMapper.readTree(applied.getExecutionResultJson());
+        assertThat(executionResult.path("regression").path("passed").asBoolean()).isTrue();
+        RagRetrievalEvaluationResponse after = evaluationDatasetService.retrievalEvaluation(demo.getId());
+        int activeVectorCountAfter = activeLocalSparseVectorCount(demo.getId());
+
+        assertComparableFrozenRuns(before, after);
+        assertThat(activeVectorCountAfter).isEqualTo(activeChunkCount);
+        assertThat(after.getHitAtK()).isGreaterThanOrEqualTo(before.getHitAtK());
+        assertThat(after.getMrr()).isGreaterThanOrEqualTo(before.getMrr());
+
+        ControlledRepairEvaluationReportWriter.write(
+                objectMapper,
+                seededProposal,
+                applied,
+                documentMapper.selectById(applied.getTargetDocumentId()).getVersionNo(),
+                executionResult,
+                before,
+                after,
+                activeVectorCountBefore,
+                activeVectorCountAfter);
+    }
+
+    private int activeLocalSparseVectorCount(Long userId) {
+        return Math.toIntExact(vectorMapper.selectCount(
+                new LambdaQueryWrapper<DocumentChunkVector>()
+                        .eq(DocumentChunkVector::getUserId, userId)
+                        .eq(DocumentChunkVector::getProviderName, "local-sparse-vector")
+                        .eq(DocumentChunkVector::getStatus, 1)));
+    }
+
+    private void assertComparableFrozenRuns(RagRetrievalEvaluationResponse before,
+                                            RagRetrievalEvaluationResponse after) {
+        assertThat(before.getTotalCaseCount()).isEqualTo(40).isEqualTo(after.getTotalCaseCount());
+        assertThat(before.getPositiveCaseCount()).isEqualTo(35).isEqualTo(after.getPositiveCaseCount());
+        assertThat(before.getEvaluationK()).isEqualTo(3).isEqualTo(after.getEvaluationK());
+        assertThat(before.getRetrievalLimit()).isEqualTo(5).isEqualTo(after.getRetrievalLimit());
+        assertThat(after.getCases()).extracting(item -> item.getCaseId())
+                .containsExactlyElementsOf(before.getCases().stream()
+                        .map(item -> item.getCaseId())
+                        .toList());
     }
 
     private Long createUser() {
