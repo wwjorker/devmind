@@ -44,8 +44,12 @@ pgvector 同步都不在数据库事务中。执行失败会保留明确失败�
 索引或目标回归失败时，系统按执行前版本补偿回滚，并允许幂等恢复中断的补偿。
 
 这套闭环验证的是个人知识库中可复现的团队知识维护模式，不宣称已经成为生产级
-企业自治 Agent 平台。四臂对照的冻结数据集和预算协议已经落库，但尚未完成真实
-Provider 评分，因此 README 不报告 Multi-Agent 准确率或 Reviewer 提升结论。
+企业自治 Agent 平台。真实 DeepSeek 四臂实验在修正版 v2 冻结集上完成 240 次模型
+调用且无调用失败：`single`、`single+self-review`、`reviewed-multi` 的根因分类均为
+24/24；Reviewer challenge 缺陷捕获分别为 12/12、8/12、10/12。独立 Reviewer
+只比 self-review 多抓 2 个，未达到预注册的至少 5 个门槛，因此项目保留双角色流水线，
+但不宣称 Multi-Agent 带来质量提升。完整原始报告、无效首跑和协议修正记录见
+[backend/evaluation](backend/evaluation/README.md)。
 
 ## 项目亮点
 

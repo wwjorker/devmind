@@ -424,9 +424,13 @@ POST /api/v1/ai/repair/proposals/{proposalId}/decision
 POST /api/v1/ai/repair/proposals/{proposalId}/execute
 ```
 
-冻结的 24 条六类 bad case、24 条 Reviewer challenge 和四臂 manifest 在
-`evaluation/`。它们只建立后续可比评测契约；尚未执行真实 Provider 评分，因此
-不宣称 Multi-Agent 或 Reviewer 已带来统计显著提升。
+冻结的 24 条六类 bad case、24 条 Reviewer challenge 和四臂协议在
+`evaluation/`。真实 DeepSeek v2 评分完成 240 次模型调用且无调用失败；三个模型臂
+的根因分类均为 24/24，`single`、`single+self-review`、`reviewed-multi` 的 challenge
+缺陷捕获分别为 12/12、8/12、10/12。独立 Reviewer 相对 self-review 的增量是 2 个，
+低于预注册的 5 个门槛，所以只证明实现了可复现的双角色生成—核验流水线，不宣称
+Reviewer 带来质量提升。原始结果和边界见
+[`evaluation/results/phase-d-four-arm-provider-run-v2-2026-08-23.md`](evaluation/results/phase-d-four-arm-provider-run-v2-2026-08-23.md)。
 
 ## 本地运行
 

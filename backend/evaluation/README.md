@@ -68,6 +68,17 @@ protocol repair, unchanged fairness contract, new degeneracy diagnostics and
 evidence policy. Any corrected v1 rerun is post-hoc regression evidence; a fresh
 dataset version is required for another scored result.
 
+The first scored amended run is preserved in
+`results/phase-d-four-arm-provider-run-v2-2026-08-23.json`, with a concise
+decision record beside it. It used the fresh 2.0.0 datasets, the exact
+`deepseek-v4-flash` model at temperature zero, and completed all 240 model calls
+without a provider failure. All three model arms classified 24/24 root-cause
+cases correctly. On reviewer challenges, `single`, `single+self-review`, and
+`reviewed-multi` caught 12/12, 8/12, and 10/12 defective proposals respectively.
+The independent reviewer therefore added two catches over self-review, below the
+preregistered threshold of five; `resumeClaimAllowed` is false. This is a scored
+negative result, not evidence of Reviewer uplift.
+
 The real MySQL merge gate uses the normal Testcontainers test. Docker Engine 29
 raises its minimum client API above the docker-java default used here, so pass an
 explicit compatible API version instead of editing a developer's private Docker
@@ -109,10 +120,12 @@ Run it with:
 .\mvnw.cmd "-Dtest=V2DeepSeekProviderEvaluationTest" test
 ```
 
-The v1 frozen text is deliberately retained even though the rules baseline is
-keyword-tuned to its exact wording and therefore reaches a ceiling score. This
-is a baseline-overfitting and dataset-difficulty limitation, not a Multi-Agent
-improvement claim. Any harder dataset must receive a new version; the v1 files
-and their prior reports must not be rewritten. The report's component gate
-booleans are diagnostic only: `resumeClaimAllowed` remains false because this
-offline prompt-only run cannot establish end-to-end production quality.
+The v1 frozen text is deliberately retained even though its rules baseline is
+keyword-tuned to the exact wording and reaches a ceiling score. The fresh v2
+wording exposed that limitation: the same rules classified only 6/24 root-cause
+cases, while the model arms reached 24/24. Neither observation establishes a
+general Agent advantage on this small internal dataset. Any harder dataset must
+receive a new version; prior files and reports must not be rewritten. The
+report's component gate booleans are diagnostic only: `resumeClaimAllowed`
+remains false because the Reviewer uplift threshold failed and this offline
+prompt-only run cannot establish end-to-end production quality.

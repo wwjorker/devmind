@@ -73,11 +73,11 @@ Docker 29 环境的复现命令见 `backend/evaluation/README.md`，需要
 
 话术：
 
-> 四臂协议固定为 rules、single、single+self-review、reviewed-multi。当前冻结集
-> 太容易，规则基线已到天花板，所以我不宣称 Reviewer 提升成立；真实 Provider
-> 报告也只有在固定精确模型、数据 hash、knowledge snapshot 和价格后才生成。
-> 这个项目能证明的是受控执行、证据绑定、恢复和可复现评测方法，不是生产规模或
-> 统计泛化。
+> 四臂协议固定为 rules、single、single+self-review、reviewed-multi。真实 DeepSeek
+> 在修正版 v2 冻结集上完成 240 次调用，三个模型臂的根因分类都是 24/24；challenge
+> 缺陷捕获依次是 12/12、8/12、10/12。独立 Reviewer 比 self-review 多抓 2 个，
+> 没达到预注册的至少 5 个门槛，所以我不宣称 Reviewer 带来质量提升。这个项目能
+> 证明的是受控执行、证据绑定、恢复和可复现评测方法，不是生产规模或统计泛化。
 
 ## 演示失败时的降级顺序
 
