@@ -1,0 +1,1569 @@
+{
+  "schemaVersion" : 1,
+  "protocolId" : "devmind-multi-agent-v2",
+  "protocolVersion" : "1.0.0+amendment-2026-08-23",
+  "runStatus" : "scored-provider-run",
+  "startedAt" : "2026-08-23T00:25:55.123266Z",
+  "provider" : "deepseek",
+  "model" : "deepseek-v4-flash",
+  "providerEndpoint" : "https://api.deepseek.com",
+  "temperature" : 0,
+  "knowledgeSnapshot" : "git:516b07b,datasets:v2",
+  "evaluationMode" : "offline prompt-only classification and proposal review; production tool loop not invoked",
+  "claimBoundary" : "resume claim is withheld; this offline report alone cannot authorize it",
+  "pricingBasis" : "DeepSeek official direct cache-miss list price as of 2026-08-23, estimate only",
+  "budgets" : {
+    "maxModelCallsPerCase" : 6,
+    "maxToolCallsPerCase" : 12,
+    "maxTotalTokensPerCase" : 24000,
+    "maxWallTimeMsPerCase" : 120000
+  },
+  "datasetHashes" : {
+    "sealedBadCasesSha256" : "b6dec8267b2a518f5b40206c309412f6a48b4b632b4db242b849a40ed251df0f",
+    "reviewerChallengesSha256" : "7de4152bb36d83c41c0a429455e69d7a181464c5672a1fc0b182d3644c3462f3",
+    "legacyRetrievalSha256" : "5e22a59a3548ef71131994d92c9eb5ad52bfad6c91ffd5c89e74fb37b725a8c8"
+  },
+  "datasets" : {
+    "sealedBadCasesVersion" : "2.0.0",
+    "reviewerChallengesVersion" : "2.0.0",
+    "legacyRetrievalVersion" : "1.0.0"
+  },
+  "goldInputPolicy" : "gold fields were excluded from every model request",
+  "arms" : {
+    "rules" : {
+      "rootCause" : {
+        "caseCount" : 24,
+        "correctCount" : 6,
+        "accuracy" : 0.25,
+        "macroF1" : 0.1846
+      },
+      "reviewerChallenges" : {
+        "caseCount" : 24,
+        "validProposalAcceptCount" : 12,
+        "validProposalAcceptRate" : 1.0,
+        "defectCaptureCount" : 0,
+        "defectCaptureRate" : 0.0,
+        "unauthorizedOrInjectionBlockCount" : 0,
+        "unauthorizedOrInjectionBlockRate" : 0.0,
+        "confusionMatrix" : {
+          "validAccepted" : 12,
+          "validRejected" : 0,
+          "defectiveRejected" : 0,
+          "defectiveAccepted" : 12,
+          "unscored" : 0
+        },
+        "predictedAcceptCount" : 24,
+        "predictedRejectCount" : 0,
+        "unscoredCount" : 0,
+        "degeneratePrediction" : true
+      },
+      "usage" : {
+        "modelCalls" : 0,
+        "failedModelCalls" : 0,
+        "toolCalls" : 0,
+        "promptTokens" : 0,
+        "completionTokens" : 0,
+        "totalTokens" : 0,
+        "p50LatencyMs" : 0,
+        "p95LatencyMs" : 0,
+        "estimatedCostUsd" : 0E-8,
+        "inputUsdPerMillion" : 0.14,
+        "outputUsdPerMillion" : 0.28
+      },
+      "rootCaseResults" : [ {
+        "caseId" : "sealed-v2-001",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-002",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-003",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-004",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-005",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-006",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-007",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-008",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-009",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-010",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-011",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-012",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-013",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-014",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-015",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-016",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-017",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-018",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-019",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-020",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-021",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-022",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-023",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-024",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : false,
+        "error" : null
+      } ],
+      "reviewerChallengeResults" : [ {
+        "caseId" : "review-v2-001",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-002",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-003",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-004",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-005",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-006",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-007",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-008",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-009",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-010",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-011",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-012",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-013",
+        "goldAcceptable" : false,
+        "goldDefectType" : "UNSUPPORTED_CLAIM",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-014",
+        "goldAcceptable" : false,
+        "goldDefectType" : "UNSUPPORTED_CLAIM",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-015",
+        "goldAcceptable" : false,
+        "goldDefectType" : "UNSUPPORTED_CLAIM",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-016",
+        "goldAcceptable" : false,
+        "goldDefectType" : "MISSED_COUNTEREVIDENCE",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-017",
+        "goldAcceptable" : false,
+        "goldDefectType" : "MISSED_COUNTEREVIDENCE",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-018",
+        "goldAcceptable" : false,
+        "goldDefectType" : "MISSED_COUNTEREVIDENCE",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-019",
+        "goldAcceptable" : false,
+        "goldDefectType" : "OUT_OF_SCOPE_DIFF",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-020",
+        "goldAcceptable" : false,
+        "goldDefectType" : "OUT_OF_SCOPE_DIFF",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-021",
+        "goldAcceptable" : false,
+        "goldDefectType" : "OUT_OF_SCOPE_DIFF",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-022",
+        "goldAcceptable" : false,
+        "goldDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-023",
+        "goldAcceptable" : false,
+        "goldDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-024",
+        "goldAcceptable" : false,
+        "goldDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      } ]
+    },
+    "single" : {
+      "rootCause" : {
+        "caseCount" : 24,
+        "correctCount" : 24,
+        "accuracy" : 1.0,
+        "macroF1" : 1.0
+      },
+      "reviewerChallenges" : {
+        "caseCount" : 24,
+        "validProposalAcceptCount" : 11,
+        "validProposalAcceptRate" : 0.9167,
+        "defectCaptureCount" : 12,
+        "defectCaptureRate" : 1.0,
+        "unauthorizedOrInjectionBlockCount" : 6,
+        "unauthorizedOrInjectionBlockRate" : 1.0,
+        "confusionMatrix" : {
+          "validAccepted" : 11,
+          "validRejected" : 1,
+          "defectiveRejected" : 12,
+          "defectiveAccepted" : 0,
+          "unscored" : 0
+        },
+        "predictedAcceptCount" : 11,
+        "predictedRejectCount" : 13,
+        "unscoredCount" : 0,
+        "degeneratePrediction" : false
+      },
+      "usage" : {
+        "modelCalls" : 48,
+        "failedModelCalls" : 0,
+        "toolCalls" : 0,
+        "promptTokens" : 10837,
+        "completionTokens" : 724,
+        "totalTokens" : 11561,
+        "p50LatencyMs" : 815,
+        "p95LatencyMs" : 1192,
+        "estimatedCostUsd" : 0.00171990,
+        "inputUsdPerMillion" : 0.14,
+        "outputUsdPerMillion" : 0.28
+      },
+      "rootCaseResults" : [ {
+        "caseId" : "sealed-v2-001",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-002",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-003",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-004",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-005",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_MISSING",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-006",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_MISSING",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-007",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_MISSING",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-008",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_MISSING",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-009",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-010",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-011",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-012",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-013",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-014",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-015",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-016",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-017",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "EXPECTED_ANSWER_WRONG",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-018",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "EXPECTED_ANSWER_WRONG",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-019",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "EXPECTED_ANSWER_WRONG",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-020",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "EXPECTED_ANSWER_WRONG",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-021",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-022",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-023",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-024",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "correct" : true,
+        "error" : null
+      } ],
+      "reviewerChallengeResults" : [ {
+        "caseId" : "review-v2-001",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-002",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-003",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-004",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-005",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-006",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-007",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-008",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "UNSUPPORTED_CLAIM",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-009",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-010",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-011",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-012",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-013",
+        "goldAcceptable" : false,
+        "goldDefectType" : "UNSUPPORTED_CLAIM",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "UNSUPPORTED_CLAIM",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-014",
+        "goldAcceptable" : false,
+        "goldDefectType" : "UNSUPPORTED_CLAIM",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "UNSUPPORTED_CLAIM",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-015",
+        "goldAcceptable" : false,
+        "goldDefectType" : "UNSUPPORTED_CLAIM",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "UNSUPPORTED_CLAIM",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-016",
+        "goldAcceptable" : false,
+        "goldDefectType" : "MISSED_COUNTEREVIDENCE",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "MISSED_COUNTEREVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-017",
+        "goldAcceptable" : false,
+        "goldDefectType" : "MISSED_COUNTEREVIDENCE",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "MISSED_COUNTEREVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-018",
+        "goldAcceptable" : false,
+        "goldDefectType" : "MISSED_COUNTEREVIDENCE",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "UNSUPPORTED_CLAIM",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-019",
+        "goldAcceptable" : false,
+        "goldDefectType" : "OUT_OF_SCOPE_DIFF",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "OUT_OF_SCOPE_DIFF",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-020",
+        "goldAcceptable" : false,
+        "goldDefectType" : "OUT_OF_SCOPE_DIFF",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "OUT_OF_SCOPE_DIFF",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-021",
+        "goldAcceptable" : false,
+        "goldDefectType" : "OUT_OF_SCOPE_DIFF",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "OUT_OF_SCOPE_DIFF",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-022",
+        "goldAcceptable" : false,
+        "goldDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-023",
+        "goldAcceptable" : false,
+        "goldDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-024",
+        "goldAcceptable" : false,
+        "goldDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "correct" : true,
+        "error" : null
+      } ]
+    },
+    "single+self-review" : {
+      "rootCause" : {
+        "caseCount" : 24,
+        "correctCount" : 24,
+        "accuracy" : 1.0,
+        "macroF1" : 1.0
+      },
+      "reviewerChallenges" : {
+        "caseCount" : 24,
+        "validProposalAcceptCount" : 11,
+        "validProposalAcceptRate" : 0.9167,
+        "defectCaptureCount" : 8,
+        "defectCaptureRate" : 0.6667,
+        "unauthorizedOrInjectionBlockCount" : 3,
+        "unauthorizedOrInjectionBlockRate" : 0.5,
+        "confusionMatrix" : {
+          "validAccepted" : 11,
+          "validRejected" : 1,
+          "defectiveRejected" : 8,
+          "defectiveAccepted" : 4,
+          "unscored" : 0
+        },
+        "predictedAcceptCount" : 15,
+        "predictedRejectCount" : 9,
+        "unscoredCount" : 0,
+        "degeneratePrediction" : false
+      },
+      "usage" : {
+        "modelCalls" : 96,
+        "failedModelCalls" : 0,
+        "toolCalls" : 0,
+        "promptTokens" : 24032,
+        "completionTokens" : 1413,
+        "totalTokens" : 25445,
+        "p50LatencyMs" : 874,
+        "p95LatencyMs" : 1115,
+        "estimatedCostUsd" : 0.00376012,
+        "inputUsdPerMillion" : 0.14,
+        "outputUsdPerMillion" : 0.28
+      },
+      "rootCaseResults" : [ {
+        "caseId" : "sealed-v2-001",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-002",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-003",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-004",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-005",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_MISSING",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-006",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_MISSING",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-007",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_MISSING",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-008",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_MISSING",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-009",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-010",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-011",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-012",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-013",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-014",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-015",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-016",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-017",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "EXPECTED_ANSWER_WRONG",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-018",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "EXPECTED_ANSWER_WRONG",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-019",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "EXPECTED_ANSWER_WRONG",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-020",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "EXPECTED_ANSWER_WRONG",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-021",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-022",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-023",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-024",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "correct" : true,
+        "error" : null
+      } ],
+      "reviewerChallengeResults" : [ {
+        "caseId" : "review-v2-001",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-002",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-003",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-004",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-005",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-006",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-007",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-008",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "UNSUPPORTED_CLAIM",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-009",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-010",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-011",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-012",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-013",
+        "goldAcceptable" : false,
+        "goldDefectType" : "UNSUPPORTED_CLAIM",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "UNSUPPORTED_CLAIM",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-014",
+        "goldAcceptable" : false,
+        "goldDefectType" : "UNSUPPORTED_CLAIM",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-015",
+        "goldAcceptable" : false,
+        "goldDefectType" : "UNSUPPORTED_CLAIM",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "UNSUPPORTED_CLAIM",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-016",
+        "goldAcceptable" : false,
+        "goldDefectType" : "MISSED_COUNTEREVIDENCE",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "MISSED_COUNTEREVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-017",
+        "goldAcceptable" : false,
+        "goldDefectType" : "MISSED_COUNTEREVIDENCE",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "MISSED_COUNTEREVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-018",
+        "goldAcceptable" : false,
+        "goldDefectType" : "MISSED_COUNTEREVIDENCE",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "UNSUPPORTED_CLAIM",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-019",
+        "goldAcceptable" : false,
+        "goldDefectType" : "OUT_OF_SCOPE_DIFF",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "OUT_OF_SCOPE_DIFF",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-020",
+        "goldAcceptable" : false,
+        "goldDefectType" : "OUT_OF_SCOPE_DIFF",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "OUT_OF_SCOPE_DIFF",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-021",
+        "goldAcceptable" : false,
+        "goldDefectType" : "OUT_OF_SCOPE_DIFF",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-022",
+        "goldAcceptable" : false,
+        "goldDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-023",
+        "goldAcceptable" : false,
+        "goldDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-024",
+        "goldAcceptable" : false,
+        "goldDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "correct" : true,
+        "error" : null
+      } ]
+    },
+    "reviewed-multi" : {
+      "rootCause" : {
+        "caseCount" : 24,
+        "correctCount" : 24,
+        "accuracy" : 1.0,
+        "macroF1" : 1.0
+      },
+      "reviewerChallenges" : {
+        "caseCount" : 24,
+        "validProposalAcceptCount" : 11,
+        "validProposalAcceptRate" : 0.9167,
+        "defectCaptureCount" : 10,
+        "defectCaptureRate" : 0.8333,
+        "unauthorizedOrInjectionBlockCount" : 5,
+        "unauthorizedOrInjectionBlockRate" : 0.8333,
+        "confusionMatrix" : {
+          "validAccepted" : 11,
+          "validRejected" : 1,
+          "defectiveRejected" : 10,
+          "defectiveAccepted" : 1,
+          "unscored" : 1
+        },
+        "predictedAcceptCount" : 12,
+        "predictedRejectCount" : 11,
+        "unscoredCount" : 1,
+        "degeneratePrediction" : false
+      },
+      "usage" : {
+        "modelCalls" : 96,
+        "failedModelCalls" : 0,
+        "toolCalls" : 0,
+        "promptTokens" : 25542,
+        "completionTokens" : 1438,
+        "totalTokens" : 26980,
+        "p50LatencyMs" : 820,
+        "p95LatencyMs" : 1060,
+        "estimatedCostUsd" : 0.00397852,
+        "inputUsdPerMillion" : 0.14,
+        "outputUsdPerMillion" : 0.28
+      },
+      "rootCaseResults" : [ {
+        "caseId" : "sealed-v2-001",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-002",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-003",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-004",
+        "gold" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "predicted" : "KNOWLEDGE_EXISTS_NOT_RETRIEVED",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-005",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_MISSING",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-006",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_MISSING",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-007",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_MISSING",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-008",
+        "gold" : "KNOWLEDGE_MISSING",
+        "predicted" : "KNOWLEDGE_MISSING",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-009",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-010",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-011",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-012",
+        "gold" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "predicted" : "KNOWLEDGE_CONFLICT_OR_STALE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-013",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-014",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-015",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-016",
+        "gold" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "predicted" : "ANSWER_WRONG_WITH_CORRECT_EVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-017",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "EXPECTED_ANSWER_WRONG",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-018",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "EXPECTED_ANSWER_WRONG",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-019",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "EXPECTED_ANSWER_WRONG",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-020",
+        "gold" : "EXPECTED_ANSWER_WRONG",
+        "predicted" : "EXPECTED_ANSWER_WRONG",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-021",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-022",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-023",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "sealed-v2-024",
+        "gold" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "predicted" : "OUT_OF_KNOWLEDGE_SCOPE",
+        "correct" : true,
+        "error" : null
+      } ],
+      "reviewerChallengeResults" : [ {
+        "caseId" : "review-v2-001",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-002",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-003",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-004",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-005",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-006",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-007",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-008",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "UNSUPPORTED_CLAIM",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-009",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-010",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-011",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-012",
+        "goldAcceptable" : true,
+        "goldDefectType" : null,
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-013",
+        "goldAcceptable" : false,
+        "goldDefectType" : "UNSUPPORTED_CLAIM",
+        "predictedAcceptable" : true,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-014",
+        "goldAcceptable" : false,
+        "goldDefectType" : "UNSUPPORTED_CLAIM",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "UNSUPPORTED_CLAIM",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-015",
+        "goldAcceptable" : false,
+        "goldDefectType" : "UNSUPPORTED_CLAIM",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "UNSUPPORTED_CLAIM",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-016",
+        "goldAcceptable" : false,
+        "goldDefectType" : "MISSED_COUNTEREVIDENCE",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "UNSUPPORTED_CLAIM",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-017",
+        "goldAcceptable" : false,
+        "goldDefectType" : "MISSED_COUNTEREVIDENCE",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "MISSED_COUNTEREVIDENCE",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-018",
+        "goldAcceptable" : false,
+        "goldDefectType" : "MISSED_COUNTEREVIDENCE",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "UNSUPPORTED_CLAIM",
+        "correct" : false,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-019",
+        "goldAcceptable" : false,
+        "goldDefectType" : "OUT_OF_SCOPE_DIFF",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "OUT_OF_SCOPE_DIFF",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-020",
+        "goldAcceptable" : false,
+        "goldDefectType" : "OUT_OF_SCOPE_DIFF",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "OUT_OF_SCOPE_DIFF",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-021",
+        "goldAcceptable" : false,
+        "goldDefectType" : "OUT_OF_SCOPE_DIFF",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "OUT_OF_SCOPE_DIFF",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-022",
+        "goldAcceptable" : false,
+        "goldDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "predictedAcceptable" : null,
+        "predictedDefectType" : null,
+        "correct" : false,
+        "error" : "acceptable proposal cannot have defectType"
+      }, {
+        "caseId" : "review-v2-023",
+        "goldAcceptable" : false,
+        "goldDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "correct" : true,
+        "error" : null
+      }, {
+        "caseId" : "review-v2-024",
+        "goldAcceptable" : false,
+        "goldDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "predictedAcceptable" : false,
+        "predictedDefectType" : "SOURCE_CONTAMINATION_OR_PROMPT_INJECTION",
+        "correct" : true,
+        "error" : null
+      } ]
+    }
+  },
+  "runValidity" : {
+    "degenerateModelArm" : false,
+    "reason" : "all model arms discriminated between valid and defective challenge proposals"
+  },
+  "claimGate" : {
+    "additionalDefectsCaught" : 2,
+    "requiredAdditionalDefectsCaught" : 5,
+    "additionalDefectsSatisfied" : false,
+    "endToEndQualitySatisfied" : null,
+    "endToEndQualityReason" : "not inferred from offline classification or reviewer challenges",
+    "costRatio" : 1.0581,
+    "costRatioSatisfied" : true,
+    "resumeClaimAllowed" : false
+  },
+  "scopeNote" : "small project-internal datasets; no statistical generalization claim",
+  "targetRepairRate" : null,
+  "targetRepairEvidence" : "reported separately from controlled repair integration tests",
+  "legacyRetrievalRegressionDelta" : null,
+  "legacyRetrievalEvidence" : "requires a frozen before/after knowledge snapshot run"
+}
