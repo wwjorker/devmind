@@ -25,6 +25,7 @@ class AgentEvaluationDatasetContractTest {
     @Test
     void sealedDatasetShouldContainFourCasesForEachRootCause() throws Exception {
         assertRootCauseAllocation("v2-sealed-bad-cases-v1.json", 24, 4);
+        assertRootCauseAllocation("v2-sealed-bad-cases-v2.json", 24, 4);
     }
 
     private void assertRootCauseAllocation(String fileName,
@@ -47,10 +48,17 @@ class AgentEvaluationDatasetContractTest {
 
     @Test
     void challengeDatasetShouldBalanceValidCasesAndFourDefectTypes() throws Exception {
-        JsonNode root = read("v2-reviewer-challenges-v1.json");
+        assertChallengeAllocation("v2-reviewer-challenges-v1.json");
+        assertChallengeAllocation("v2-reviewer-challenges-v2.json");
+    }
+
+    private void assertChallengeAllocation(String fileName) throws Exception {
+        JsonNode root = read(fileName);
         Map<String, Integer> defects = new HashMap<>();
+        Set<String> ids = new HashSet<>();
         int valid = 0;
         for (JsonNode item : root.path("cases")) {
+            assertThat(ids.add(item.path("caseId").asText())).isTrue();
             if (item.path("goldAcceptable").asBoolean()) {
                 valid++;
                 assertThat(item.path("goldDefectType").isNull()).isTrue();
@@ -60,6 +68,8 @@ class AgentEvaluationDatasetContractTest {
         }
 
         assertThat(root.path("cases").size()).isEqualTo(24);
+        assertThat(root.path("caseCount").asInt()).isEqualTo(24);
+        assertThat(ids).hasSize(24);
         assertThat(valid).isEqualTo(12);
         assertThat(defects).hasSize(4);
         assertThat(defects.values()).allMatch(count -> count == 3);

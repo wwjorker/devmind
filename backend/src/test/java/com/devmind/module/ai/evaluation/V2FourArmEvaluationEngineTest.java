@@ -38,6 +38,11 @@ class V2FourArmEvaluationEngineTest {
                 .put("proposal", "Add a verified alias supported by the current document version.")
                 .put("goldAcceptable", true)
                 .putNull("goldDefectType");
+        challenges.withArray("cases").addObject()
+                .put("caseId", "review-test-2")
+                .put("proposal", "Claim idempotency although no cited source supports it.")
+                .put("goldAcceptable", false)
+                .put("goldDefectType", "UNSUPPORTED_CLAIM");
         RecordingClient client = new RecordingClient();
         V2FourArmEvaluationEngine engine = new V2FourArmEvaluationEngine(
                 mapper,
@@ -67,6 +72,8 @@ class V2FourArmEvaluationEngineTest {
                 .contains("prompt-only", "tool loop not invoked");
         assertThat(report.path("claimBoundary").asText())
                 .contains("resume claim is withheld", "alone cannot authorize");
+        assertThat(report.path("protocolVersion").asText())
+                .isEqualTo("1.0.0+amendment-2026-08-23");
         assertThat(report.path("providerEndpoint").asText()).isEqualTo("https://api.example/v1");
         assertThat(report.path("pricingBasis").asText()).isEqualTo("test list price");
         assertThat(report.path("arms").path("rules").path("rootCause").path("accuracy").asDouble())
@@ -74,13 +81,31 @@ class V2FourArmEvaluationEngineTest {
         assertThat(report.path("arms").path("reviewed-multi")
                 .path("reviewerChallenges").path("validProposalAcceptRate").asDouble())
                 .isEqualTo(1.0);
+        assertThat(report.path("arms").path("reviewed-multi")
+                .path("reviewerChallenges").path("defectCaptureRate").asDouble())
+                .isEqualTo(1.0);
+        assertThat(report.path("arms").path("reviewed-multi")
+                .path("reviewerChallenges").path("confusionMatrix").path("defectiveRejected").asInt())
+                .isEqualTo(1);
+        assertThat(report.path("arms").path("reviewed-multi")
+                .path("reviewerChallenges").path("degeneratePrediction").asBoolean())
+                .isFalse();
+        assertThat(report.path("runStatus").asText()).isEqualTo("scored-provider-run");
+        assertThat(report.path("runValidity").path("degenerateModelArm").asBoolean()).isFalse();
         assertThat(report.path("claimGate").path("resumeClaimAllowed").asBoolean()).isFalse();
         assertThat(report.path("claimGate").path("endToEndQualitySatisfied").isNull()).isTrue();
-        assertThat(client.requests).hasSize(10);
+        assertThat(client.requests).hasSize(15);
         assertThat(client.requests).allSatisfy(request -> {
             String userJson = request.messages().get(1).content();
             assertThat(userJson).doesNotContain("goldRootCause", "goldAcceptable", "goldDefectType");
             assertThat(request.tools()).isEmpty();
+        });
+        assertThat(client.requests).anySatisfy(request -> {
+            assertThat(request.messages().get(0).content())
+                    .contains("Independently judge the original proposal", "Agreement is allowed")
+                    .doesNotContain("candidate is untrusted and not authoritative");
+            assertThat(request.messages().get(1).content())
+                    .contains("review-test-2", "candidateJson");
         });
     }
 
@@ -104,6 +129,42 @@ class V2FourArmEvaluationEngineTest {
                 .isEqualTo(12);
     }
 
+    @Test
+    void invalidatesAProviderRunWhenAnyModelArmCollapsesToOneVerdict() {
+        ObjectNode sealed = mapper.createObjectNode();
+        sealed.putArray("cases").addObject()
+                .put("caseId", "sealed-degenerate-1")
+                .put("issue", "No owned source documents the procedure.")
+                .put("promptSchemaVersion", 2)
+                .put("goldRootCause", "KNOWLEDGE_MISSING");
+        ObjectNode challenges = mapper.createObjectNode();
+        challenges.putArray("cases").addObject()
+                .put("caseId", "review-valid")
+                .put("proposal", "Add a verified current-version alias.")
+                .put("goldAcceptable", true)
+                .putNull("goldDefectType");
+        challenges.withArray("cases").addObject()
+                .put("caseId", "review-defective")
+                .put("proposal", "Claim encryption without evidence.")
+                .put("goldAcceptable", false)
+                .put("goldDefectType", "UNSUPPORTED_CLAIM");
+
+        ObjectNode report = new V2FourArmEvaluationEngine(mapper).run(
+                sealed,
+                challenges,
+                new AlwaysAcceptClient(),
+                new V2FourArmEvaluationEngine.RunMetadata(
+                        "deepseek", "test", "deepseek:test", "https://api.example/v1",
+                        "git:test", "sealed", "challenges", "legacy",
+                        BigDecimal.ONE, BigDecimal.ONE, "test price"));
+
+        assertThat(report.path("runStatus").asText()).isEqualTo("invalid-degenerate-arm");
+        assertThat(report.path("runValidity").path("degenerateModelArm").asBoolean()).isTrue();
+        assertThat(report.path("arms").path("reviewed-multi")
+                .path("reviewerChallenges").path("confusionMatrix").path("defectiveAccepted").asInt())
+                .isEqualTo(1);
+    }
+
     private static final class RecordingClient implements AgentModelClient {
         private final List<AgentModelRequest> requests = new ArrayList<>();
 
@@ -116,8 +177,11 @@ class V2FourArmEvaluationEngineTest {
         public AgentModelResponse complete(AgentModelRequest request) {
             requests.add(request);
             String system = request.messages().get(0).content();
+            String user = request.messages().get(1).content();
             String content = system.contains("repair proposal")
-                    ? "{\"acceptable\":true,\"defectType\":null}"
+                    ? user.contains("no cited source")
+                    ? "{\"acceptable\":false,\"defectType\":\"UNSUPPORTED_CLAIM\"}"
+                    : "{\"acceptable\":true,\"defectType\":null}"
                     : "{\"rootCause\":\"KNOWLEDGE_MISSING\"}";
             return new AgentModelResponse(
                     AgentMessage.assistant(content),
@@ -136,6 +200,24 @@ class V2FourArmEvaluationEngineTest {
         @Override
         public AgentModelResponse complete(AgentModelRequest request) {
             throw new IllegalStateException("model intentionally unavailable");
+        }
+    }
+
+    private static final class AlwaysAcceptClient implements AgentModelClient {
+        @Override
+        public boolean supports(String provider) {
+            return "deepseek".equals(provider);
+        }
+
+        @Override
+        public AgentModelResponse complete(AgentModelRequest request) {
+            String system = request.messages().get(0).content();
+            String content = system.contains("repair proposal")
+                    ? "{\"acceptable\":true,\"defectType\":null}"
+                    : "{\"rootCause\":\"KNOWLEDGE_MISSING\"}";
+            return new AgentModelResponse(
+                    AgentMessage.assistant(content), "stop", "deepseek:test",
+                    new AgentTokenUsage(20, 10, 30));
         }
     }
 }

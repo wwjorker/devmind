@@ -29,6 +29,12 @@ and 12 defective proposals, with three examples for each preregistered defect
 class. It measures whether an independent Reviewer catches material defects
 without rejecting sound proposals.
 
+`v2-sealed-bad-cases-v2.json` and `v2-reviewer-challenges-v2.json` are fresh
+2.0.0 datasets frozen after the reviewer-prompt amendment and before its first
+provider run. They keep the preregistered class allocation but use new case IDs
+and wording. Version 1 remains unchanged and its corrected rerun, if any, is
+post-hoc regression evidence only.
+
 `v2-run-manifest-template.json` records the four preregistered arms (`rules`,
 `single`, `single+self-review`, and `reviewed-multi`), common budgets,
 provider/model identity, dataset hashes, run counts, metrics, and the claim gate.
@@ -52,6 +58,16 @@ The first opt-in real-provider protocol check is recorded in
 two-round tool-calling wire path against the configured DeepSeek model, but is
 not a scored four-arm evaluation or a model-quality claim.
 
+The first complete four-arm run is preserved in
+`results/phase-d-four-arm-provider-run-2026-08-23-invalid.json` with its
+human-readable incident record beside it. It completed 240 provider calls but
+the original `reviewed-multi` prompt collapsed to an all-accept classifier. The
+run is invalid for quality comparison and its closed claim gate must not be
+reinterpreted. `v2-protocol-amendment-2026-08-23.json` records the wording-only
+protocol repair, unchanged fairness contract, new degeneracy diagnostics and
+evidence policy. Any corrected v1 rerun is post-hoc regression evidence; a fresh
+dataset version is required for another scored result.
+
 The real MySQL merge gate uses the normal Testcontainers test. Docker Engine 29
 raises its minimum client API above the docker-java default used here, so pass an
 explicit compatible API version instead of editing a developer's private Docker
@@ -64,7 +80,7 @@ $env:DOCKER_HOST='npipe:////./pipe/dockerDesktopLinuxEngine'
 ```
 
 `V2DeepSeekProviderEvaluationTest` is the opt-in four-arm runner. It reads the
-frozen files, hashes their exact bytes, strips gold fields from model messages,
+2.0.0 frozen files, hashes their exact bytes, strips gold fields from model messages,
 uses temperature zero, counts invalid/provider failures as failed cases, and
 writes only to `target/evaluation/v2-four-arm-provider-report.json`. A full run
 attempts at most 240 model calls (48 single, 96 self-review, 96 reviewed-multi),

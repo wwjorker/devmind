@@ -29,9 +29,9 @@ class V2DeepSeekProviderEvaluationTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
-    void writesARealFrozenFourArmReportToTarget() throws Exception {
-        Path sealedPath = Path.of("evaluation", "v2-sealed-bad-cases-v1.json");
-        Path challengePath = Path.of("evaluation", "v2-reviewer-challenges-v1.json");
+    void writesARealAmendedFourArmReportToTarget() throws Exception {
+        Path sealedPath = Path.of("evaluation", "v2-sealed-bad-cases-v2.json");
+        Path challengePath = Path.of("evaluation", "v2-reviewer-challenges-v2.json");
         Path legacyPath = Path.of("src", "main", "resources", "evaluation", "v1-retrieval-cases.json");
         byte[] sealedBytes = Files.readAllBytes(sealedPath);
         byte[] challengeBytes = Files.readAllBytes(challengePath);

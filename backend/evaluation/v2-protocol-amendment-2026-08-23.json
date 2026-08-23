@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "protocolId": "devmind-multi-agent-v2",
+  "baseProtocolVersion": "1.0.0",
+  "amendedProtocolVersion": "1.0.0+amendment-2026-08-23",
+  "amendedAt": "2026-08-23",
+  "trigger": {
+    "report": "results/phase-d-four-arm-provider-run-2026-08-23-invalid.json",
+    "reportSha256": "336ac916ceacbc2c50397c86f567b4b29610e0628323b9d6528329a6d10b7d42",
+    "observedFailure": "reviewed-multi emitted acceptable=true for every mixed reviewer-challenge case"
+  },
+  "classification": "evaluation protocol defect",
+  "changes": [
+    "Make the independent reviewer judge the original issue or proposal rather than the trustworthiness of candidateJson.",
+    "State that candidateJson may be correct or wrong and that agreement is allowed.",
+    "Retain second-output-wins semantics; do not add a deterministic merge or veto.",
+    "Report the reviewer confusion matrix and invalidate any run where a model arm collapses to one verdict on a mixed challenge set."
+  ],
+  "unchanged": [
+    "four experiment arms",
+    "model and temperature fairness contract",
+    "gold-label exclusion",
+    "per-case budgets",
+    "claim gate thresholds"
+  ],
+  "evidencePolicy": {
+    "triggerRunMaySupportQualityClaims": false,
+    "sameV1DatasetRerunClassification": "post-hoc regression only",
+    "freshScoredEvidenceRequiresNewDatasetVersion": true,
+    "priorRunMustBePreserved": true
+  }
+}
