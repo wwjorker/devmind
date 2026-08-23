@@ -60,6 +60,8 @@ results do not support a claim that adding more model passes automatically
 improves quality.
 
 End-to-end controlled-repair quality and frozen before/after retrieval
-regression remain separate evidence requirements. They are deliberately not
-inferred from this offline prompt-only run. The dataset is small and internal,
-so no statistical generalization claim is made.
+regression are deliberately not inferred from this offline prompt-only run.
+They are now reported separately in
+`phase-d-controlled-repair-run-2026-08-23.json`: its one controlled fixture
+passed and the 40-case sparse Hit@3/MRR deltas were both zero. Both datasets are
+small and internal, so no statistical generalization claim is made.

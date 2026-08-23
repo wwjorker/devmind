@@ -101,6 +101,13 @@ to one deterministic repair fixture and must not be presented as a generalized
 success rate. Set `DEVMIND_EVAL_KNOWLEDGE_SNAPSHOT` when preserving a report;
 ordinary test runs use the explicit placeholder `git:working-tree`.
 
+The preserved real-MySQL run is
+`results/phase-d-controlled-repair-run-2026-08-23.json`, with its measured
+summary beside it. The one controlled target repair passed, while sparse-hybrid
+Hit@3 and MRR remained unchanged across the full frozen suite. This closes the
+separate before/after evidence item; it does not change the negative four-arm
+Reviewer-uplift decision.
+
 `V2DeepSeekProviderEvaluationTest` is the opt-in four-arm runner. It reads the
 2.0.0 frozen files, hashes their exact bytes, strips gold fields from model messages,
 uses temperature zero, counts invalid/provider failures as failed cases, and

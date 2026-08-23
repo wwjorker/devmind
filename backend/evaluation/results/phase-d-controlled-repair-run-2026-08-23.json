@@ -1,0 +1,74 @@
+{
+  "schemaVersion" : 1,
+  "runType" : "phase-d-controlled-repair-before-after",
+  "knowledgeSnapshot" : "git:5fea5b3976deb886fc1a9a9838d81dd212f04fe6",
+  "evaluationMode" : "real MySQL controlled repair with deterministic local sparse embeddings; no external model, embedding, rerank, Redis, or pgvector dependency",
+  "datasets" : {
+    "retrievalDatasetId" : "devmind-retrieval-v1",
+    "retrievalDatasetVersion" : "1.0.0",
+    "retrievalDatasetSha256" : "5e22a59a3548ef71131994d92c9eb5ad52bfad6c91ffd5c89e74fb37b725a8c8",
+    "demoSeedSha256" : "4fe8daaab070b814c8c3f9234ef4094328bc532b7854a6eb02836f3a3d84ac03"
+  },
+  "fairnessControls" : {
+    "embeddingProvider" : "local-sparse-vector",
+    "allActiveChunksBackfilledBeforeBaseline" : true,
+    "sameRetrievalPathBeforeAndAfter" : true,
+    "activeVectorCountBefore" : 14,
+    "activeVectorCountAfter" : 14,
+    "totalCaseCount" : 40,
+    "positiveCaseCount" : 35,
+    "evaluationK" : 3,
+    "retrievalLimit" : 5
+  },
+  "targetRepairRate" : 1.0,
+  "targetRepairEvidence" : {
+    "attemptedCount" : 1,
+    "passedCount" : 1,
+    "proposalType" : "METADATA_PATCH",
+    "baseDocumentVersion" : 1,
+    "appliedDocumentVersion" : 2,
+    "finalProposalStatus" : "APPLIED",
+    "targetRegressionPassed" : true,
+    "scope" : "One deterministic seeded metadata-repair fixture; not a generalized success rate."
+  },
+  "retrieval" : {
+    "sparseHybridBefore" : {
+      "passedCaseCount" : 36,
+      "passRate" : 0.9,
+      "hitAtK" : 1.0,
+      "mrr" : 0.9381
+    },
+    "sparseHybridAfter" : {
+      "passedCaseCount" : 36,
+      "passRate" : 0.9,
+      "hitAtK" : 1.0,
+      "mrr" : 0.9381
+    },
+    "sparseHybridDelta" : {
+      "hitAtK" : 0.0,
+      "mrr" : 0.0
+    },
+    "keywordBaselineBefore" : {
+      "passedCaseCount" : 33,
+      "passRate" : 0.825,
+      "hitAtK" : 0.8286,
+      "mrr" : 0.8071
+    },
+    "keywordBaselineAfter" : {
+      "passedCaseCount" : 33,
+      "passRate" : 0.825,
+      "hitAtK" : 0.8286,
+      "mrr" : 0.8071
+    },
+    "keywordBaselineDelta" : {
+      "hitAtK" : 0.0,
+      "mrr" : 0.0
+    },
+    "changedCases" : [ ]
+  },
+  "legacyRetrievalRegressionDelta" : {
+    "hitAtK" : 0.0,
+    "mrr" : 0.0
+  },
+  "scopeNote" : "The full 40-case retrieval suite is measured before and after the same approved repair against the same MySQL dataset and persisted local vector path."
+}
