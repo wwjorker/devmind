@@ -108,6 +108,9 @@ Hit@3 and MRR remained unchanged across the full frozen suite. This closes the
 separate before/after evidence item; it does not change the negative four-arm
 Reviewer-uplift decision.
 
+The final branch-wide test, migration, frontend-build, repository, and secret
+checks are recorded in `results/phase-d-final-merge-audit-2026-08-23.md`.
+
 `V2DeepSeekProviderEvaluationTest` is the opt-in four-arm runner. It reads the
 2.0.0 frozen files, hashes their exact bytes, strips gold fields from model messages,
 uses temperature zero, counts invalid/provider failures as failed cases, and
