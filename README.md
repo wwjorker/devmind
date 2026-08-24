@@ -17,7 +17,7 @@ DevMind 是一个面向个人开发学习、项目复盘和知识沉淀的 AI �
 ```text
 backend: Docker-enabled Maven 测试共 193 项，190 passed、3 skipped、0 failures/errors
 frontend: npm run build 生产构建通过
-GitHub Actions: 已配置后端测试和前端构建；当前改动的远端 CI 待 PR 验证
+GitHub Actions: push / PR 自动执行后端测试与前端构建，实时状态见顶部 CI 徽章
 ```
 
 当前版本已实现真实 dense embedding 接入（OpenAI 兼容 API，可插拔 provider）、rerank 精排（离线评估）、多策略检索评估，以及可选的 pgvector 向量存储：dense 向量双写 MySQL JSON（源数据，兼对照组）与 Postgres + pgvector HNSW（serving 索引，`docker compose` 一键启动，默认关闭）。仍不宣称实现 rerank 线上问答链路、PDF/OCR 或生产级部署。默认配置全本地运行、零外部调用，不配置 API key 不产生任何费用。
