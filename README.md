@@ -4,6 +4,37 @@
 
 DevMind 是一个面向个人开发学习、项目复盘和知识沉淀的 AI 知识库系统。项目重点不是简单包装大模型 API，而是把 RAG 问答接入完整的 Java 后端工程链路。
 
+## 30 秒速览
+
+- **Java / Spring Boot 后端**：认证、文档版本、MySQL / Redis、Flyway、短事务与失败补偿组成可运行的 RAG 工程链路。
+- **可解释 RAG**：关键词、FULLTEXT、稀疏/稠密向量、RRF、可选 pgvector 与 rerank 对照；回答展示真实召回引用，模型完整输入与有限日志 preview 分离。
+- **受控 Agent 修复**：Evidence Triage 只读调查，独立 Reviewer 审核证据、反证和回归计划；Tool Calling 受 schema 与预算约束，写入必须经过 `APPROVE / APPROVE_WITH_EDIT / REJECT`。
+- **可恢复执行**：文档乐观锁、不可变版本、审批幂等、事务外 embedding / 索引重建，以及索引或回归失败后的补偿回滚。
+- **可复现实验**：14 篇演示文档、40 条 gold-label 检索用例，sparse-hybrid Hit@3=`1.000`；Docker-enabled Maven 共 193 项（190 passed、3 个 opt-in skipped、0 failures/errors）。
+- **诚实负结论**：冻结集完成 240 次真实 DeepSeek 调用且无 Provider 失败；Reviewer 比 self-review 多捕获 2 个缺陷，但未达到预注册 `+5` 门槛，因此不宣称 Multi-Agent 显著提升质量。
+
+**最短体验路径**：默认 mock 模式不需要 API Key。克隆后运行 `.\start-local.ps1`，打开 `http://127.0.0.1:5173`；完整演示数据、讲解顺序与降级路径见 [5 分钟演示指南](docs/guides/multi-agent-v2-5-minute-demo.md)。
+
+## 界面预览
+
+### RAG 回答与可见引用
+
+![DevMind RAG 回答、召回片段与引用](docs/assets/portfolio/rag-answer-citations.png)
+
+真实本地 mock 问答复用完整检索编排；页面同时展示回答依据、chunk ID、来源文档和召回分数。
+
+### Triage 提案与版本化证据
+
+![DevMind Triage 元数据提案、来源证据与回归计划](docs/assets/portfolio/triage-reviewer-proposal.png)
+
+离线演示 fixture 处于 `AWAITING_APPROVAL`：提案只允许白名单 metadata patch，并绑定文档版本、来源证据、反证与目标回归计划；它不冒充实时模型输出。
+
+### HITL 应用与目标回归
+
+![DevMind HITL 应用结果与目标回归](docs/assets/portfolio/hitl-applied-result.png)
+
+人工批准后由 Java 服务执行版本化发布和派生索引重建；截图中的真实结果为 `RESOLVED`、applied version 2、目标文档 rank 1。`APPROVE_WITH_EDIT / REJECT` 与补偿回滚由同一受控状态机覆盖，演示步骤见上方指南。
+
 ## 当前状态
 
 这是一个前后端分离的完整 monorepo 项目：
@@ -147,7 +178,8 @@ TypeScript
 Windows 一键启动（会打开前后端两个日志终端）：
 
 ```powershell
-cd F:\AI项目\devmind
+git clone https://github.com/wwjorker/devmind.git
+cd devmind
 .\start-local.ps1
 ```
 
@@ -155,11 +187,11 @@ cd F:\AI项目\devmind
 
 ```powershell
 # 终端 1：自动启动 Docker MySQL 3307、Redis 6380 和 Spring Boot 8081
-cd F:\AI项目\devmind
+cd devmind
 .\backend\scripts\run-local.ps1
 
 # 终端 2：启动 Vite 5173
-cd F:\AI项目\devmind
+cd devmind
 .\frontend\scripts\run-local.ps1
 ```
 
