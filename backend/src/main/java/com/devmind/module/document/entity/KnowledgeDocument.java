@@ -3,6 +3,7 @@ package com.devmind.module.document.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 
 import java.time.LocalDateTime;
 
@@ -18,6 +19,8 @@ public class KnowledgeDocument {
     private String tags;
     private String summary;
     private Integer status;
+    @Version
+    private Integer versionNo;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -83,6 +86,14 @@ public class KnowledgeDocument {
 
     public void setStatus(Integer status) {
         this.status = status;
+    }
+
+    public Integer getVersionNo() {
+        return versionNo;
+    }
+
+    public void setVersionNo(Integer versionNo) {
+        this.versionNo = versionNo;
     }
 
     public LocalDateTime getCreatedAt() {

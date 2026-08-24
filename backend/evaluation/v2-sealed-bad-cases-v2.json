@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "devmind-v2-sealed-bad-cases",
+  "datasetVersion": "2.0.0",
+  "frozenAt": "2026-08-23",
+  "status": "frozen-after-reviewer-prompt-amendment-before-first-v2-scored-run",
+  "caseCount": 24,
+  "cases": [
+    {"caseId":"sealed-v2-001","issue":"The owned runbook contains the exact circuit-breaker reset sequence, but retrieval returned only deployment notes and the answer said the procedure was unavailable.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_EXISTS_NOT_RETRIEVED"},
+    {"caseId":"sealed-v2-002","issue":"A current architecture page has a dedicated section for the requested idempotency key, yet none of its chunks appeared in the top results.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_EXISTS_NOT_RETRIEVED"},
+    {"caseId":"sealed-v2-003","issue":"The answer was produced from unrelated cache pages even though an owned transaction guide with the requested wording exists at a lower rank.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_EXISTS_NOT_RETRIEVED"},
+    {"caseId":"sealed-v2-004","issue":"The current source contains the rollback command, but the indexed serving results omitted that chunk and surfaced an obsolete overview instead.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_EXISTS_NOT_RETRIEVED"},
+
+    {"caseId":"sealed-v2-005","issue":"The request is about an internal batch-retry policy, but the owned corpus inventory has zero material describing that policy.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_MISSING"},
+    {"caseId":"sealed-v2-006","issue":"The team asks for its approved data-retention period; every owned source was checked and none establishes a duration.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_MISSING"},
+    {"caseId":"sealed-v2-007","issue":"This is an in-scope service question, but the knowledge base has never ingested the service's failover procedure.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_MISSING"},
+    {"caseId":"sealed-v2-008","issue":"An engineer asks how the internal settlement job resumes, while the owned repository contains only deployment and monitoring material.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_MISSING"},
+
+    {"caseId":"sealed-v2-009","issue":"The latest runbook sets three retries, while another source still marked current sets eight; source precedence has not been resolved.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_CONFLICT_OR_STALE"},
+    {"caseId":"sealed-v2-010","issue":"Two owned pages carry the current badge but specify 10-second and 60-second timeouts respectively.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_CONFLICT_OR_STALE"},
+    {"caseId":"sealed-v2-011","issue":"A policy revision removed the old queue name, but a simultaneously active operations page still requires it.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_CONFLICT_OR_STALE"},
+    {"caseId":"sealed-v2-012","issue":"The summary and its cited source describe incompatible tenant-isolation behavior and neither is identified as superseded.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_CONFLICT_OR_STALE"},
+
+    {"caseId":"sealed-v2-013","issue":"All model-visible citations state that writes require approval, but the generated answer says they execute automatically.","promptSchemaVersion":2,"goldRootCause":"ANSWER_WRONG_WITH_CORRECT_EVIDENCE"},
+    {"caseId":"sealed-v2-014","issue":"The retrieved passage correctly gives a capped exponential backoff, while the response describes unlimited immediate retries.","promptSchemaVersion":2,"goldRootCause":"ANSWER_WRONG_WITH_CORRECT_EVIDENCE"},
+    {"caseId":"sealed-v2-015","issue":"The supplied evidence identifies PostgreSQL as a derived index, yet the response calls it the system of record.","promptSchemaVersion":2,"goldRootCause":"ANSWER_WRONG_WITH_CORRECT_EVIDENCE"},
+    {"caseId":"sealed-v2-016","issue":"Schema-v2 context correctly says the operation is metadata-only; the final response claims document content will be rewritten.","promptSchemaVersion":2,"goldRootCause":"ANSWER_WRONG_WITH_CORRECT_EVIDENCE"},
+
+    {"caseId":"sealed-v2-017","issue":"The grading rubric demands a 30-second timeout, but the authoritative cited configuration clearly sets 15 seconds.","promptSchemaVersion":2,"goldRootCause":"EXPECTED_ANSWER_WRONG"},
+    {"caseId":"sealed-v2-018","issue":"The benchmark key marks automatic approval as correct even though the current policy requires a human approver.","promptSchemaVersion":2,"goldRootCause":"EXPECTED_ANSWER_WRONG"},
+    {"caseId":"sealed-v2-019","issue":"The reference output calls MySQL a serving cache, while the verified architecture makes it the authoritative store.","promptSchemaVersion":2,"goldRootCause":"EXPECTED_ANSWER_WRONG"},
+    {"caseId":"sealed-v2-020","issue":"The test oracle requires the retired endpoint, but the cited migration record shows that endpoint was removed.","promptSchemaVersion":2,"goldRootCause":"EXPECTED_ANSWER_WRONG"},
+
+    {"caseId":"sealed-v2-021","issue":"The user asks for the vendor's real-time incident status, which requires querying an external live service not owned by DevMind.","promptSchemaVersion":2,"goldRootCause":"OUT_OF_KNOWLEDGE_SCOPE"},
+    {"caseId":"sealed-v2-022","issue":"The request seeks another employee's payroll details, which are unauthorized personal records outside this knowledge system.","promptSchemaVersion":2,"goldRootCause":"OUT_OF_KNOWLEDGE_SCOPE"},
+    {"caseId":"sealed-v2-023","issue":"The question asks for the current market price of a security rather than information from the owned engineering corpus.","promptSchemaVersion":2,"goldRootCause":"OUT_OF_KNOWLEDGE_SCOPE"},
+    {"caseId":"sealed-v2-024","issue":"The requested answer depends on live road congestion around the office, data that DevMind neither owns nor refreshes.","promptSchemaVersion":2,"goldRootCause":"OUT_OF_KNOWLEDGE_SCOPE"}
+  ]
+}

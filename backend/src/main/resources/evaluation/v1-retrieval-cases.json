@@ -1,0 +1,695 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "devmind-retrieval-v1",
+  "datasetVersion": "1.0.0",
+  "frozenAt": "2026-08-17",
+  "cases": [
+    {
+      "caseId": "redis-cache-penetration-basic",
+      "category": "redis",
+      "question": "面试中应该如何解释 Redis 缓存穿透？",
+      "relevantDocumentTitles": [
+        "Redis 缓存穿透",
+        "Redis 缓存穿透复盘",
+        "Redis cache penetration review",
+        "Redis cache penetration review updated",
+        "redis-cache-penetration"
+      ],
+      "expectedKeywords": [
+        "Redis",
+        "cache",
+        "penetration"
+      ],
+      "expectedAnswer": "应该说明缓存穿透是请求不存在的数据导致缓存未命中并反复打到数据库，解决方案包括缓存空值、参数校验、布隆过滤器或限流，并能区分缓存击穿和缓存雪崩。",
+      "expectedEvidence": "证据应该来自 Redis 缓存穿透笔记、bug 复盘或后端缓存设计文档。",
+      "riskType": "normal_retrieval"
+    },
+    {
+      "caseId": "redis-cache-penetration-cn",
+      "category": "redis",
+      "question": "Redis 缓存穿透怎么解决？",
+      "relevantDocumentTitles": [
+        "Redis 缓存穿透",
+        "Redis 缓存穿透复盘",
+        "Redis cache penetration review",
+        "Redis cache penetration review updated",
+        "redis-cache-penetration"
+      ],
+      "expectedKeywords": [
+        "Redis",
+        "缓存穿透",
+        "空值",
+        "限流"
+      ],
+      "expectedAnswer": "应该说明缓存空值、过滤非法参数、布隆过滤器或限流，并说明目标是保护数据库免受重复 miss 冲击。",
+      "expectedEvidence": "证据应该来自中文或英文 Redis 缓存穿透 chunk。",
+      "riskType": "multilingual_retrieval"
+    },
+    {
+      "caseId": "jwt-logout-blacklist",
+      "category": "security",
+      "question": "JWT 退出登录为什么需要 Redis 黑名单？",
+      "relevantDocumentTitles": [
+        "JWT 退出登录与 Redis 黑名单"
+      ],
+      "expectedKeywords": [
+        "JWT",
+        "logout",
+        "Redis",
+        "blacklist"
+      ],
+      "expectedAnswer": "应该说明 JWT 无状态导致服务端默认不保存会话，未过期 token 退出后仍可能可用；把 token 放入 Redis 黑名单并设置剩余 TTL，可以在认证过滤器中拦截已退出 token。",
+      "expectedEvidence": "证据应该来自 JWT、Redis 黑名单或登录认证设计笔记。",
+      "riskType": "backend_design"
+    },
+    {
+      "caseId": "redis-missing-key-db-pressure",
+      "category": "redis",
+      "question": "查不存在的 key 一直打到 MySQL，怎么避免数据库被打穿？",
+      "relevantDocumentTitles": [
+        "Redis 缓存穿透",
+        "Redis 缓存穿透复盘",
+        "Redis cache penetration review",
+        "Redis cache penetration review updated",
+        "redis-cache-penetration"
+      ],
+      "expectedKeywords": [
+        "key",
+        "MySQL",
+        "TTL",
+        "限流"
+      ],
+      "expectedAnswer": "应该识别这是缓存穿透场景：请求查询不存在的数据，缓存无法命中并反复打到数据库；解决方案包括缓存空值并设置较短 TTL、参数校验、布隆过滤器和接口限流。",
+      "expectedEvidence": "证据应该来自 Redis 缓存穿透复盘或后端缓存设计笔记；这个 case 故意不用“缓存穿透”作为问题主表达，用来检查改写问题下的召回能力。",
+      "riskType": "lexical_mismatch_retrieval"
+    },
+    {
+      "caseId": "token-still-valid-after-logout",
+      "category": "security",
+      "question": "用户退出后旧 token 还没过期，后端怎么拦截？",
+      "relevantDocumentTitles": [
+        "JWT 退出登录与 Redis 黑名单"
+      ],
+      "expectedKeywords": [
+        "token",
+        "Redis",
+        "TTL",
+        "黑名单"
+      ],
+      "expectedAnswer": "应该说明 JWT 是无状态的，服务端默认不会保存会话；退出登录后需要把旧 token 放入 Redis 黑名单，并设置为 token 剩余有效期 TTL，认证过滤器发现黑名单命中后拒绝请求。",
+      "expectedEvidence": "证据应该来自 JWT 退出登录与 Redis 黑名单文档；这个 case 故意不直接问“JWT 黑名单”，用于检查登录退出问题的轻度改写召回。",
+      "riskType": "lexical_mismatch_retrieval"
+    },
+    {
+      "caseId": "flyway-migration",
+      "category": "database",
+      "question": "这个项目里 Flyway migration 解决了什么问题？",
+      "relevantDocumentTitles": [
+        "Flyway migration 数据库迁移"
+      ],
+      "expectedKeywords": [
+        "Flyway",
+        "migration",
+        "database"
+      ],
+      "expectedAnswer": "应该说明 Flyway 用版本化脚本管理表结构变更，应用启动时自动迁移，避免不同环境手动执行 SQL 导致结构漂移。",
+      "expectedEvidence": "证据应该来自数据库迁移、本地启动或工程化初始化文档。",
+      "riskType": "backend_design"
+    },
+    {
+      "caseId": "llm-provider-abstraction",
+      "category": "ai_engineering",
+      "question": "为什么 DevMind 要抽象 LlmClient，而不是直接调用 DeepSeek？",
+      "relevantDocumentTitles": [
+        "LlmClient 与 LLM Provider 抽象"
+      ],
+      "expectedKeywords": [
+        "LlmClient",
+        "DeepSeek",
+        "Mock",
+        "provider"
+      ],
+      "expectedAnswer": "应该说明 LlmClient 可以隔离模型供应商，支持 Mock/DeepSeek 切换、本地测试、成本控制，并避免业务服务和某个厂商 API 强耦合。",
+      "expectedEvidence": "证据应该来自 LLM Provider 抽象、架构说明或 AI Ask 主链路文档。",
+      "riskType": "ai_engineering"
+    },
+    {
+      "caseId": "no-context-fallback",
+      "category": "rag",
+      "question": "检索不到 chunk 时 DevMind 应该怎么处理？",
+      "relevantDocumentTitles": [
+        "RAG 无上下文兜底"
+      ],
+      "expectedKeywords": [
+        "fallback",
+        "retrieval",
+        "chunks"
+      ],
+      "expectedAnswer": "应该说明系统不能强行编答案，应返回知识库资料不足的兜底提示；必要时跳过模型调用，减少幻觉和无效成本。",
+      "expectedEvidence": "证据应该来自 RAG 兜底、幻觉控制或无上下文处理文档。",
+      "riskType": "hallucination_control"
+    },
+    {
+      "caseId": "unknown-kubernetes-fallback",
+      "category": "negative_case",
+      "question": "Kubernetes Pod 驱逐策略是什么？",
+      "relevantDocumentTitles": [],
+      "expectedKeywords": [
+        "Kubernetes",
+        "pod",
+        "eviction"
+      ],
+      "expectedAnswer": "如果知识库没有 Kubernetes 笔记，期望行为是返回无上下文兜底，而不是编造答案。",
+      "expectedEvidence": "除非已经添加 Kubernetes 笔记，否则期望证据是召回 chunk 数为 0。",
+      "riskType": "no_context_negative_case"
+    },
+    {
+      "caseId": "rag-evaluation-purpose",
+      "category": "evaluation",
+      "question": "怎么判断 RAG 回答质量是否足够好？",
+      "relevantDocumentTitles": [
+        "RAG 回答质量评估"
+      ],
+      "expectedKeywords": [
+        "RAG",
+        "evaluation",
+        "bad case",
+        "hit rate"
+      ],
+      "expectedAnswer": "应该说明可以用标准问题、期望答案、召回 chunks、bad case feedback、Hit@K 和 MRR 评估链路质量。",
+      "expectedEvidence": "证据应该来自 evaluation dataset、bad case 或 RAG 质量分析文档。",
+      "riskType": "evaluation_reasoning"
+    },
+    {
+      "caseId": "redis-empty-value-cache-plain",
+      "category": "redis",
+      "question": "查不存在的数据时怎样别让请求每次都落到数据库？",
+      "relevantDocumentTitles": [
+        "Redis 缓存穿透",
+        "Redis 缓存穿透复盘",
+        "Redis cache penetration review",
+        "Redis cache penetration review updated",
+        "redis-cache-penetration"
+      ],
+      "expectedKeywords": [
+        "Redis",
+        "空值缓存",
+        "数据库",
+        "限流"
+      ],
+      "expectedAnswer": "应该识别这是缓存穿透场景，说明空值缓存、短 TTL、参数校验、限流或布隆过滤器等做法。",
+      "expectedEvidence": "证据应该来自 Redis 缓存穿透复盘文档；这个 case 不直接出现“缓存穿透”，用于检验口语化改写下的召回。",
+      "riskType": "lexical_mismatch_retrieval"
+    },
+    {
+      "caseId": "jwt-old-token-block-plain",
+      "category": "security",
+      "question": "退出后旧令牌还能访问接口，服务端要怎么拦？",
+      "relevantDocumentTitles": [
+        "JWT 退出登录与 Redis 黑名单"
+      ],
+      "expectedKeywords": [
+        "JWT",
+        "token",
+        "Redis",
+        "TTL"
+      ],
+      "expectedAnswer": "应该说明 JWT 无状态，退出后需要把旧 token 写入 Redis 黑名单，并用剩余有效期作为 TTL。",
+      "expectedEvidence": "证据应该来自 JWT 退出登录与 Redis 黑名单文档；这个 case 用“旧令牌”替代 JWT 黑名单直问。",
+      "riskType": "lexical_mismatch_retrieval"
+    },
+    {
+      "caseId": "flyway-manual-sql-drift",
+      "category": "database",
+      "question": "每个环境手动改表结构容易不一致，这个项目怎么避免？",
+      "relevantDocumentTitles": [
+        "Flyway migration 数据库迁移"
+      ],
+      "expectedKeywords": [
+        "Flyway",
+        "migration",
+        "schema",
+        "version"
+      ],
+      "expectedAnswer": "应该说明用 Flyway migration 管理表结构版本，应用启动时自动执行未运行的迁移脚本，减少环境漂移。",
+      "expectedEvidence": "证据应该来自 Flyway migration 数据库迁移文档；这个 case 不直接问 Flyway，而是描述手动 SQL 的痛点。",
+      "riskType": "lexical_mismatch_retrieval"
+    },
+    {
+      "caseId": "llm-mock-provider-local-test",
+      "category": "ai_engineering",
+      "question": "为什么本地测试时不用真的请求 DeepSeek，也能跑通 AI 问答流程？",
+      "relevantDocumentTitles": [
+        "LlmClient 与 LLM Provider 抽象"
+      ],
+      "expectedKeywords": [
+        "LlmClient",
+        "Mock",
+        "DeepSeek",
+        "provider"
+      ],
+      "expectedAnswer": "应该说明 LlmClient 抽象隔离了模型供应商，本地可以走 Mock provider，真实环境再切到 DeepSeek。",
+      "expectedEvidence": "证据应该来自 LlmClient 与 LLM Provider 抽象文档；这个 case 从测试成本角度追问 provider 抽象。",
+      "riskType": "lexical_mismatch_retrieval"
+    },
+    {
+      "caseId": "rag-no-evidence-dont-answer",
+      "category": "rag",
+      "question": "知识库里没资料时系统为什么不应该硬编答案？",
+      "relevantDocumentTitles": [
+        "RAG 无上下文兜底"
+      ],
+      "expectedKeywords": [
+        "RAG",
+        "fallback",
+        "hallucination",
+        "chunks"
+      ],
+      "expectedAnswer": "应该说明没有检索到有效 chunk 时应返回无上下文兜底，避免幻觉和无效 token 成本。",
+      "expectedEvidence": "证据应该来自 RAG 无上下文兜底文档；这个 case 用“硬编答案”描述幻觉风险。",
+      "riskType": "lexical_mismatch_retrieval"
+    },
+    {
+      "caseId": "redis-bloom-filter-wording",
+      "category": "redis",
+      "question": "布隆过滤器在缓存查询链路里能挡住哪类异常流量？",
+      "relevantDocumentTitles": [
+        "Redis 缓存穿透",
+        "Redis 缓存穿透复盘",
+        "Redis cache penetration review",
+        "Redis cache penetration review updated",
+        "redis-cache-penetration"
+      ],
+      "expectedKeywords": [
+        "Redis",
+        "布隆过滤器",
+        "非法参数",
+        "miss"
+      ],
+      "expectedAnswer": "应该说明布隆过滤器可提前拦截明显不存在或高风险的查询，减少缓存 miss 和数据库压力。",
+      "expectedEvidence": "证据应该来自 Redis 缓存穿透复盘文档；这个 case 是同一主题的另一种表达。",
+      "riskType": "synonym_retrieval"
+    },
+    {
+      "caseId": "jwt-blacklist-ttl-wording",
+      "category": "security",
+      "question": "退出登录时黑名单里的 token 应该保存多久？",
+      "relevantDocumentTitles": [
+        "JWT 退出登录与 Redis 黑名单"
+      ],
+      "expectedKeywords": [
+        "JWT",
+        "blacklist",
+        "TTL",
+        "logout"
+      ],
+      "expectedAnswer": "应该说明黑名单 entry 的 TTL 应等于 token 剩余有效期，过期后无需继续保存。",
+      "expectedEvidence": "证据应该来自 JWT 退出登录与 Redis 黑名单文档；这个 case 聚焦 TTL 细节。",
+      "riskType": "synonym_retrieval"
+    },
+    {
+      "caseId": "flyway-versioned-script-wording",
+      "category": "database",
+      "question": "数据库变更脚本为什么要带版本号并随应用启动执行？",
+      "relevantDocumentTitles": [
+        "Flyway migration 数据库迁移"
+      ],
+      "expectedKeywords": [
+        "Flyway",
+        "version",
+        "migration",
+        "script"
+      ],
+      "expectedAnswer": "应该说明版本化迁移脚本可以记录已执行版本，启动时自动补齐未执行的数据库结构变更。",
+      "expectedEvidence": "证据应该来自 Flyway migration 数据库迁移文档；这个 case 从脚本版本化角度追问。",
+      "riskType": "synonym_retrieval"
+    },
+    {
+      "caseId": "llm-provider-switch-wording",
+      "category": "ai_engineering",
+      "question": "如果以后模型供应商从 DeepSeek 换成别家，业务代码为什么不用大改？",
+      "relevantDocumentTitles": [
+        "LlmClient 与 LLM Provider 抽象"
+      ],
+      "expectedKeywords": [
+        "LlmClient",
+        "provider",
+        "DeepSeek",
+        "Mock"
+      ],
+      "expectedAnswer": "应该说明业务依赖 LlmClient 接口和 Router，供应商差异留在具体 client 实现中。",
+      "expectedEvidence": "证据应该来自 LlmClient 与 LLM Provider 抽象文档；这个 case 检查供应商切换能力。",
+      "riskType": "synonym_retrieval"
+    },
+    {
+      "caseId": "rag-quality-metric-wording",
+      "category": "evaluation",
+      "question": "除了看回答顺不顺，还能用哪些离线指标判断 RAG 检索质量？",
+      "relevantDocumentTitles": [
+        "RAG 回答质量评估"
+      ],
+      "expectedKeywords": [
+        "RAG",
+        "Hit@K",
+        "MRR",
+        "gold label"
+      ],
+      "expectedAnswer": "应该说明可以用标准问题、gold label、召回 chunks、Hit@K、MRR 和 bad case feedback 评估质量。",
+      "expectedEvidence": "证据应该来自 RAG 回答质量评估文档；这个 case 是评估主题的另一种问法。",
+      "riskType": "synonym_retrieval"
+    },
+    {
+      "caseId": "unknown-kafka-consumer-rebalance",
+      "category": "negative_case",
+      "question": "Kafka consumer rebalance 为什么会变慢？",
+      "relevantDocumentTitles": [],
+      "expectedKeywords": [
+        "Kafka",
+        "consumer",
+        "rebalance"
+      ],
+      "expectedAnswer": "如果知识库没有 Kafka 笔记，期望行为是返回无上下文兜底，而不是把 Redis、JWT 或 RAG 文档硬套过来。",
+      "expectedEvidence": "除非已经添加 Kafka 文档，否则期望证据是召回 chunk 数为 0。",
+      "riskType": "no_context_negative_case"
+    },
+    {
+      "caseId": "unknown-elasticsearch-inverted-index",
+      "category": "negative_case",
+      "question": "Elasticsearch 倒排索引怎么做相关性排序？",
+      "relevantDocumentTitles": [],
+      "expectedKeywords": [
+        "Elasticsearch",
+        "inverted index",
+        "ranking"
+      ],
+      "expectedAnswer": "如果知识库没有 Elasticsearch 笔记，期望行为是返回无上下文兜底。",
+      "expectedEvidence": "除非已经添加 Elasticsearch 文档，否则期望证据是召回 chunk 数为 0。",
+      "riskType": "no_context_negative_case"
+    },
+    {
+      "caseId": "unknown-docker-layer-cache",
+      "category": "negative_case",
+      "question": "Docker 镜像层缓存为什么能加速构建？",
+      "relevantDocumentTitles": [],
+      "expectedKeywords": [
+        "Docker",
+        "image",
+        "layer cache"
+      ],
+      "expectedAnswer": "如果知识库没有 Docker 笔记，期望行为是返回无上下文兜底。",
+      "expectedEvidence": "除非已经添加 Docker 文档，否则期望证据是召回 chunk 数为 0。",
+      "riskType": "no_context_negative_case"
+    },
+    {
+      "caseId": "unknown-spring-cloud-gateway",
+      "category": "negative_case",
+      "question": "Spring Cloud Gateway 的全局过滤器链怎么排序？",
+      "relevantDocumentTitles": [],
+      "expectedKeywords": [
+        "Spring Cloud Gateway",
+        "filter",
+        "order"
+      ],
+      "expectedAnswer": "如果知识库没有 Spring Cloud Gateway 笔记，期望行为是返回无上下文兜底。",
+      "expectedEvidence": "除非已经添加 Spring Cloud Gateway 文档，否则期望证据是召回 chunk 数为 0。",
+      "riskType": "no_context_negative_case"
+    },
+    {
+      "caseId": "hard-negative-redis-vs-flyway-database-pressure",
+      "category": "redis",
+      "question": "数据库压力很大但根因是缓存 miss 反复穿透时，该看哪篇笔记？",
+      "relevantDocumentTitles": [
+        "Redis 缓存穿透",
+        "Redis 缓存穿透复盘",
+        "Redis cache penetration review",
+        "Redis cache penetration review updated",
+        "redis-cache-penetration"
+      ],
+      "expectedKeywords": [
+        "Redis",
+        "database",
+        "miss",
+        "TTL"
+      ],
+      "expectedAnswer": "虽然问题包含数据库，但 gold 应该是 Redis 缓存穿透复盘，因为根因是缓存 miss 反复打到数据库。",
+      "expectedEvidence": "证据应该来自 Redis 缓存穿透复盘文档；这个 case 用 database 干扰 Flyway 文档。",
+      "riskType": "hard_negative_retrieval"
+    },
+    {
+      "caseId": "hard-negative-jwt-vs-rag-fallback",
+      "category": "security",
+      "question": "用户退出后访问接口被拒绝，这是 fallback 兜底还是 token 黑名单？",
+      "relevantDocumentTitles": [
+        "JWT 退出登录与 Redis 黑名单"
+      ],
+      "expectedKeywords": [
+        "JWT",
+        "token",
+        "blacklist",
+        "fallback"
+      ],
+      "expectedAnswer": "问题里有 fallback 干扰词，但正确证据应是 JWT 退出登录与 Redis 黑名单。",
+      "expectedEvidence": "证据应该来自 JWT 退出登录与 Redis 黑名单文档；这个 case 用 fallback 干扰 RAG 兜底文档。",
+      "riskType": "hard_negative_retrieval"
+    },
+    {
+      "caseId": "hard-negative-rag-evaluation-vs-llm-provider",
+      "category": "evaluation",
+      "question": "不是换 DeepSeek provider，而是想知道回答质量怎么量化，应该看哪块？",
+      "relevantDocumentTitles": [
+        "RAG 回答质量评估"
+      ],
+      "expectedKeywords": [
+        "RAG",
+        "evaluation",
+        "DeepSeek",
+        "provider"
+      ],
+      "expectedAnswer": "问题带有 DeepSeek/provider 干扰词，但 gold 应该是 RAG 回答质量评估。",
+      "expectedEvidence": "证据应该来自 RAG 回答质量评估文档；这个 case 用 provider 干扰 LlmClient 文档。",
+      "riskType": "hard_negative_retrieval"
+    },
+    {
+      "caseId": "hard-negative-flyway-vs-llm-router",
+      "category": "database",
+      "question": "Router 能切 provider 不是重点，数据库表结构版本漂移要靠什么管？",
+      "relevantDocumentTitles": [
+        "Flyway migration 数据库迁移"
+      ],
+      "expectedKeywords": [
+        "Flyway",
+        "migration",
+        "provider",
+        "version"
+      ],
+      "expectedAnswer": "问题带有 provider/Router 干扰词，但 gold 应该是 Flyway migration 数据库迁移。",
+      "expectedEvidence": "证据应该来自 Flyway migration 数据库迁移文档；这个 case 用 provider 干扰 LlmClient 文档。",
+      "riskType": "hard_negative_retrieval"
+    },
+    {
+      "caseId": "mysql-index-covering-query",
+      "category": "database",
+      "question": "联合索引和覆盖索引怎么减少 MySQL 扫描行数？",
+      "relevantDocumentTitles": [
+        "MySQL 索引优化"
+      ],
+      "expectedKeywords": [
+        "MySQL",
+        "索引",
+        "联合索引",
+        "覆盖索引"
+      ],
+      "expectedAnswer": "应该说明按查询条件设计联合索引、遵守最左前缀、使用覆盖索引，并通过 explain 验证扫描行数和 key。",
+      "expectedEvidence": "证据应该来自 MySQL 索引优化文档。",
+      "riskType": "synonym_retrieval"
+    },
+    {
+      "caseId": "mysql-transaction-repeatable-read",
+      "category": "database",
+      "question": "可重复读为什么能让同一事务里多次查询结果稳定？",
+      "relevantDocumentTitles": [
+        "MySQL 事务隔离级别"
+      ],
+      "expectedKeywords": [
+        "MySQL",
+        "Repeatable Read",
+        "MVCC",
+        "事务"
+      ],
+      "expectedAnswer": "应该说明 InnoDB 默认 Repeatable Read 通过 MVCC 提供一致性快照读，并区分脏读、不可重复读和幻读。",
+      "expectedEvidence": "证据应该来自 MySQL 事务隔离级别文档。",
+      "riskType": "synonym_retrieval"
+    },
+    {
+      "caseId": "thread-pool-reject-policy",
+      "category": "java_concurrency",
+      "question": "线程池队列满了以后任务会怎么处理？",
+      "relevantDocumentTitles": [
+        "线程池核心参数与拒绝策略"
+      ],
+      "expectedKeywords": [
+        "线程池",
+        "workQueue",
+        "maximumPoolSize",
+        "拒绝策略"
+      ],
+      "expectedAnswer": "应该说明任务先用核心线程、再进队列、再扩容到最大线程数，继续满载时触发拒绝策略。",
+      "expectedEvidence": "证据应该来自 线程池核心参数与拒绝策略 文档。",
+      "riskType": "synonym_retrieval"
+    },
+    {
+      "caseId": "spring-bean-post-processor",
+      "category": "spring",
+      "question": "Spring 里 AOP 代理通常是在 Bean 生命周期哪个扩展点织入的？",
+      "relevantDocumentTitles": [
+        "Spring Bean 生命周期与 IoC"
+      ],
+      "expectedKeywords": [
+        "Spring",
+        "Bean",
+        "BeanPostProcessor",
+        "AOP"
+      ],
+      "expectedAnswer": "应该说明 Bean 生命周期包含实例化、属性填充、Aware 回调、BeanPostProcessor 和初始化，AOP 常通过后置处理器织入代理。",
+      "expectedEvidence": "证据应该来自 Spring Bean 生命周期与 IoC 文档。",
+      "riskType": "synonym_retrieval"
+    },
+    {
+      "caseId": "mysql-slow-query-explain-fields",
+      "category": "database",
+      "question": "慢 SQL 排查时 explain 里 type、key、rows、Extra 分别看什么？",
+      "relevantDocumentTitles": [
+        "MySQL 慢查询与 explain"
+      ],
+      "expectedKeywords": [
+        "MySQL",
+        "explain",
+        "type",
+        "rows",
+        "Extra"
+      ],
+      "expectedAnswer": "应该说明通过 explain 观察访问类型、命中索引、扫描行数和 filesort/temporary 等额外信息。",
+      "expectedEvidence": "证据应该来自 MySQL 慢查询与 explain 文档。",
+      "riskType": "synonym_retrieval"
+    },
+    {
+      "caseId": "redis-persistence-rdb-aof",
+      "category": "redis",
+      "question": "Redis 既想恢复快又想少丢数据，RDB 和 AOF 怎么取舍？",
+      "relevantDocumentTitles": [
+        "Redis 持久化 RDB/AOF"
+      ],
+      "expectedKeywords": [
+        "Redis",
+        "RDB",
+        "AOF",
+        "rewrite"
+      ],
+      "expectedAnswer": "应该说明 RDB 是快照、恢复快但可能丢最近数据，AOF 记录写命令、更安全但文件更大，需要 rewrite。",
+      "expectedEvidence": "证据应该来自 Redis 持久化 RDB/AOF 文档。",
+      "riskType": "synonym_retrieval"
+    },
+    {
+      "caseId": "redis-lock-safe-release",
+      "category": "redis",
+      "question": "Redis 分布式锁释放时为什么要校验 value？",
+      "relevantDocumentTitles": [
+        "Redis 分布式锁"
+      ],
+      "expectedKeywords": [
+        "Redis",
+        "分布式锁",
+        "SET NX PX",
+        "Lua"
+      ],
+      "expectedAnswer": "应该说明加锁用唯一 value，释放时校验 value 后删除，避免误删其他客户端持有的锁。",
+      "expectedEvidence": "证据应该来自 Redis 分布式锁文档。",
+      "riskType": "synonym_retrieval"
+    },
+    {
+      "caseId": "http-tcp-layering",
+      "category": "network",
+      "question": "HTTP 和 TCP 分别属于哪一层，HTTPS 又多了什么？",
+      "relevantDocumentTitles": [
+        "HTTP 与 TCP 基础"
+      ],
+      "expectedKeywords": [
+        "HTTP",
+        "TCP",
+        "HTTPS",
+        "TLS"
+      ],
+      "expectedAnswer": "应该说明 TCP 是传输层可靠字节流，HTTP 是应用层请求响应协议，HTTPS 在 HTTP 与 TCP 之间加入 TLS。",
+      "expectedEvidence": "证据应该来自 HTTP 与 TCP 基础文档。",
+      "riskType": "synonym_retrieval"
+    },
+    {
+      "caseId": "hard-negative-redis-persistence-vs-cache",
+      "category": "redis",
+      "question": "Redis 缓存数据怕宕机丢失时，是看缓存穿透还是 RDB/AOF？",
+      "relevantDocumentTitles": [
+        "Redis 持久化 RDB/AOF"
+      ],
+      "expectedKeywords": [
+        "Redis",
+        "缓存",
+        "RDB",
+        "AOF"
+      ],
+      "expectedAnswer": "问题里有缓存干扰词，但 gold 应该是 Redis 持久化 RDB/AOF，因为关注点是宕机后的数据恢复。",
+      "expectedEvidence": "证据应该来自 Redis 持久化 RDB/AOF 文档；这个 case 用缓存干扰 Redis 缓存穿透复盘。",
+      "riskType": "hard_negative_retrieval"
+    },
+    {
+      "caseId": "hard-negative-redis-lock-vs-cache",
+      "category": "redis",
+      "question": "Redis 里为了防止并发重复扣库存,应该看缓存穿透还是分布式锁？",
+      "relevantDocumentTitles": [
+        "Redis 分布式锁"
+      ],
+      "expectedKeywords": [
+        "Redis",
+        "并发",
+        "缓存",
+        "分布式锁"
+      ],
+      "expectedAnswer": "问题里有缓存干扰词，但 gold 应该是 Redis 分布式锁，因为关注点是并发互斥。",
+      "expectedEvidence": "证据应该来自 Redis 分布式锁文档；这个 case 用缓存干扰 Redis 缓存穿透复盘。",
+      "riskType": "hard_negative_retrieval"
+    },
+    {
+      "caseId": "hard-negative-mysql-slow-vs-index",
+      "category": "database",
+      "question": "SQL 很慢但我已经有索引了，下一步应该看索引设计还是 explain 执行计划？",
+      "relevantDocumentTitles": [
+        "MySQL 慢查询与 explain"
+      ],
+      "expectedKeywords": [
+        "MySQL",
+        "索引",
+        "explain",
+        "慢查询"
+      ],
+      "expectedAnswer": "问题带有索引干扰词，但 gold 应该是 MySQL 慢查询与 explain，因为重点是慢 SQL 排查路径。",
+      "expectedEvidence": "证据应该来自 MySQL 慢查询与 explain 文档；这个 case 用索引干扰 MySQL 索引优化文档。",
+      "riskType": "hard_negative_retrieval"
+    },
+    {
+      "caseId": "hard-negative-mysql-transaction-vs-index",
+      "category": "database",
+      "question": "并发更新时读到的数据前后不一致，这是索引问题还是事务隔离问题？",
+      "relevantDocumentTitles": [
+        "MySQL 事务隔离级别"
+      ],
+      "expectedKeywords": [
+        "MySQL",
+        "索引",
+        "事务",
+        "隔离级别"
+      ],
+      "expectedAnswer": "问题带有索引干扰词，但 gold 应该是 MySQL 事务隔离级别，因为关注并发一致性。",
+      "expectedEvidence": "证据应该来自 MySQL 事务隔离级别文档；这个 case 用索引干扰 MySQL 索引优化文档。",
+      "riskType": "hard_negative_retrieval"
+    }
+  ]
+}

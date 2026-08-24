@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "devmind-v2-development-bad-cases",
+  "datasetVersion": "1.0.0",
+  "frozenAt": "2026-08-20",
+  "status": "development-labels-visible",
+  "caseCount": 12,
+  "allocation": "two technical cases per preregistered root-cause label",
+  "cases": [
+    {"caseId":"dev-v1-001","issue":"A Spring transaction note uses the alias tx propagation, so the original query did not retrieve it.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_EXISTS_NOT_RETRIEVED"},
+    {"caseId":"dev-v1-002","issue":"A cache consistency note contains the answer but lacks the invalidation tag used by the question.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_EXISTS_NOT_RETRIEVED"},
+    {"caseId":"dev-v1-003","issue":"The user requests deployment rollback steps and targeted searches find no owned source.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_MISSING"},
+    {"caseId":"dev-v1-004","issue":"No current document covers the requested incident escalation matrix.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_MISSING"},
+    {"caseId":"dev-v1-005","issue":"Two current notes specify incompatible request timeouts and neither is authoritative.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_CONFLICT_OR_STALE"},
+    {"caseId":"dev-v1-006","issue":"An old runbook conflicts with an undated queue-retention note.","promptSchemaVersion":2,"goldRootCause":"KNOWLEDGE_CONFLICT_OR_STALE"},
+    {"caseId":"dev-v1-007","issue":"The schema-v2 visible citation states REQUIRED propagation, but the answer says REQUIRES_NEW.","promptSchemaVersion":2,"goldRootCause":"ANSWER_WRONG_WITH_CORRECT_EVIDENCE"},
+    {"caseId":"dev-v1-008","issue":"Visible evidence says to cache null values briefly, while the answer says never cache misses.","promptSchemaVersion":2,"goldRootCause":"ANSWER_WRONG_WITH_CORRECT_EVIDENCE"},
+    {"caseId":"dev-v1-009","issue":"The expected answer demands a deprecated endpoint that current owned evidence forbids.","promptSchemaVersion":2,"goldRootCause":"EXPECTED_ANSWER_WRONG"},
+    {"caseId":"dev-v1-010","issue":"The evaluator expects unlimited retries, but the current policy caps attempts.","promptSchemaVersion":2,"goldRootCause":"EXPECTED_ANSWER_WRONG"},
+    {"caseId":"dev-v1-011","issue":"The question asks for a live stock price not maintained by the personal knowledge base.","promptSchemaVersion":2,"goldRootCause":"OUT_OF_KNOWLEDGE_SCOPE"},
+    {"caseId":"dev-v1-012","issue":"The user requests today's weather from an offline engineering-note repository.","promptSchemaVersion":2,"goldRootCause":"OUT_OF_KNOWLEDGE_SCOPE"}
+  ]
+}

@@ -1784,3 +1784,127 @@ select:focus {
 .strategy-table .strategy-na {
   color: #94a3b8;
 }
+
+.repair-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 2fr);
+  gap: 18px;
+}
+
+.repair-case-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+}
+
+.repair-case-button {
+  display: grid;
+  gap: 5px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  color: #334155;
+  text-align: left;
+}
+
+.repair-case-button.active {
+  border-color: #0f8b7f;
+  background: #f0fdfa;
+}
+
+.repair-case-button span,
+.repair-case-button small,
+.repair-detail p {
+  color: #64748b;
+}
+
+.repair-detail,
+.proposal-card {
+  display: grid;
+  gap: 14px;
+}
+
+.proposal-card {
+  padding: 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.repair-detail-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.repair-detail-heading h3,
+.repair-grid h4 {
+  margin: 6px 0;
+}
+
+.conflict-review-box {
+  padding: 14px 16px;
+  border: 1px solid rgba(217, 119, 6, 0.42);
+  border-left: 4px solid #d97706;
+  border-radius: 12px;
+  background: rgba(255, 247, 237, 0.92);
+  color: #7c2d12;
+}
+
+.conflict-review-box strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.conflict-review-box p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.repair-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.repair-grid section,
+.repair-evidence-card,
+.approval-box {
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.repair-grid pre,
+.repair-evidence-card pre {
+  max-height: 260px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.approval-box label {
+  display: grid;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.error-text {
+  color: #b91c1c;
+}
+
+@media (max-width: 900px) {
+  .repair-layout,
+  .repair-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .repair-detail-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

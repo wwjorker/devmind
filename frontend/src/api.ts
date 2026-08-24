@@ -193,6 +193,50 @@ export interface RagRetrievalEvaluation {
   cases: RagRetrievalEvaluationCase[];
 }
 
+export interface RepairCaseSummary {
+  id: number;
+  sourceType: string;
+  sourceRef: string;
+  askLogId: number | null;
+  rootCause: string | null;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RepairProposalItem {
+  id: number;
+  proposalType: string;
+  targetDocumentId: number | null;
+  baseVersionNo: number | null;
+  diffJson: string;
+  evidenceJson: string;
+  counterevidenceJson: string;
+  impactJson: string;
+  regressionPlanJson: string;
+  reviewerVerdict: string | null;
+  reviewerFindingsJson: string | null;
+  revisionNo: number;
+  status: string;
+  approvalDecision: string | null;
+  approvedDiffJson: string | null;
+  decisionComment: string | null;
+  executionResultJson: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RepairCaseDetail extends RepairCaseSummary {
+  askSnapshotJson: string;
+  chunkSnapshotJson: string;
+  trustedSourceJson: string | null;
+  promptSchemaVersion: number | null;
+  diagnosisJson: string | null;
+  proposals: RepairProposalItem[];
+}
+
 const TOKEN_KEY = 'devmind_token';
 
 export function getToken() {

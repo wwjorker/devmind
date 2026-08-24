@@ -13,9 +13,13 @@ import com.devmind.module.search.service.ChunkVectorService;
 import com.devmind.module.search.vectorstore.DenseVectorCodec;
 import com.devmind.module.search.vectorstore.PgVectorStore;
 import com.devmind.module.search.vo.ChunkSearchResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
@@ -32,6 +36,7 @@ import java.util.stream.Collectors;
 @Service
 public class HybridRetrievalStrategy implements RetrievalStrategy {
 
+    private static final Logger log = LoggerFactory.getLogger(HybridRetrievalStrategy.class);
     private static final String STRATEGY_NAME = "hybrid-keyword-local-sparse-vector-rrf-v1";
     private static final String DESCRIPTION = "Keyword/FULLTEXT baseline plus persisted local sparse-vector rerank fused by RRF";
     private static final int STATUS_ACTIVE = 1;
@@ -49,6 +54,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
 
     // Only dense embeddings fit the fixed-dimension pgvector schema.
     private static final String REMOTE_DENSE_PROVIDER = "remote-dense";
+    private static final String LOCAL_SPARSE_PROVIDER = "local-sparse-vector";
 
     private final KeywordRetrievalStrategy keywordRetrievalStrategy;
     private final DocumentChunkMapper chunkMapper;
@@ -85,6 +91,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
     }
 
     @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<ChunkSearchResponse> retrieve(Long userId, List<String> keywords, Integer limit) {
         EmbeddingClient currentClient = embeddingClientRouter.currentClient();
         // Serve the vector arm from pgvector only when the store is enabled AND the
@@ -94,6 +101,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
         return retrieveInternal(userId, keywords, limit, currentClient, true, usePgStore);
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<ChunkSearchResponse> retrieveWithEmbeddingProvider(Long userId,
                                                                    List<String> keywords,
                                                                    Integer limit,
@@ -105,6 +113,7 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
      * Evaluation entry point that forces the vector arm through the pgvector store,
      * so the same gold-label cases can compare MySQL-JSON brute force vs HNSW serving.
      */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public List<ChunkSearchResponse> retrieveWithEmbeddingProviderAndPgStore(Long userId,
                                                                              List<String> keywords,
                                                                              Integer limit,
@@ -204,23 +213,34 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                                                           List<String> keywords,
                                                           EmbeddingClient embeddingClient,
                                                           boolean allowOnTheFlyFallback) {
+        String provider = embeddingClient.providerName();
+        List<DocumentChunkVector> persistedVectors = chunkVectorService.listActiveVectors(
+                userId,
+                provider,
+                VECTOR_CANDIDATE_LIMIT
+        );
+        if (persistedVectors.isEmpty()) {
+            if (!allowOnTheFlyFallback || !LOCAL_SPARSE_PROVIDER.equals(provider)) {
+                if (allowOnTheFlyFallback) {
+                    log.warn("Skip on-the-fly chunk embedding for provider={} because no persisted vectors exist; "
+                                    + "falling back to keyword retrieval until embedding backfill completes. userId={}",
+                            provider, userId);
+                }
+                return List.of();
+            }
+            Map<String, Double> queryVector = embeddingClient.embed(
+                    embeddingTextBuilder.buildForQuery(keywords));
+            if (queryVector.isEmpty()) {
+                return List.of();
+            }
+            return retrieveByOnTheFlyVector(userId, queryVector, embeddingClient);
+        }
+
         Map<String, Double> queryVector = embeddingClient.embed(embeddingTextBuilder.buildForQuery(keywords));
         if (queryVector.isEmpty()) {
             return List.of();
         }
-
-        List<DocumentChunkVector> persistedVectors = chunkVectorService.listActiveVectors(
-                userId,
-                embeddingClient.providerName(),
-                VECTOR_CANDIDATE_LIMIT
-        );
-        if (!persistedVectors.isEmpty()) {
-            return retrieveByPersistedVector(userId, queryVector, persistedVectors, embeddingClient);
-        }
-        if (allowOnTheFlyFallback) {
-            return retrieveByOnTheFlyVector(userId, queryVector, embeddingClient);
-        }
-        return List.of();
+        return retrieveByPersistedVector(userId, queryVector, persistedVectors, embeddingClient);
     }
 
     private List<ChunkSearchResponse> retrieveByPersistedVector(Long userId,
@@ -337,7 +357,8 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                 chunk.getChunkIndex(),
                 chunk.getContent(),
                 chunk.getTokenCount(),
-                Math.max(1, (int) Math.round(similarity * VECTOR_SCORE_WEIGHT))
+                Math.max(1, (int) Math.round(similarity * VECTOR_SCORE_WEIGHT)),
+                document.getVersionNo()
         );
     }
 
@@ -369,7 +390,8 @@ public class HybridRetrievalStrategy implements RetrievalStrategy {
                 source.getChunkIndex(),
                 source.getContent(),
                 source.getTokenCount(),
-                score
+                score,
+                source.getDocumentVersionNo()
         );
     }
 

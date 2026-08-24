@@ -20,8 +20,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashSet;
@@ -45,6 +48,7 @@ public class ChunkVectorService {
     private final EmbeddingTextBuilder embeddingTextBuilder;
     private final ObjectMapper objectMapper;
     private final ObjectProvider<PgVectorStore> pgVectorStoreProvider;
+    private final TransactionOperations transactionOperations;
 
     public ChunkVectorService(DocumentChunkVectorMapper vectorMapper,
                               DocumentChunkMapper chunkMapper,
@@ -52,7 +56,8 @@ public class ChunkVectorService {
                               EmbeddingClientRouter embeddingClientRouter,
                               EmbeddingTextBuilder embeddingTextBuilder,
                               ObjectMapper objectMapper,
-                              ObjectProvider<PgVectorStore> pgVectorStoreProvider) {
+                              ObjectProvider<PgVectorStore> pgVectorStoreProvider,
+                              TransactionOperations transactionOperations) {
         this.vectorMapper = vectorMapper;
         this.chunkMapper = chunkMapper;
         this.documentMapper = documentMapper;
@@ -60,9 +65,10 @@ public class ChunkVectorService {
         this.embeddingTextBuilder = embeddingTextBuilder;
         this.objectMapper = objectMapper;
         this.pgVectorStoreProvider = pgVectorStoreProvider;
+        this.transactionOperations = transactionOperations;
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void rebuildVectors(Long userId, Long documentId, List<DocumentChunk> chunks) {
         if (chunks == null || chunks.isEmpty()) {
             return;
@@ -74,25 +80,23 @@ public class ChunkVectorService {
             return;
         }
 
+        String provider = embeddingClientRouter.providerName();
+        List<PreparedVector> preparedVectors = new ArrayList<>();
         for (DocumentChunk chunk : chunks) {
-            Map<String, Double> vector = embeddingClientRouter.embed(embeddingTextBuilder.buildForChunk(document, chunk));
+            Map<String, Double> vector = embeddingClientRouter.embed(
+                    provider, embeddingTextBuilder.buildForChunk(document, chunk));
             if (vector.isEmpty()) {
                 continue;
             }
-            DocumentChunkVector chunkVector = new DocumentChunkVector();
-            chunkVector.setUserId(userId);
-            chunkVector.setDocumentId(documentId);
-            chunkVector.setChunkId(chunk.getId());
-            chunkVector.setProviderName(embeddingClientRouter.providerName());
-            chunkVector.setVectorJson(encodeVector(vector));
-            chunkVector.setStatus(STATUS_ACTIVE);
-            vectorMapper.insert(chunkVector);
-            doubleWriteToPgVector(userId, documentId, chunk.getId(), embeddingClientRouter.providerName(), vector);
+            preparedVectors.add(new PreparedVector(
+                    userId, documentId, chunk.getId(), provider, vector));
         }
+        persistPreparedVectors(preparedVectors);
+        syncServingIndex(preparedVectors);
     }
 
-    @Transactional
-    public void archiveByDocument(Long userId, Long documentId) {
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void archiveMySqlByDocument(Long userId, Long documentId) {
         // A content rebuild invalidates every vector for the old chunks, regardless of provider.
         QueryWrapper<DocumentChunkVector> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("user_id", userId)
@@ -103,6 +107,10 @@ public class ChunkVectorService {
             vector.setStatus(STATUS_ARCHIVED);
             vectorMapper.updateById(vector);
         }
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void archiveServingIndexByDocument(Long userId, Long documentId) {
         PgVectorStore pgVectorStore = pgVectorStoreProvider.getIfAvailable();
         if (pgVectorStore != null) {
             try {
@@ -116,7 +124,7 @@ public class ChunkVectorService {
         }
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void backfillVectors(Long userId, String provider) {
         EmbeddingClient embeddingClient = embeddingClientRouter.clientFor(provider);
         List<DocumentChunk> chunks = listActiveChunks(userId);
@@ -131,6 +139,8 @@ public class ChunkVectorService {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Map<Long, KnowledgeDocument> activeDocuments = findActiveDocuments(userId, documentIds);
 
+        List<PreparedVector> newVectors = new ArrayList<>();
+        List<PreparedVector> servingVectors = new ArrayList<>();
         for (DocumentChunk chunk : chunks) {
             KnowledgeDocument document = activeDocuments.get(chunk.getDocumentId());
             if (document == null) {
@@ -144,22 +154,30 @@ public class ChunkVectorService {
                 // for another embedding request or touching the MySQL row.
                 Map<String, Double> storedVector = decodeVector(existingActiveVector.getVectorJson());
                 if (!storedVector.isEmpty()) {
-                    doubleWriteToPgVector(
+                    servingVectors.add(new PreparedVector(
                             userId,
                             document.getId(),
                             chunk.getId(),
                             embeddingClient.providerName(),
                             storedVector
-                    );
+                    ));
                 }
                 continue;
             }
-            Map<String, Double> vector = embeddingClient.embed(embeddingTextBuilder.buildForChunk(document, chunk));
+            Map<String, Double> vector = embeddingClientRouter.embed(
+                    embeddingClient.providerName(), embeddingTextBuilder.buildForChunk(document, chunk));
             if (vector.isEmpty()) {
                 continue;
             }
-            saveVector(userId, document.getId(), chunk.getId(), embeddingClient.providerName(), vector);
+            PreparedVector preparedVector = new PreparedVector(
+                    userId, document.getId(), chunk.getId(), embeddingClient.providerName(), vector);
+            newVectors.add(preparedVector);
+            servingVectors.add(preparedVector);
         }
+        // Compute the full batch first. A provider failure therefore leaves MySQL
+        // unchanged instead of persisting a hard-to-explain prefix of the backfill.
+        persistPreparedVectors(newVectors);
+        syncServingIndex(servingVectors);
     }
 
     public List<DocumentChunkVector> listActiveVectors(Long userId, int limit) {
@@ -241,9 +259,6 @@ public class ChunkVectorService {
             existingVector.setVectorJson(encodeVector(vector));
             existingVector.setStatus(STATUS_ACTIVE);
             vectorMapper.updateById(existingVector);
-            // The update branch revives archived rows during backfill; without this
-            // double-write the pgvector index silently misses every re-embedded chunk.
-            doubleWriteToPgVector(userId, documentId, chunkId, provider, vector);
             return;
         }
 
@@ -255,7 +270,30 @@ public class ChunkVectorService {
         chunkVector.setVectorJson(encodeVector(vector));
         chunkVector.setStatus(STATUS_ACTIVE);
         vectorMapper.insert(chunkVector);
-        doubleWriteToPgVector(userId, documentId, chunkId, provider, vector);
+    }
+
+    private void persistPreparedVectors(List<PreparedVector> preparedVectors) {
+        if (preparedVectors.isEmpty()) {
+            return;
+        }
+        transactionOperations.executeWithoutResult(status -> preparedVectors.forEach(prepared ->
+                saveVector(
+                        prepared.userId(),
+                        prepared.documentId(),
+                        prepared.chunkId(),
+                        prepared.provider(),
+                        prepared.vector()
+                )));
+    }
+
+    private void syncServingIndex(List<PreparedVector> preparedVectors) {
+        preparedVectors.forEach(prepared -> doubleWriteToPgVector(
+                prepared.userId(),
+                prepared.documentId(),
+                prepared.chunkId(),
+                prepared.provider(),
+                prepared.vector()
+        ));
     }
 
     /**
@@ -299,5 +337,12 @@ public class ChunkVectorService {
 
     private boolean isActive(Integer status) {
         return Integer.valueOf(STATUS_ACTIVE).equals(status);
+    }
+
+    private record PreparedVector(Long userId,
+                                  Long documentId,
+                                  Long chunkId,
+                                  String provider,
+                                  Map<String, Double> vector) {
     }
 }

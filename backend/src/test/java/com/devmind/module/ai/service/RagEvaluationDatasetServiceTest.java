@@ -104,7 +104,8 @@ class RagEvaluationDatasetServiceTest {
                 retrievalStrategy,
                 keywordRetrievalStrategy,
                 retrievalKeywordService,
-                rerankRouter()
+                rerankRouter(),
+                evaluationDatasetCatalog()
         );
 
         RagRetrievalEvaluationResponse response = service.retrievalEvaluation(1L);
@@ -218,7 +219,8 @@ class RagEvaluationDatasetServiceTest {
                 retrievalStrategy,
                 keywordRetrievalStrategy,
                 retrievalKeywordService,
-                rerankRouter()
+                rerankRouter(),
+                evaluationDatasetCatalog()
         );
 
         RagRetrievalEvaluationResponse response = service.retrievalEvaluation(1L);
@@ -259,7 +261,8 @@ class RagEvaluationDatasetServiceTest {
                 retrievalStrategy,
                 keywordRetrievalStrategy,
                 retrievalKeywordService,
-                rerankRouter()
+                rerankRouter(),
+                evaluationDatasetCatalog()
         );
 
         RagRetrievalEvaluationResponse response = service.retrievalEvaluation(1L);
@@ -296,7 +299,8 @@ class RagEvaluationDatasetServiceTest {
                 retrievalStrategy,
                 keywordRetrievalStrategy,
                 retrievalKeywordService,
-                rerankRouter()
+                rerankRouter(),
+                evaluationDatasetCatalog()
         );
 
         RagRetrievalEvaluationResponse response = service.retrievalEvaluation(1L);
@@ -530,8 +534,13 @@ class RagEvaluationDatasetServiceTest {
                 mock(HybridRetrievalStrategy.class),
                 mock(KeywordRetrievalStrategy.class),
                 mock(RetrievalKeywordService.class),
-                rerankRouter()
+                rerankRouter(),
+                evaluationDatasetCatalog()
         );
+    }
+
+    private RagEvaluationDatasetCatalog evaluationDatasetCatalog() {
+        return new RagEvaluationDatasetCatalog(new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules());
     }
 
     private RerankClientRouter rerankRouter() {

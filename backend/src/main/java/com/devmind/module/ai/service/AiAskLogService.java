@@ -21,9 +21,12 @@ public class AiAskLogService {
     private static final long MAX_PAGE_SIZE = 50;
 
     private final AiAskLogMapper askLogMapper;
+    private final RetrievedEvidenceSnapshotCodec evidenceSnapshotCodec;
 
-    public AiAskLogService(AiAskLogMapper askLogMapper) {
+    public AiAskLogService(AiAskLogMapper askLogMapper,
+                           RetrievedEvidenceSnapshotCodec evidenceSnapshotCodec) {
         this.askLogMapper = askLogMapper;
+        this.evidenceSnapshotCodec = evidenceSnapshotCodec;
     }
 
     @Transactional
@@ -44,6 +47,7 @@ public class AiAskLogService {
         log.setQuestion(question);
         log.setRetrievalKeyword(retrievalKeyword);
         log.setPromptPreview(promptPreview);
+        log.setPromptSchemaVersion(PromptSchemaVersions.CURRENT);
         log.setAnswer(answer);
         log.setModelProvider(modelProvider);
         log.setMock(mock);
@@ -52,6 +56,7 @@ public class AiAskLogService {
         log.setTotalTokens(totalTokens);
         log.setRetrievedChunkCount(retrievedChunks.size());
         log.setRetrievedChunkIds(toChunkIds(retrievedChunks));
+        log.setRetrievalSnapshotJson(evidenceSnapshotCodec.encode(retrievedChunks));
         log.setElapsedMs(elapsedMs);
         log.setStatus(STATUS_SUCCESS);
         askLogMapper.insert(log);
@@ -73,11 +78,13 @@ public class AiAskLogService {
         log.setQuestion(question);
         log.setRetrievalKeyword(retrievalKeyword);
         log.setPromptPreview(promptPreview);
+        log.setPromptSchemaVersion(PromptSchemaVersions.CURRENT);
         log.setAnswer(toFailureAnswer(failureMessage));
         log.setModelProvider(modelProvider);
         log.setMock(mock);
         log.setRetrievedChunkCount(retrievedChunks.size());
         log.setRetrievedChunkIds(toChunkIds(retrievedChunks));
+        log.setRetrievalSnapshotJson(evidenceSnapshotCodec.encode(retrievedChunks));
         log.setElapsedMs(elapsedMs);
         log.setStatus(STATUS_FAILED);
         askLogMapper.insert(log);

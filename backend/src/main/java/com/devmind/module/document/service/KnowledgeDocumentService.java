@@ -7,12 +7,16 @@ import com.devmind.common.api.ResultCode;
 import com.devmind.common.exception.BizException;
 import com.devmind.module.document.dto.CreateDocumentRequest;
 import com.devmind.module.document.dto.UpdateDocumentRequest;
+import com.devmind.module.document.entity.DocumentChunk;
 import com.devmind.module.document.entity.KnowledgeDocument;
 import com.devmind.module.document.mapper.KnowledgeDocumentMapper;
 import com.devmind.module.document.vo.DocumentChunkResponse;
 import com.devmind.module.document.vo.DocumentResponse;
+import com.devmind.module.search.service.ChunkVectorService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,6 +28,7 @@ import java.util.List;
 @Service
 public class KnowledgeDocumentService {
 
+    private static final Logger log = LoggerFactory.getLogger(KnowledgeDocumentService.class);
     private static final int STATUS_ACTIVE = 1;
     private static final int STATUS_ARCHIVED = 0;
     private static final long MAX_PAGE_SIZE = 50;
@@ -32,31 +37,50 @@ public class KnowledgeDocumentService {
     private static final String DEFAULT_IMPORTED_SOURCE_TYPE = "learning_note";
 
     private final KnowledgeDocumentMapper documentMapper;
+    private final KnowledgeDocumentVersionService versionService;
     private final DocumentChunkService chunkService;
+    private final ChunkVectorService chunkVectorService;
+    private final TransactionOperations transactionOperations;
 
     public KnowledgeDocumentService(KnowledgeDocumentMapper documentMapper,
-                                    DocumentChunkService chunkService) {
+                                    KnowledgeDocumentVersionService versionService,
+                                    DocumentChunkService chunkService,
+                                    ChunkVectorService chunkVectorService,
+                                    TransactionOperations transactionOperations) {
         this.documentMapper = documentMapper;
+        this.versionService = versionService;
         this.chunkService = chunkService;
+        this.chunkVectorService = chunkVectorService;
+        this.transactionOperations = transactionOperations;
     }
 
-    @Transactional
     public DocumentResponse create(Long userId, CreateDocumentRequest request) {
-        validateCreateRequest(request);
-        KnowledgeDocument document = new KnowledgeDocument();
-        document.setUserId(userId);
-        document.setTitle(request.getTitle());
-        document.setContent(request.getContent());
-        document.setSourceType(request.getSourceType());
-        document.setTags(request.getTags());
-        document.setSummary(request.getSummary());
-        document.setStatus(STATUS_ACTIVE);
-        documentMapper.insert(document);
-        chunkService.rebuildChunks(userId, document.getId(), request.getContent());
-        return toResponse(document);
+        return create(userId, request, DocumentVersionOrigin.USER_CREATE);
     }
 
-    @Transactional
+    private DocumentResponse create(Long userId,
+                                    CreateDocumentRequest request,
+                                    DocumentVersionOrigin origin) {
+        validateCreateRequest(request);
+        DocumentWriteResult result = transactionOperations.execute(status -> {
+            KnowledgeDocument document = new KnowledgeDocument();
+            document.setUserId(userId);
+            document.setTitle(request.getTitle());
+            document.setContent(request.getContent());
+            document.setSourceType(request.getSourceType());
+            document.setTags(request.getTags());
+            document.setSummary(request.getSummary());
+            document.setStatus(STATUS_ACTIVE);
+            document.setVersionNo(1);
+            documentMapper.insert(document);
+            versionService.snapshot(document, origin, null, null);
+            List<DocumentChunk> chunks = replaceChunksAndArchiveVectors(
+                    userId, document.getId(), request.getContent());
+            return new DocumentWriteResult(document, chunks);
+        });
+        return completeVectorIndexing(userId, result);
+    }
+
     public DocumentResponse importFromFile(Long userId,
                                            MultipartFile file,
                                            String title,
@@ -81,7 +105,7 @@ public class KnowledgeDocumentService {
         request.setSourceType(StringUtils.hasText(sourceType) ? sourceType.trim() : DEFAULT_IMPORTED_SOURCE_TYPE);
         request.setTags(StringUtils.hasText(tags) ? tags.trim() : "");
         request.setSummary(StringUtils.hasText(summary) ? summary.trim() : "导入文件：" + filename);
-        return create(userId, request);
+        return create(userId, request, DocumentVersionOrigin.FILE_IMPORT);
     }
 
     public DocumentResponse getDetail(Long userId, Long documentId) {
@@ -137,34 +161,74 @@ public class KnowledgeDocumentService {
         return chunkService.listActiveChunks(userId, documentId);
     }
 
-    @Transactional
     public DocumentResponse update(Long userId, Long documentId, UpdateDocumentRequest request) {
-        KnowledgeDocument document = findOwnedActiveDocument(userId, documentId);
-        document.setTitle(request.getTitle());
-        document.setContent(request.getContent());
-        document.setSourceType(request.getSourceType());
-        document.setTags(request.getTags());
-        document.setSummary(request.getSummary());
-        documentMapper.updateById(document);
-        chunkService.rebuildChunks(userId, documentId, request.getContent());
-        return toResponse(document);
+        validateUpdateRequest(request);
+        DocumentWriteResult result = transactionOperations.execute(status -> {
+            KnowledgeDocument document = findOwnedActiveDocument(userId, documentId);
+            document.setTitle(request.getTitle());
+            document.setContent(request.getContent());
+            document.setSourceType(request.getSourceType());
+            document.setTags(request.getTags());
+            document.setSummary(request.getSummary());
+            updateDocumentOrThrowConflict(document);
+            versionService.snapshot(document, DocumentVersionOrigin.USER_UPDATE, null, null);
+            List<DocumentChunk> chunks = replaceChunksAndArchiveVectors(
+                    userId, documentId, request.getContent());
+            return new DocumentWriteResult(document, chunks);
+        });
+        return completeVectorIndexing(userId, result);
     }
 
-    @Transactional
     public void archive(Long userId, Long documentId) {
-        KnowledgeDocument document = findOwnedActiveDocument(userId, documentId);
-        document.setStatus(STATUS_ARCHIVED);
-        documentMapper.updateById(document);
-        chunkService.archiveByDocument(userId, documentId);
+        transactionOperations.executeWithoutResult(status -> {
+            KnowledgeDocument document = findOwnedActiveDocument(userId, documentId);
+            document.setStatus(STATUS_ARCHIVED);
+            updateDocumentOrThrowConflict(document);
+            versionService.snapshot(document, DocumentVersionOrigin.USER_ARCHIVE, null, null);
+            chunkService.archiveByDocument(userId, documentId);
+            chunkVectorService.archiveMySqlByDocument(userId, documentId);
+        });
+        chunkVectorService.archiveServingIndexByDocument(userId, documentId);
     }
 
-    @Transactional
     public DocumentResponse restore(Long userId, Long documentId) {
-        KnowledgeDocument document = findOwnedDocumentByStatus(userId, documentId, STATUS_ARCHIVED);
-        document.setStatus(STATUS_ACTIVE);
-        documentMapper.updateById(document);
-        chunkService.rebuildChunks(userId, documentId, document.getContent());
-        return toResponse(document);
+        DocumentWriteResult result = transactionOperations.execute(status -> {
+            KnowledgeDocument document = findOwnedDocumentByStatus(userId, documentId, STATUS_ARCHIVED);
+            document.setStatus(STATUS_ACTIVE);
+            updateDocumentOrThrowConflict(document);
+            versionService.snapshot(document, DocumentVersionOrigin.USER_RESTORE, null, null);
+            List<DocumentChunk> chunks = replaceChunksAndArchiveVectors(
+                    userId, documentId, document.getContent());
+            return new DocumentWriteResult(document, chunks);
+        });
+        return completeVectorIndexing(userId, result);
+    }
+
+    private List<DocumentChunk> replaceChunksAndArchiveVectors(Long userId,
+                                                               Long documentId,
+                                                               String content) {
+        List<DocumentChunk> chunks = chunkService.replaceChunks(userId, documentId, content);
+        chunkVectorService.archiveMySqlByDocument(userId, documentId);
+        return chunks;
+    }
+
+    private DocumentResponse completeVectorIndexing(Long userId, DocumentWriteResult result) {
+        if (result == null) {
+            throw new IllegalStateException("document transaction returned no result");
+        }
+        Long documentId = result.document().getId();
+        chunkVectorService.archiveServingIndexByDocument(userId, documentId);
+        try {
+            chunkVectorService.rebuildVectors(userId, documentId, result.chunks());
+        } catch (RuntimeException ex) {
+            // Document content and chunks are the primary searchable data. Embeddings are
+            // derived: keep keyword/full-text retrieval available and let backfill repair
+            // the missing provider vectors instead of rolling back a committed document.
+            log.warn("Vector indexing failed after document commit; document remains keyword-searchable "
+                            + "and can be repaired by embedding backfill. userId={}, documentId={}",
+                    userId, documentId, ex);
+        }
+        return toResponse(result.document());
     }
 
     private KnowledgeDocument findOwnedActiveDocument(Long userId, Long documentId) {
@@ -264,5 +328,28 @@ public class KnowledgeDocumentService {
                 document.getCreatedAt(),
                 document.getUpdatedAt()
         );
+    }
+
+    private void validateUpdateRequest(UpdateDocumentRequest request) {
+        if (request == null) {
+            throw new BizException(ResultCode.BAD_REQUEST, "document request is required");
+        }
+        CreateDocumentRequest equivalent = new CreateDocumentRequest();
+        equivalent.setTitle(request.getTitle());
+        equivalent.setContent(request.getContent());
+        equivalent.setSourceType(request.getSourceType());
+        equivalent.setTags(request.getTags());
+        equivalent.setSummary(request.getSummary());
+        validateCreateRequest(equivalent);
+    }
+
+    private void updateDocumentOrThrowConflict(KnowledgeDocument document) {
+        if (documentMapper.updateById(document) != 1) {
+            throw new BizException(ResultCode.CONFLICT,
+                    "document changed concurrently; reload the latest version");
+        }
+    }
+
+    private record DocumentWriteResult(KnowledgeDocument document, List<DocumentChunk> chunks) {
     }
 }

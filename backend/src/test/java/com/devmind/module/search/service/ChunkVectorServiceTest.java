@@ -17,14 +17,20 @@ import com.devmind.module.search.vectorstore.PgVectorStore;
 import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.SimpleTransactionStatus;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionOperations;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -45,7 +51,8 @@ class ChunkVectorServiceTest {
                 localRouter(),
                 new EmbeddingTextBuilder(),
                 new ObjectMapper(),
-                emptyPgVectorStoreProvider()
+                emptyPgVectorStoreProvider(),
+                immediateTransactions()
         );
         when(documentMapper.selectById(100L)).thenReturn(document(100L));
 
@@ -63,6 +70,51 @@ class ChunkVectorServiceTest {
     }
 
     @Test
+    void shouldComputeOutsideTransactionPersistInsideAndSyncPgVectorAfterCommit() {
+        DocumentChunkVectorMapper vectorMapper = mock(DocumentChunkVectorMapper.class);
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        EmbeddingClientRouter embeddingClientRouter = mock(EmbeddingClientRouter.class);
+        PgVectorStore pgVectorStore = mock(PgVectorStore.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<PgVectorStore> pgVectorStoreProvider = mock(ObjectProvider.class);
+        TrackingTransactionOperations transactions = new TrackingTransactionOperations();
+        when(documentMapper.selectById(100L)).thenReturn(document(100L));
+        when(embeddingClientRouter.providerName()).thenReturn("remote-dense");
+        when(embeddingClientRouter.embed(eq("remote-dense"), any())).thenAnswer(invocation -> {
+            assertThat(transactions.isActive()).isFalse();
+            return Map.of("0", 0.1, "1", 0.2, "2", 0.3);
+        });
+        when(pgVectorStoreProvider.getIfAvailable()).thenReturn(pgVectorStore);
+        when(pgVectorStore.dimension()).thenReturn(3);
+        doAnswer(invocation -> {
+            assertThat(transactions.isActive()).isTrue();
+            return 1;
+        }).when(vectorMapper).insert(any(DocumentChunkVector.class));
+        doAnswer(invocation -> {
+            assertThat(transactions.isActive()).isFalse();
+            return null;
+        }).when(pgVectorStore).upsertChunkVector(
+                eq(1L), eq(100L), eq(10L), eq("remote-dense"), any(float[].class));
+        ChunkVectorService service = new ChunkVectorService(
+                vectorMapper,
+                mock(DocumentChunkMapper.class),
+                documentMapper,
+                embeddingClientRouter,
+                new EmbeddingTextBuilder(),
+                new ObjectMapper(),
+                pgVectorStoreProvider,
+                transactions
+        );
+
+        service.rebuildVectors(1L, 100L, List.of(chunk(10L, 100L)));
+
+        verify(vectorMapper).insert(any(DocumentChunkVector.class));
+        verify(pgVectorStore).upsertChunkVector(
+                eq(1L), eq(100L), eq(10L), eq("remote-dense"), any(float[].class));
+        assertThat(transactions.isActive()).isFalse();
+    }
+
+    @Test
     void shouldArchiveVectorsForAllProvidersByDocument() {
         DocumentChunkVectorMapper vectorMapper = mock(DocumentChunkVectorMapper.class);
         DocumentChunkVector localVector = vector(10L, 100L, "local-sparse-vector");
@@ -74,11 +126,12 @@ class ChunkVectorServiceTest {
                 localRouter(),
                 new EmbeddingTextBuilder(),
                 new ObjectMapper(),
-                emptyPgVectorStoreProvider()
+                emptyPgVectorStoreProvider(),
+                immediateTransactions()
         );
         when(vectorMapper.selectList(any())).thenReturn(List.of(localVector, remoteVector));
 
-        service.archiveByDocument(1L, 100L);
+        service.archiveMySqlByDocument(1L, 100L);
 
         ArgumentCaptor<DocumentChunkVector> captor = ArgumentCaptor.forClass(DocumentChunkVector.class);
         verify(vectorMapper, times(2)).updateById(captor.capture());
@@ -99,7 +152,8 @@ class ChunkVectorServiceTest {
                 localRouter(),
                 new EmbeddingTextBuilder(),
                 new ObjectMapper(),
-                emptyPgVectorStoreProvider()
+                emptyPgVectorStoreProvider(),
+                immediateTransactions()
         );
 
         Map<String, Double> vector = service.decodeVector("{\"redis\":0.8,\"cache\":0.6}");
@@ -120,7 +174,8 @@ class ChunkVectorServiceTest {
                 localRouter(),
                 new EmbeddingTextBuilder(),
                 new ObjectMapper(),
-                emptyPgVectorStoreProvider()
+                emptyPgVectorStoreProvider(),
+                immediateTransactions()
         );
         when(chunkMapper.selectList(any())).thenReturn(List.of(
                 chunk(10L, 100L),
@@ -154,7 +209,8 @@ class ChunkVectorServiceTest {
         when(pgVectorStore.dimension()).thenReturn(3);
         when(embeddingClientRouter.clientFor("remote-dense")).thenReturn(denseClient);
         when(denseClient.providerName()).thenReturn("remote-dense");
-        when(denseClient.embed(any())).thenReturn(Map.of("0", 0.1, "1", 0.2, "2", 0.3));
+        when(embeddingClientRouter.embed(eq("remote-dense"), any()))
+                .thenReturn(Map.of("0", 0.1, "1", 0.2, "2", 0.3));
         ChunkVectorService service = new ChunkVectorService(
                 vectorMapper,
                 chunkMapper,
@@ -162,7 +218,8 @@ class ChunkVectorServiceTest {
                 embeddingClientRouter,
                 new EmbeddingTextBuilder(),
                 new ObjectMapper(),
-                pgVectorStoreProvider
+                pgVectorStoreProvider,
+                immediateTransactions()
         );
         when(chunkMapper.selectList(any())).thenReturn(List.of(chunk(10L, 100L)));
         when(vectorMapper.selectList(any())).thenReturn(List.of());
@@ -209,7 +266,8 @@ class ChunkVectorServiceTest {
                 embeddingClientRouter,
                 new EmbeddingTextBuilder(),
                 new ObjectMapper(),
-                pgVectorStoreProvider
+                pgVectorStoreProvider,
+                immediateTransactions()
         );
         DocumentChunkVector activeVector = vector(10L, 100L, "remote-dense");
         activeVector.setVectorJson("{\"0\":0.1,\"1\":0.2,\"2\":0.3}");
@@ -219,7 +277,7 @@ class ChunkVectorServiceTest {
 
         service.backfillVectors(1L, "remote-dense");
 
-        verify(denseClient, never()).embed(any());
+        verify(embeddingClientRouter, never()).embed(eq("remote-dense"), any());
         verify(vectorMapper, never()).insert(any(DocumentChunkVector.class));
         verify(vectorMapper, never()).updateById(any(DocumentChunkVector.class));
         ArgumentCaptor<float[]> embeddingCaptor = ArgumentCaptor.forClass(float[].class);
@@ -246,7 +304,8 @@ class ChunkVectorServiceTest {
         when(pgVectorStoreProvider.getIfAvailable()).thenReturn(pgVectorStore);
         when(pgVectorStore.dimension()).thenReturn(3);
         when(embeddingClientRouter.providerName()).thenReturn("remote-dense");
-        when(embeddingClientRouter.embed(any())).thenReturn(Map.of("0", 0.1, "1", 0.2, "2", 0.3));
+        when(embeddingClientRouter.embed(eq("remote-dense"), any()))
+                .thenReturn(Map.of("0", 0.1, "1", 0.2, "2", 0.3));
         when(embeddingClientRouter.clientFor("remote-dense")).thenReturn(denseClient);
         when(denseClient.providerName()).thenReturn("remote-dense");
         doThrow(new RuntimeException("pgvector unavailable"))
@@ -260,7 +319,8 @@ class ChunkVectorServiceTest {
                 embeddingClientRouter,
                 new EmbeddingTextBuilder(),
                 new ObjectMapper(),
-                pgVectorStoreProvider
+                pgVectorStoreProvider,
+                immediateTransactions()
         );
         when(documentMapper.selectById(100L)).thenReturn(document(100L));
 
@@ -293,7 +353,8 @@ class ChunkVectorServiceTest {
                 localRouter(),
                 new EmbeddingTextBuilder(),
                 new ObjectMapper(),
-                emptyPgVectorStoreProvider()
+                emptyPgVectorStoreProvider(),
+                immediateTransactions()
         );
         when(chunkMapper.selectList(any())).thenReturn(List.of(chunk(10L, 100L)));
         when(vectorMapper.selectList(any())).thenReturn(List.of());
@@ -302,6 +363,43 @@ class ChunkVectorServiceTest {
         assertThatThrownBy(() -> service.backfillVectors(1L, "remote-dense"))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("external embedding provider is not configured");
+        verify(vectorMapper, never()).insert(any(DocumentChunkVector.class));
+        verify(vectorMapper, never()).updateById(any(DocumentChunkVector.class));
+    }
+
+    @Test
+    void shouldNotPersistPartialBackfillWhenLaterEmbeddingFails() {
+        DocumentChunkVectorMapper vectorMapper = mock(DocumentChunkVectorMapper.class);
+        DocumentChunkMapper chunkMapper = mock(DocumentChunkMapper.class);
+        KnowledgeDocumentMapper documentMapper = mock(KnowledgeDocumentMapper.class);
+        EmbeddingClientRouter embeddingClientRouter = mock(EmbeddingClientRouter.class);
+        EmbeddingClient denseClient = mock(EmbeddingClient.class);
+        when(embeddingClientRouter.clientFor("remote-dense")).thenReturn(denseClient);
+        when(denseClient.providerName()).thenReturn("remote-dense");
+        when(chunkMapper.selectList(any())).thenReturn(List.of(
+                chunk(10L, 100L),
+                chunk(20L, 100L)
+        ));
+        when(vectorMapper.selectList(any())).thenReturn(List.of());
+        when(documentMapper.selectList(any())).thenReturn(List.of(document(100L)));
+        when(embeddingClientRouter.embed(eq("remote-dense"), any()))
+                .thenReturn(Map.of("0", 0.1, "1", 0.2, "2", 0.3))
+                .thenThrow(new IllegalStateException("embedding unavailable"));
+        ChunkVectorService service = new ChunkVectorService(
+                vectorMapper,
+                chunkMapper,
+                documentMapper,
+                embeddingClientRouter,
+                new EmbeddingTextBuilder(),
+                new ObjectMapper(),
+                emptyPgVectorStoreProvider(),
+                immediateTransactions()
+        );
+
+        assertThatThrownBy(() -> service.backfillVectors(1L, "remote-dense"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("embedding unavailable");
+
         verify(vectorMapper, never()).insert(any(DocumentChunkVector.class));
         verify(vectorMapper, never()).updateById(any(DocumentChunkVector.class));
     }
@@ -352,6 +450,30 @@ class ChunkVectorServiceTest {
     @SuppressWarnings("unchecked")
     private ObjectProvider<PgVectorStore> emptyPgVectorStoreProvider() {
         return mock(ObjectProvider.class);
+    }
+
+    private TransactionOperations immediateTransactions() {
+        return new TrackingTransactionOperations();
+    }
+
+    private static final class TrackingTransactionOperations implements TransactionOperations {
+
+        private final AtomicBoolean active = new AtomicBoolean();
+
+        @Override
+        public <T> T execute(TransactionCallback<T> action) {
+            assertThat(active.compareAndSet(false, true)).isTrue();
+            TransactionStatus status = new SimpleTransactionStatus();
+            try {
+                return action.doInTransaction(status);
+            } finally {
+                active.set(false);
+            }
+        }
+
+        private boolean isActive() {
+            return active.get();
+        }
     }
 
 }

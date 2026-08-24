@@ -76,6 +76,12 @@ DeepSeek API
 ./mvnw test        # Windows: .\mvnw.cmd test
 ```
 
+真实 DeepSeek Tool Calling smoke 默认跳过，避免普通测试意外产生外部调用。
+只有同时提供 `DEVMIND_DEEPSEEK_API_KEY` 和
+`DEVMIND_RUN_DEEPSEEK_SMOKE=true` 时，才会执行
+`DeepSeekAgentModelClientSmokeTest`；密钥应通过当前进程环境或 CI Secret
+注入，不要写入仓库。
+
 现有测试覆盖了在后续迭代中应保持稳定的核心逻辑：
 
 ```text
@@ -87,7 +93,7 @@ Redis-backed token blacklist
 Spring context wiring for mapper scan safety
 ```
 
-测试集还包含一个受 Docker 控制的 MySQL Testcontainers 集成测试。当 Docker 可用时，它会启动 MySQL 5.7、在真实数据库引擎上执行 Flyway 迁移、经服务层创建一篇文档、验证 chunk 向量持久化、跑一遍混合检索，并检查 MySQL FULLTEXT mapper 的行为。当本地没有 Docker 时，该集成测试会被跳过，而不是阻塞本地开发。
+测试集还包含一个受 Docker 控制的 MySQL Testcontainers 集成测试。当 Docker 可用时，它会启动 MySQL 8.0、在真实数据库引擎上执行 Flyway 迁移、经服务层创建一篇文档、验证 chunk 向量持久化、跑一遍混合检索，并检查 MySQL FULLTEXT mapper 的行为。当本地没有 Docker 时，该集成测试会被跳过，而不是阻塞本地开发。
 
 GitHub Actions 会在每次向 `main` 的 push 和 pull request 上执行同样的 Maven 测试命令，因此 MySQL 集成测试预期会在有 Docker 的 CI 环境里真实运行。
 
@@ -138,8 +144,8 @@ sequenceDiagram
         AI-->>Client: knowledge base has insufficient information
     else chunks found
     AI->>Prompt: buildPrompt(question, chunks)
-    Prompt-->>AI: prompt preview
-    AI->>LLM: generate(prompt)
+    Prompt-->>AI: full prompt + bounded preview
+    AI->>LLM: generate(full prompt)
     LLM-->>AI: answer + token usage
     AI->>Log: save success log with provider, chunks, latency, tokens
     AI-->>Client: answer + citations + logId
@@ -192,6 +198,13 @@ POST   /api/v1/ai/ask-logs/{logId}/feedback
 GET    /api/v1/ai/ask-feedback?helpful=&askLogId=
 GET    /api/v1/ai/evaluation/summary
 GET    /api/v1/ai/evaluation/dataset
+
+GET    /api/v1/ai/repair/cases
+GET    /api/v1/ai/repair/cases/{badCaseId}
+POST   /api/v1/ai/repair/cases/{badCaseId}/triage
+POST   /api/v1/ai/repair/proposals/{proposalId}/review
+POST   /api/v1/ai/repair/proposals/{proposalId}/decision
+POST   /api/v1/ai/repair/proposals/{proposalId}/execute
 ```
 
 ## 可观测性与评估
@@ -202,6 +215,7 @@ GET    /api/v1/ai/evaluation/dataset
 question
 retrieval keywords
 prompt preview
+prompt schema version
 model provider
 mock or real-provider flag
 retrieved chunk ids
@@ -328,6 +342,96 @@ summary    optional
 
 导入后，后端会创建一篇正常的知识文档，并走和手动创建文档相同的 `DocumentChunkService` 路径重建 chunk。这样保证 RAG 链路一致，上传的笔记也能立即被检索到。
 
+## Agent 运行审计（Phase B 基础设施）
+
+V6 migration 新增 `agent_run` 与 `agent_step`，用于持久化实验臂、预算、
+累计用量、有序模型/工具步骤和终态；V7 为工具步骤补充 Provider
+`tool_call_id`，使返回消息和审计步骤可以稳定关联。Phase C 已开放受认证保护的
+repair workflow API，但模型仍没有通用知识库写工具；只有 Java 白名单执行器能在
+人工批准后应用 metadata patch。
+
+步骤预留和完成分别使用短事务；外部模型调用在事务外执行。步数、模型调用
+次数和调用前 deadline 会在请求发出前阻断；总 token 以 Provider 返回的
+usage 记账，达到阈值后禁止下一次调用。工具调用同样占用总步数并受 deadline
+与 token 阈值约束，但不占用模型调用次数。审计仅保存角色、工具名、字段名、
+字符数等有界摘要，不保存完整 Prompt、模型输出、工具参数值或工具结果正文。
+
+Phase B 当前只注册三个租户隔离的只读工具：`searchKnowledge`、
+`getChunkEvidence`、`getAskLogEvidence`。`userId` 与 `runId` 由服务端上下文
+注入，不属于模型参数。普通检索只返回 active 数据；历史证据工具允许按已记录
+ID 读取 archived chunk，但会明确声明它是当前数据库行的解析结果，不是不可变
+历史快照。旧 Prompt Schema 日志会标记为不可用于“证据正确但回答错误”判定。
+Triage 输出使用固定六类根因和一一对应的 route，并拒绝未知字段。
+
+`EvidenceTriageAgent` 提供 Phase B 内部技术切片：首轮固定读取目标 ask log，
+随后按模型请求执行只读工具，完整重建 assistant/tool 消息，最终对 diagnosis
+做服务端证据引用校验。未执行的 tool-call ID、工具结果中不存在的记录 ID、
+重复 call ID、目标 ask log 串线，以及使用旧 Prompt Schema 判定“正确证据但
+回答错误”，都会使 run 明确失败。`evaluation/v2-development-bad-cases-v0.1.json`
+的六条 label-visible case 已通过 scripted 编排测试；这只证明协议和控制流可跑，
+不代表真实模型准确率。Phase C 已加入 bad-case intake、业务状态机和受控提案。
+预注册的 6 次模型调用、12 次工具调用、24,000 token 和 120 秒限制均有独立
+持久计数或终态检查；已完成但造成 token 越界的模型调用保留审计记录，同时 run
+立即进入 `BUDGET_EXHAUSTED`，不能再被标为成功。
+
+Phase C 的知识写入以 `knowledge_document.version_no` 作为乐观锁，并在
+`knowledge_document_version` 保存创建、导入、用户更新、归档和恢复后的不可变
+全文及 metadata 快照。V9 会为已有文档补一条 version 1 baseline。文档当前态、
+版本快照、chunk 替换和 MySQL 向量失效保持同一短事务；embedding 与 pgvector
+同步仍在提交后执行。repair proposal 的来源证据和 proposal ID 将复用同一版本表。
+
+新的 ask log 会额外保存结构化 retrieval snapshot：内容是模型实际可见的
+有界 chunk 文本，并带当时的 document version。`helpful=false` 与问答快照
+在同一短事务内生成去重的 `ai_bad_case`；旧日志缺少该快照时只保留
+空证据并沿用原 prompt schema 标记，不伪装成新 schema 证据。bad case 状态
+迁移受 Java 白名单和 `status_version` 乐观锁双重保护。
+
+`repair_proposal` 把 diff、document base version、正反证据、影响范围和回归计划
+分字段留痕。确定性 `ProposalValidator` 会拒绝跨租户引用、过期 base version、
+越界 diff 和不存在于来源版本的 excerpt。首版只把 `METADATA_PATCH`
+标记为可执行；`DOCUMENT_DRAFT` 必须引用 `USER_SUPPLIED` 可信材料，且只供
+人工复核，不会被自动发布。proposal 创建使用租户级幂等键。
+
+`ChangeReviewerAgent` 是独立的第二角色：它只读结构化 diagnosis、proposal、
+当前 document version 和只读工具结果，首轮必须自主搜索当前用户知识库。
+它不能读 ask log 工具、不能写入、不能审批；输出限定为 `PASS / REVISE /
+REJECT` 严格 schema。`REVISE` 只能消耗一次幂等修订，第二次仍要求修订时
+确定性终止为拒绝，避免 Agent 循环。
+
+Reviewer `PASS` 只会把 proposal 送到 `AWAITING_APPROVAL`，不等于用户同意。
+HITL 内部契约支持 `APPROVE / APPROVE_WITH_EDIT / REJECT`；人工编辑后的 diff
+必须重新通过同一套租户、证据、字段白名单和 base-version 校验。审批请求
+使用租户级幂等键；拒绝必须记录原因。review-only `DOCUMENT_DRAFT` 不能进入
+执行状态。
+
+受控执行把文档 metadata patch、版本快照、chunk 和 MySQL 向量源数据写入保持在
+短事务中；随后才在事务外重建 embedding/pgvector serving index 并执行目标问题
+Hit@3 回归。目标回归或派生索引失败时，执行器按变更前版本补偿 MySQL 源数据，
+再重建 serving index；中断恢复使用幂等执行键继续未完成的执行或补偿。Triage
+诊断、proposal/route 与 AgentRun 成功事实同事务提交，Reviewer 决策与对应
+AgentRun 也同事务提交，但所有远程模型调用始终处于事务外。
+
+前端“受控修复”页与 `/api/v1/ai/repair/**` 提供 case 列表、诊断、proposal diff、
+正反证据、Reviewer findings、人工决定和执行结果。所有查询与动作都从认证主体
+注入 `userId`，请求不能指定其他租户。当前公开动作接口均要求客户端幂等键：
+
+```text
+GET  /api/v1/ai/repair/cases
+GET  /api/v1/ai/repair/cases/{badCaseId}
+POST /api/v1/ai/repair/cases/{badCaseId}/triage
+POST /api/v1/ai/repair/proposals/{proposalId}/review
+POST /api/v1/ai/repair/proposals/{proposalId}/decision
+POST /api/v1/ai/repair/proposals/{proposalId}/execute
+```
+
+冻结的 24 条六类 bad case、24 条 Reviewer challenge 和四臂协议在
+`evaluation/`。真实 DeepSeek v2 评分完成 240 次模型调用且无调用失败；三个模型臂
+的根因分类均为 24/24，`single`、`single+self-review`、`reviewed-multi` 的 challenge
+缺陷捕获分别为 12/12、8/12、10/12。独立 Reviewer 相对 self-review 的增量是 2 个，
+低于预注册的 5 个门槛，所以只证明实现了可复现的双角色生成—核验流水线，不宣称
+Reviewer 带来质量提升。原始结果和边界见
+[`evaluation/results/phase-d-four-arm-provider-run-v2-2026-08-23.md`](evaluation/results/phase-d-four-arm-provider-run-v2-2026-08-23.md)。
+
 ## 本地运行
 
 依赖：
@@ -382,7 +486,15 @@ DEVMIND_DB_URL=jdbc:mysql://localhost:3306/devmind?useUnicode=true&characterEnco
 DEVMIND_REDIS_PORT=6379
 ```
 
-IDEA 打开本目录后可选择共享运行配置 `DevMind - Local Mock`。它不包含密钥，并与 `run-local.ps1` 使用同一套 Compose 数据；真实 Provider 配置应保留在未提交的个人运行配置或操作系统环境变量中。
+IDEA 打开本目录后可选择共享运行配置 `DevMind - Local Mock`。它不包含密钥，并与 `run-local.ps1` 使用同一套 Compose 数据。
+
+真实 Provider 按以下边界注入密钥：
+
+- 本地开发：使用未勾选“存储为项目文件”的 IDEA 个人运行配置，或由当前进程环境注入；
+- CI/CD：使用仓库或流水线 Secret，在任务运行时映射为同名环境变量；
+- 部署环境：使用部署平台 Secret 或专用密钥管理服务，不依赖 IDE 配置。
+
+仓库仅提交 `.env.example` 作为变量契约；`.env` 和 `.env.*` 本地文件均被忽略。不得将真实密钥写入 `.env.example`、`application.yml` 或共享 `.run` 配置。密钥曾出现在截图、日志或提交历史时，应立即在 Provider 端轮换，不以删除本地文件代替轮换。
 
 DeepSeek provider：
 

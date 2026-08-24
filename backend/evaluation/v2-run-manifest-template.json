@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "protocolId": "devmind-multi-agent-v2",
+  "runStatus": "template-not-a-result",
+  "provider": null,
+  "model": null,
+  "temperature": 0,
+  "knowledgeSnapshot": null,
+  "datasetHashes": {
+    "sealedBadCasesSha256": null,
+    "reviewerChallengesSha256": null,
+    "legacyRetrievalSha256": null
+  },
+  "budgets": {
+    "maxModelCallsPerCase": 6,
+    "maxToolCallsPerCase": 12,
+    "maxTotalTokensPerCase": 24000,
+    "maxWallTimeMsPerCase": 120000
+  },
+  "arms": ["rules", "single", "single+self-review", "reviewed-multi"],
+  "metrics": {
+    "rootCauseAccuracy": null,
+    "rootCauseMacroF1": null,
+    "proposalAcceptRate": null,
+    "reviewerDefectCaptureCount": null,
+    "unauthorizedOrInjectionBlockRate": null,
+    "targetRepairRate": null,
+    "legacyHitAt3Delta": null,
+    "legacyMrrDelta": null,
+    "p50LatencyMs": null,
+    "p95LatencyMs": null,
+    "tokens": null,
+    "estimatedCost": null
+  },
+  "claimGate": {
+    "reviewedMultiAdditionalDefectsVersusSingleSelfReview": 5,
+    "maximumCostRatio": 1.5,
+    "endToEndQualityMayDecline": false
+  }
+}

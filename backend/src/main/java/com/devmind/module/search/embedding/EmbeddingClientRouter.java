@@ -4,6 +4,8 @@ import com.devmind.common.api.ResultCode;
 import com.devmind.common.exception.BizException;
 import com.devmind.module.ai.config.AiProperties;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
@@ -40,8 +42,14 @@ public class EmbeddingClientRouter {
         return currentClient().providerName();
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Map<String, Double> embed(String text) {
         return currentClient().embed(text);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public Map<String, Double> embed(String provider, String text) {
+        return clientFor(provider).embed(text);
     }
 
     public double cosineSimilarity(Map<String, Double> left, Map<String, Double> right) {

@@ -8,19 +8,48 @@ DevMind 是一个面向个人开发学习、项目复盘和知识沉淀的 AI �
 
 这是一个前后端分离的完整 monorepo 项目：
 
-- `backend`：Spring Boot 后端，已实现认证、知识文档、检索、AI 问答、日志、反馈和评估接口。
-- `frontend`：Vue 3 前端，已实现中文工作台、文档创建/编辑/归档与导入、AI 问答、召回上下文、日志分页详情和评估看板。
+- `backend`：Spring Boot 后端，已实现认证、知识文档、检索、AI 问答、日志、反馈、评估和受控 bad-case 修复接口。
+- `frontend`：Vue 3 前端，已实现中文工作台、文档管理、AI 问答、日志与评估看板，以及提案 diff、Reviewer 意见和人工审批界面。
 - `CI`：GitHub Actions 已配置后端测试和前端构建。
 
-已验证：
+已验证（当前本地快照）：
 
 ```text
-backend: 单元测试通过
-frontend: npm run build 通过
-GitHub Actions: main 分支 CI 通过
+backend: Docker-enabled Maven 测试共 193 项，190 passed、3 skipped、0 failures/errors
+frontend: npm run build 生产构建通过
+GitHub Actions: 已配置后端测试和前端构建；当前改动的远端 CI 待 PR 验证
 ```
 
 当前版本已实现真实 dense embedding 接入（OpenAI 兼容 API，可插拔 provider）、rerank 精排（离线评估）、多策略检索评估，以及可选的 pgvector 向量存储：dense 向量双写 MySQL JSON（源数据，兼对照组）与 Postgres + pgvector HNSW（serving 索引，`docker compose` 一键启动，默认关闭）。仍不宣称实现 rerank 线上问答链路、PDF/OCR 或生产级部署。默认配置全本地运行、零外部调用，不配置 API key 不产生任何费用。
+
+## Multi-Agent 受控修复闭环
+
+Phase C 把 bad case 从一条反馈记录推进为可审计的受控修复流程：Evidence
+Triage 只读历史问答与知识证据并归因，Change Reviewer 独立检查提案的证据、
+反证、影响范围和回归计划，Java 服务负责 schema 校验、状态迁移、幂等、版本冲突
+与最终执行。Reviewer 通过不等于执行；任何写入都必须经过当前用户的
+`APPROVE / APPROVE_WITH_EDIT / REJECT` 决策。
+
+```text
+bad case -> triage -> metadata proposal -> independent review
+         -> human approval -> short MySQL write transaction
+         -> rebuild derived vectors -> target regression
+         -> applied or compensating rollback
+```
+
+首版有意只执行白名单内的 metadata patch；需要改正文的 `DOCUMENT_DRAFT`
+只能作为人工审阅材料，不能自动发布。MySQL 中的文档、不可变版本、chunk 和向量
+源数据是可恢复事实，pgvector 只是可重建 serving index。embedding、模型调用和
+pgvector 同步都不在数据库事务中。执行失败会保留明确失败阶段；源数据已变更但
+索引或目标回归失败时，系统按执行前版本补偿回滚，并允许幂等恢复中断的补偿。
+
+这套闭环验证的是个人知识库中可复现的团队知识维护模式，不宣称已经成为生产级
+企业自治 Agent 平台。真实 DeepSeek 四臂实验在修正版 v2 冻结集上完成 240 次模型
+调用且无调用失败：`single`、`single+self-review`、`reviewed-multi` 的根因分类均为
+24/24；Reviewer challenge 缺陷捕获分别为 12/12、8/12、10/12。独立 Reviewer
+只比 self-review 多抓 2 个，未达到预注册的至少 5 个门槛，因此项目保留双角色流水线，
+但不宣称 Multi-Agent 带来质量提升。完整原始报告、无效首跑和协议修正记录见
+[backend/evaluation](backend/evaluation/README.md)。
 
 ## 项目亮点
 
@@ -160,6 +189,10 @@ backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql
 4. 查看回答、召回来源、召回片段、Prompt Preview 和 token 用量。
 5. 提问：`Kafka consumer rebalance 为什么会变慢？`，展示无上下文兜底。
 6. 打开评估看板，查看标准问题覆盖率、Hit@3、MRR 和问答日志。
+7. 打开“受控修复”，先查看 `CONFLICT_PENDING` 的只读来源冲突，再批准并执行预置的低风险 metadata patch。
+
+完整的计时话术、fixture 边界和失败降级路径见
+[5 分钟 Multi-Agent v2 演示脚本](docs/guides/multi-agent-v2-5-minute-demo.md)。
 
 ## 核心功能
 
@@ -194,7 +227,7 @@ DevMind 的核心设计围绕 RAG 链路和后端工程化展开：
 3. chunk 重建时同步生成本地稀疏向量并持久化到向量表，提问时只计算 query 向量，再与已持久化的 chunk 向量做余弦相似度比较。
 4. 混合检索使用 RRF 融合关键词 / FULLTEXT 排名和本地稀疏向量排名，避免直接相加不同量纲的分数。
 5. 当检索不到有效上下文时，系统返回无上下文兜底，避免模型在知识库缺资料时编造答案。
-6. Prompt Preview 与 Ask Log 会记录上下文、模型来源、召回片段、token 用量、耗时和状态，方便定位 RAG 问题。
+6. 完整 Prompt 与 Prompt Preview 分离：模型接收全部召回上下文，日志和 API 只保留最多 2,000 字符的预览；Ask Log 用 schema version 区分历史截断输入与修复后的可信输入，方便定位 RAG 问题。
 7. `LlmClient` 抽象隔离业务流程和模型供应商，支持 Mock、本地测试、DeepSeek 接入和后续 Provider 扩展。
 8. JWT logout 使用 Redis 黑名单保存未过期 token 的剩余 TTL，解决无状态 token 退出后仍可能可用的问题。
 9. AI 问答入口使用 Redis Lua 原子执行 `INCR + EXPIRE`，按用户限制固定窗口内的请求次数；默认每分钟 10 次，超限返回 HTTP 429，Redis 故障策略可配置。
@@ -225,6 +258,8 @@ DevMind 是一个面向开发学习场景的 AI 知识库系统，重点展示 J
 - 架构说明：[backend/docs/architecture.md](backend/docs/architecture.md)
 - API 调试：[backend/docs/api/devmind-api.http](backend/docs/api/devmind-api.http)
 - 部署与运维边界：[docs/operations/production-readiness.md](docs/operations/production-readiness.md)
+- 5 分钟演示：[docs/guides/multi-agent-v2-5-minute-demo.md](docs/guides/multi-agent-v2-5-minute-demo.md)
+- Multi-Agent v2 面试手册：[docs/interview/multi-agent-v2-handbook.md](docs/interview/multi-agent-v2-handbook.md)
 
 ## CI
 

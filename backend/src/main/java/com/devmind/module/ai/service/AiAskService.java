@@ -56,22 +56,25 @@ public class AiAskService {
                 ? DEFAULT_RETRIEVAL_LIMIT
                 : request.getRetrievalLimit();
 
-        List<ChunkSearchResponse> chunks = retrievalStrategy.retrieve(userId, retrievalKeywords, retrievalLimit);
-        String promptPreview = promptBuilderService.buildPrompt(question, chunks);
-        List<CitationResponse> citations = buildCitations(chunks);
-        if (chunks.isEmpty()) {
+        List<ChunkSearchResponse> visibleChunks = List.copyOf(
+                retrievalStrategy.retrieve(userId, retrievalKeywords, retrievalLimit)
+        );
+        String fullPrompt = promptBuilderService.buildPrompt(question, visibleChunks);
+        String promptPreview = promptBuilderService.buildPromptPreview(fullPrompt);
+        List<CitationResponse> citations = buildCitations(visibleChunks);
+        if (visibleChunks.isEmpty()) {
             return buildNoContextResponse(
                     userId,
                     question,
                     retrievalKeyword,
                     promptPreview,
-                    chunks,
+                    visibleChunks,
                     citations,
                     System.currentTimeMillis() - startTime
             );
         }
 
-        LlmRequest llmRequest = new LlmRequest(question, promptPreview, chunks, citations);
+        LlmRequest llmRequest = new LlmRequest(question, fullPrompt, visibleChunks, citations);
         LlmResponse llmResponse;
         try {
             llmResponse = llmClientRouter.generate(llmRequest);
@@ -81,7 +84,7 @@ public class AiAskService {
             log.warn("LLM provider failed, falling back to local mock provider. userId={}, provider={}, chunks={}, elapsedMs={}",
                     userId,
                     modelProvider,
-                    chunks.size(),
+                    visibleChunks.size(),
                     elapsedMs,
                     ex);
             askLogService.saveFailureLog(
@@ -92,7 +95,7 @@ public class AiAskService {
                     ex.getMessage(),
                     modelProvider,
                     isMockProvider(modelProvider),
-                    chunks,
+                    visibleChunks,
                     elapsedMs
             );
             llmResponse = llmClientRouter.generateFallbackFromConfiguredProvider(llmRequest);
@@ -112,7 +115,7 @@ public class AiAskService {
                 llmResponse.getPromptTokens(),
                 llmResponse.getCompletionTokens(),
                 llmResponse.getTotalTokens(),
-                chunks,
+                visibleChunks,
                 elapsedMs
         );
 
@@ -127,7 +130,7 @@ public class AiAskService {
                 llmResponse.getPromptTokens(),
                 llmResponse.getCompletionTokens(),
                 llmResponse.getTotalTokens(),
-                chunks,
+                visibleChunks,
                 citations
         );
     }

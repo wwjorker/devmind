@@ -18,6 +18,27 @@ SET @demo_user_id := (
 -- Stop here mentally if this returns NULL. Register/login testuser in the app first, then rerun this script.
 SELECT @demo_user_id AS demo_user_id;
 
+DELETE s
+FROM agent_step s
+WHERE s.user_id = @demo_user_id;
+
+-- Versions can reference repair proposals, so remove them before proposals.
+DELETE dv
+FROM knowledge_document_version dv
+WHERE dv.user_id = @demo_user_id;
+
+DELETE p
+FROM repair_proposal p
+WHERE p.user_id = @demo_user_id;
+
+DELETE r
+FROM agent_run r
+WHERE r.user_id = @demo_user_id;
+
+DELETE b
+FROM ai_bad_case b
+WHERE b.user_id = @demo_user_id;
+
 DELETE f
 FROM ai_ask_feedback f
 WHERE f.user_id = @demo_user_id;
@@ -73,6 +94,7 @@ SELECT
     120,
     1
 WHERE @demo_user_id IS NOT NULL;
+SET @redis_chunk_id := LAST_INSERT_ID();
 
 -- 2. JWT logout Redis blacklist
 INSERT INTO knowledge_document (user_id, title, content, source_type, tags, summary, status)
@@ -409,6 +431,7 @@ SELECT
     115,
     1
 WHERE @demo_user_id IS NOT NULL;
+SET @redis_lock_chunk_id := LAST_INSERT_ID();
 
 -- 14. HTTP and TCP basics
 INSERT INTO knowledge_document (user_id, title, content, source_type, tags, summary, status)
@@ -436,6 +459,135 @@ SELECT
     'TCP 是传输层协议，负责可靠、有序、面向连接的字节流，涉及三次握手、四次挥手、重传、拥塞控制和流量控制。HTTP 是应用层协议，基于请求响应模型描述资源访问；HTTPS 则在 HTTP 与 TCP 之间加入 TLS。HTTP/1.1 长连接和 HTTP/2 多路复用是常见面试点。',
     120,
     1
+WHERE @demo_user_id IS NOT NULL;
+
+-- Phase C/Phase D demo evidence: every current document receives immutable version 1.
+INSERT INTO knowledge_document_version (
+    document_id, user_id, version_no, title, content, source_type, tags, summary,
+    document_status, origin, source_evidence_json, proposal_id
+)
+SELECT
+    id, user_id, version_no, title, content, source_type, tags, summary,
+    status, 'MIGRATION_BASELINE', NULL, NULL
+FROM knowledge_document
+WHERE user_id = @demo_user_id;
+
+-- Read-only conflict example. This deliberately has no automatic resolution action.
+INSERT INTO ai_bad_case (
+    user_id, source_type, source_ref, ask_snapshot_json, chunk_snapshot_json,
+    trusted_source_json, prompt_schema_version, root_cause, diagnosis_json,
+    status, status_version
+)
+SELECT
+    @demo_user_id,
+    'EVALUATION',
+    'demo:source-conflict',
+    JSON_OBJECT(
+        'question', 'Redis 锁的过期时间应该固定为 30 秒还是按任务续期？',
+        'answer', '两个当前来源给出了不兼容结论，需要人工确认。',
+        'reason', '当前来源冲突，系统不得自动选择。'
+    ),
+    JSON_ARRAY(
+        JSON_OBJECT('chunkId', @redis_lock_chunk_id, 'documentId', @redis_lock_doc_id,
+                    'documentTitle', 'Redis 分布式锁',
+                    'modelVisibleContent', '长任务需要考虑续期，高可用场景要评估主从切换和 Redlock 取舍。'),
+        JSON_OBJECT('chunkId', NULL, 'documentTitle', '用户补充的运行手册',
+                    'modelVisibleContent', '所有锁固定为 30 秒，不允许续期。')
+    ),
+    JSON_ARRAY(JSON_OBJECT(
+        'sourceId', 'demo-runbook-2026',
+        'title', '用户补充的运行手册',
+        'content', '所有锁固定为 30 秒，不允许续期。',
+        'origin', 'USER_SUPPLIED'
+    )),
+    2,
+    'knowledge_conflict_or_stale',
+    JSON_OBJECT(
+        'rootCause', 'knowledge_conflict_or_stale',
+        'summary', '两个来源对锁过期策略给出不兼容结论。',
+        'recommendedRoute', 'human_source_conflict_review',
+        'confidence', 0.94
+    ),
+    'CONFLICT_PENDING',
+    0
+WHERE @demo_user_id IS NOT NULL;
+
+-- Offline controlled-repair example. It is explicitly seeded as already reviewed;
+-- no claim is made that a model generated it during this reset script.
+INSERT INTO ai_bad_case (
+    user_id, source_type, source_ref, ask_snapshot_json, chunk_snapshot_json,
+    prompt_schema_version, root_cause, diagnosis_json, status, status_version
+)
+SELECT
+    @demo_user_id,
+    'EVALUATION',
+    'demo:metadata-repair-awaiting-approval',
+    JSON_OBJECT(
+        'question', '缓存不存在值时如何保护 MySQL？',
+        'answer', '现有文档包含答案，但原查询没有命中英文 alias。',
+        'reason', '文档存在但 metadata 缺少 cache penetration alias。'
+    ),
+    JSON_ARRAY(JSON_OBJECT(
+        'chunkId', @redis_chunk_id,
+        'documentId', @redis_doc_id,
+        'documentTitle', 'Redis 缓存穿透复盘',
+        'modelVisibleContent', 'Redis 缓存穿透是大量请求查询不存在的数据，导致缓存无法命中并反复打到 MySQL。'
+    )),
+    2,
+    'knowledge_exists_not_retrieved',
+    JSON_OBJECT(
+        'rootCause', 'knowledge_exists_not_retrieved',
+        'summary', '目标文档存在，英文 alias 缺失导致召回失败。',
+        'recommendedRoute', 'retrieval_metadata_proposal',
+        'confidence', 0.93
+    ),
+    'AWAITING_APPROVAL',
+    0
+WHERE @demo_user_id IS NOT NULL;
+SET @repair_bad_case_id := LAST_INSERT_ID();
+
+INSERT INTO repair_proposal (
+    user_id, bad_case_id, proposal_type, target_document_id, base_version_no,
+    diff_json, evidence_json, counterevidence_json, impact_json,
+    regression_plan_json, reviewer_verdict, reviewer_findings_json,
+    revision_no, status, idempotency_key, lock_version
+)
+SELECT
+    @demo_user_id,
+    @repair_bad_case_id,
+    'METADATA_PATCH',
+    @redis_doc_id,
+    1,
+    JSON_OBJECT('tags', 'Redis,缓存穿透,cache penetration,空值缓存,布隆过滤器,限流'),
+    JSON_ARRAY(JSON_OBJECT(
+        'kind', 'DOCUMENT_VERSION',
+        'documentId', @redis_doc_id,
+        'documentVersionNo', 1,
+        'excerpt', 'Redis 缓存穿透',
+        'claim', '当前版本支持补充 cache penetration alias。'
+    )),
+    JSON_ARRAY(),
+    JSON_OBJECT(
+        'summary', '仅增加可验证的英文检索 alias。',
+        'risk', 'LOW',
+        'affectedQueries', JSON_ARRAY('cache penetration', '不存在 key 保护 MySQL')
+    ),
+    JSON_OBJECT(
+        'targetQuestion', 'Redis 缓存穿透是大量请求查询不存在的数据',
+        'relatedKeywords', JSON_ARRAY('缓存穿透', 'MySQL', 'cache penetration'),
+        'fullDatasetVersion', 'devmind-retrieval-v1'
+    ),
+    'PASS',
+    JSON_OBJECT(
+        'verdict', 'PASS',
+        'summary', '证据支持且 diff 限定在 metadata。',
+        'findings', JSON_ARRAY(),
+        'confidence', 0.92
+    ),
+    0,
+    'AWAITING_APPROVAL',
+    'demo:metadata-repair-proposal',
+    0
 WHERE @demo_user_id IS NOT NULL;
 
 SELECT

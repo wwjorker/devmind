@@ -15,6 +15,7 @@ public class AiAskLog {
     private String question;
     private String retrievalKeyword;
     private String promptPreview;
+    private Integer promptSchemaVersion;
     private String answer;
     private String modelProvider;
     private Boolean mock;
@@ -23,6 +24,7 @@ public class AiAskLog {
     private Integer totalTokens;
     private Integer retrievedChunkCount;
     private String retrievedChunkIds;
+    private String retrievalSnapshotJson;
     private Long elapsedMs;
     private Integer status;
     private LocalDateTime createdAt;
@@ -65,6 +67,14 @@ public class AiAskLog {
 
     public void setPromptPreview(String promptPreview) {
         this.promptPreview = promptPreview;
+    }
+
+    public Integer getPromptSchemaVersion() {
+        return promptSchemaVersion;
+    }
+
+    public void setPromptSchemaVersion(Integer promptSchemaVersion) {
+        this.promptSchemaVersion = promptSchemaVersion;
     }
 
     public String getAnswer() {
@@ -129,6 +139,14 @@ public class AiAskLog {
 
     public void setRetrievedChunkIds(String retrievedChunkIds) {
         this.retrievedChunkIds = retrievedChunkIds;
+    }
+
+    public String getRetrievalSnapshotJson() {
+        return retrievalSnapshotJson;
+    }
+
+    public void setRetrievalSnapshotJson(String retrievalSnapshotJson) {
+        this.retrievalSnapshotJson = retrievalSnapshotJson;
     }
 
     public Long getElapsedMs() {
