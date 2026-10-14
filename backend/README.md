@@ -1,553 +1,122 @@
 # DevMind 后端
 
-DevMind 是一个个人开发者知识库的 Spring Boot 后端，内置 RAG 式的 AI 问答链路。
-
-项目包含认证、文档管理、chunk 生成、检索、Prompt 构造、LLM Provider 抽象、召回来源、AI 调用日志、token 用量统计、bad case 反馈，以及一套轻量的 RAG 评估接口。
-
-## 为什么做这个项目
-
-很多 AI demo 止步于“把 prompt 发给模型、拿回一个答案”。DevMind 把 AI 问答当成一个正常后端系统的一部分来做：
-
-```text
-knowledge document
--> text or Markdown file import
--> document chunks
--> retrieval
--> no-context fallback when retrieval is empty
--> prompt building
--> LLM provider
--> provider fallback when the real model fails
--> answer with citations
--> success/failure ask log with token usage
--> bad-case feedback
--> evaluation summary
-```
-
-AI 功能被接进了后端工程里常见的关注点：认证、数据库设计、服务分层、可观测性、成本追踪，以及可迭代的质量改进。
-
-## 核心功能
-
-- JWT 认证 + BCrypt 密码加密
-- 基于 Redis 的 JWT 登出黑名单
-- 基于 Redis Lua 的 AI 问答限流：按用户默认每分钟 10 次，超限返回 HTTP 429
-- 按用户隔离的知识文档
-- 软归档而非物理删除
-- TXT / Markdown 笔记导入并自动建文档
-- 文档 chunk 自动生成，更新时自动重建
-- 面向中英文技术问题的多语言关键词检索
-- `RetrievalStrategy` / `EmbeddingClient` / `RerankClient` 抽象，覆盖关键词 baseline、混合检索、dense embedding 与 rerank
-- 基于 MySQL FULLTEXT 的 chunk 内容相关性检索
-- chunk 向量持久化（默认本地稀疏向量，可选经 OpenAI 兼容 API 的真实 dense embedding），与关键词排名用 RRF 融合，并可叠加 rerank；默认配置零外部调用
-- 元数据感知检索：chunk 内容、文档标题、标签、来源类型
-- 重复 chunk 降权，减少复制粘贴笔记造成的重复引用
-- 无上下文兜底，避免模型在无依据时强答
-- 带 Prompt Preview 和召回上下文的 RAG 问答链路
-- 可插拔的 LLM 层：`MockLlmClient` 与 `DeepSeekLlmClient`
-- 通过环境变量接入 DeepSeek 真实模型
-- 真实模型调用失败时，从配置的模型降级回本地 mock
-- AI 调用日志：成功/失败状态、provider、耗时、召回 chunk id、token 用量
-- AI 反馈记录：helpful 标注与 bad case 收集
-- 评估汇总接口：总反馈数、bad case 数、bad case 率、近期 bad case
-- RAG 评估数据集接口：标准问题、期望答案、期望关键词、问答日志覆盖情况
-- 检索评估指标：Hit@3、MRR、首个相关片段排名、无上下文负例
-- OpenAPI / Swagger UI 与 IDEA HTTP Client 示例
-
-## 技术栈
-
-```text
-Java 17
-Spring Boot 3.3.x
-Spring Security
-MyBatis-Plus
-MySQL
-Redis
-Maven
-Flyway
-Springdoc OpenAPI
-JJWT
-DeepSeek API
-```
-
-## 测试与 CI
-
-用 Maven Wrapper 在本地跑后端测试（无需系统安装 Maven）：
-
-```bash
-./mvnw test        # Windows: .\mvnw.cmd test
-```
-
-真实 DeepSeek Tool Calling smoke 默认跳过，避免普通测试意外产生外部调用。
-只有同时提供 `DEVMIND_DEEPSEEK_API_KEY` 和
-`DEVMIND_RUN_DEEPSEEK_SMOKE=true` 时，才会执行
-`DeepSeekAgentModelClientSmokeTest`；密钥应通过当前进程环境或 CI Secret
-注入，不要写入仓库。
-
-现有测试覆盖了在后续迭代中应保持稳定的核心逻辑：
-
-```text
-Prompt building
-Mock LLM responses
-LLM provider routing
-JWT creation and parsing
-Redis-backed token blacklist
-Spring context wiring for mapper scan safety
-```
-
-测试集还包含一个受 Docker 控制的 MySQL Testcontainers 集成测试。当 Docker 可用时，它会启动 MySQL 8.0、在真实数据库引擎上执行 Flyway 迁移、经服务层创建一篇文档、验证 chunk 向量持久化、跑一遍混合检索，并检查 MySQL FULLTEXT mapper 的行为。当本地没有 Docker 时，该集成测试会被跳过，而不是阻塞本地开发。
-
-GitHub Actions 会在每次向 `main` 的 push 和 pull request 上执行同样的 Maven 测试命令，因此 MySQL 集成测试预期会在有 Docker 的 CI 环境里真实运行。
-
-## 架构
-
-```mermaid
-flowchart LR
-    Client["HTTP Client / Swagger"] --> Auth["Auth Module"]
-    Client --> Doc["Document Module"]
-    Client --> Search["Search Module"]
-    Client --> AI["AI Module"]
-
-    Auth --> UserTable[("user_account")]
-    Doc --> DocTable[("knowledge_document")]
-    Doc --> ChunkTable[("knowledge_document_chunk")]
-    Search --> ChunkTable
-    Search --> DocTable
-
-    AI --> Search
-    AI --> Prompt["PromptBuilder"]
-    AI --> Router["LlmClientRouter"]
-    Router --> Mock["MockLlmClient"]
-    Router --> DeepSeek["DeepSeekLlmClient"]
-    AI --> LogTable[("ai_ask_log")]
-    AI --> FeedbackTable[("ai_ask_feedback")]
-    AI --> Summary["Evaluation Summary"]
-```
-
-更多细节见：[架构说明](docs/architecture.md)
-
-## RAG 流程
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant AI as AiAskService
-    participant Search as ChunkSearchService
-    participant Prompt as PromptBuilderService
-    participant LLM as LlmClientRouter
-    participant Log as AiAskLogService
-    participant Feedback as AiAskFeedbackService
-
-    Client->>AI: POST /api/v1/ai/ask
-    AI->>Search: searchChunks(userId, keywords)
-    Search-->>AI: retrieved chunks
-    alt no chunks found
-        AI->>Log: save fallback log without calling LLM
-        AI-->>Client: knowledge base has insufficient information
-    else chunks found
-    AI->>Prompt: buildPrompt(question, chunks)
-    Prompt-->>AI: full prompt + bounded preview
-    AI->>LLM: generate(full prompt)
-    LLM-->>AI: answer + token usage
-    AI->>Log: save success log with provider, chunks, latency, tokens
-    AI-->>Client: answer + citations + logId
-    LLM--xAI: provider error
-    AI->>Log: save failure log with provider, chunks, latency, reason
-    AI->>LLM: fallback to mock provider
-    LLM-->>AI: local fallback answer
-    AI->>Log: save fallback success log with provider chain
-    AI-->>Client: fallback answer + citations + logId
-    end
-    Client->>Feedback: POST feedback for logId
-```
-
-## 接口总览
-
-Swagger UI：
-
-```text
-http://localhost:8081/swagger-ui.html
-```
-
-IDEA HTTP Client 示例：
-
-```text
-docs/api/devmind-api.http
-```
-
-主要接口：
-
-```text
-POST   /api/v1/auth/register
-POST   /api/v1/auth/login
-GET    /api/v1/auth/me
-POST   /api/v1/auth/logout
-
-POST   /api/v1/documents
-POST   /api/v1/documents/import
-GET    /api/v1/documents
-GET    /api/v1/documents/{documentId}
-PUT    /api/v1/documents/{documentId}
-DELETE /api/v1/documents/{documentId}
-GET    /api/v1/documents/{documentId}/chunks
-
-GET    /api/v1/search/chunks
-GET    /api/v1/search/chunks/by-ids
-
-POST   /api/v1/ai/ask
-GET    /api/v1/ai/ask-logs
-POST   /api/v1/ai/ask-logs/{logId}/feedback
-GET    /api/v1/ai/ask-feedback?helpful=&askLogId=
-GET    /api/v1/ai/evaluation/summary
-GET    /api/v1/ai/evaluation/dataset
-
-GET    /api/v1/ai/repair/cases
-GET    /api/v1/ai/repair/cases/{badCaseId}
-POST   /api/v1/ai/repair/cases/{badCaseId}/triage
-POST   /api/v1/ai/repair/proposals/{proposalId}/review
-POST   /api/v1/ai/repair/proposals/{proposalId}/decision
-POST   /api/v1/ai/repair/proposals/{proposalId}/execute
-```
-
-## 可观测性与评估
-
-每条 AI 调用日志记录：
-
-```text
-question
-retrieval keywords
-prompt preview
-prompt schema version
-model provider
-mock or real-provider flag
-retrieved chunk ids
-elapsed milliseconds
-prompt tokens
-completion tokens
-total tokens
-status: success or failed
-```
-
-登出时会把当前 JWT 写入 Redis 黑名单，TTL 设为 token 的剩余有效期。认证过滤器在接受 bearer token 前会先检查黑名单。
-
-当检索返回空 chunk 时，后端返回一个确定性的兜底回答，而不是调用 LLM。这样既避免了无依据的答案，也省下模型 token。
-
-当检索有上下文、但配置的真实模型调用失败时，DevMind 会先记一条失败日志，再降级到 `MockLlmClient` 并返回一个带原始引用的本地回答。响应的 provider 会记成一条链路，比如 `deepseek->mock-local`，这样 UI 和日志历史能区分“正常真实模型回答”和“降级回答”。
-
-反馈记录保存：
-
-```text
-helpful label
-bad-case reason
-expected answer
-related ask log id
-```
-
-评估汇总接口聚合：
-
-```text
-total feedback count
-helpful count
-bad-case count
-bad-case rate
-recent bad cases
-```
-
-评估数据集接口返回标准 RAG 测试用例，并标记当前用户是否已经问过每个问题：
-
-```text
-case id
-category
-question
-relevant document titles
-expected keywords
-expected answer
-expected evidence
-risk type
-covered status
-latest ask log id and retrieved chunk count
-```
-
-检索评估接口用同一批标准用例直接跑检索层，并**按人工标注的 gold 文档标题判断相关性**。它输出通过率、正例数、Hit@K、MRR、首个相关片段排名、命中关键词与缺失关键词，同时输出 keyword baseline 的 Hit@K/MRR 以及当前混合策略相对它的 delta，这样检索改动可以在同一套 gold-label 数据集上对比。命中关键词只作为诊断信息，不作为相关性裁判。无上下文负例单独处理：只有召回为空才算通过。
-
-## 检索质量 V1
-
-检索层通过 `RetrievalStrategy` 接口暴露，向量表示与重排则隔离在 `EmbeddingClient` 和 `RerankClient` 接口后面。DevMind 以 `HybridRetrievalStrategy` 为主策略：保留可解释的关键词/FULLTEXT baseline，再加一路持久化向量排名（默认本地稀疏向量，或配置后用真实 dense embedding），并用 RRF 融合两路排名。同一套 AI 问答与评估流程，可以在不改动系统其余部分的前提下对比 keyword / sparse-hybrid / dense-hybrid / dense-hybrid-pgvector / dense-hybrid-rerank 五种策略。
-
-DevMind 不依赖单个原始关键词。问答流程会先从用户问题里解析出多个检索关键词，包含中文技术短语和英文 token。检索随后使用多个候选来源：
-
-```text
-MySQL FULLTEXT retrieval over chunk content
-keyword LIKE fallback over chunk content
-document metadata: title, tags, source type
-Persisted local sparse-vector similarity over title, tags, and chunk content, fused with keyword ranks by RRF
-```
-
-关键词打分是可解释的：
-
-```text
-FULLTEXT relevance: capped BM25-style contribution
-content match:     +10 per occurrence
-title match:       +5 per occurrence
-tags match:        +3 per occurrence
-source type match: +1 per occurrence
-```
-
-MySQL InnoDB FULLTEXT 提供一个轻量的 BM25 式相关性信号。chunk 内容上的 FULLTEXT 索引使用 MySQL 内置的 ngram parser——默认 parser 只按空格和标点分词，中文会被当成一整个 token，FULLTEXT 对中文查询形同虚设；换成 ngram 后中文查询可以直接走 FULLTEXT 相关性排序，LIKE 只作为兜底召回。DevMind 把这个信号和显式的关键词、元数据分数结合起来，让排名在调试时仍然容易检查。需要说明的是：上面的可解释性只针对关键词通道的原始得分；RRF 融合之后的最终分数是排名融合分，只用于排序，不能按业务含义解读。
-
-`EmbeddingClient` 背后共存两种向量表示：一种是本地确定性稀疏向量（由英文 token 和中文 bigram 归一化得到，是零成本的默认值），另一种是来自 OpenAI 兼容 API 的真实 dense embedding（仅在配置了 key 时启用）。两者都按 `provider_name` 存进 `knowledge_document_chunk_vector`，在 chunk 重建或回填时生成，所以查询路径只需构造 query 向量、再与已持久化的 chunk 向量比较。混合检索用 RRF 融合关键词/FULLTEXT 排名与向量排名，并可用一个可选的 `RerankClient` 对融合后的候选重排。向量存储分两层：MySQL JSON 行是源数据（默认 serving 路径，暴力余弦），启用 pgvector 后 dense 向量双写到 Postgres 并由 HNSW 索引承担相似度查询——MySQL 路径保留为对照组。
-
-初步排名之后，关键词 baseline 会对重复的 chunk 内容降权，避免复制粘贴的笔记占满全部 top 引用，给 Prompt 更多样的上下文。
-
-gold-label 的 Hit@3/MRR 评估接口在同一批人工标注用例上跑多策略对比——keyword baseline、sparse-hybrid、dense-hybrid、dense-hybrid-pgvector、dense-hybrid-rerank（相关性由标注的 gold 文档判断，而不是检索器自己的关键词分数）。若某策略的外部依赖（dense embedding、rerank 或 pgvector）未配置，会被标记为 `unavailable` 并优雅降级，因此默认情况下评估既不会失败、也不会发起网络调用。
-
-### 向量 serving 规模基准：暴力余弦 vs pgvector HNSW
-
-合成聚簇语料（64 簇 + 受控噪声，模拟真实 embedding 的流形结构）、1024 维、单机实测（i7-12700H / 16GB / Windows 11，Postgres 运行于 Docker Desktop WSL2），每组含预热、top-10、50 次查询：
-
-| 规模 | 暴力余弦 P50 / P99 | HNSW ef=40（默认）P50 / P99 / recall@10 | HNSW ef=120 P50 / P99 / recall@10 |
-|---|---|---|---|
-| 1 万 | 6.0 / 13.2 ms | 1.6 / 2.0 ms / **1.000** | 1.7 / 4.0 ms / 1.000 |
-| 10 万 | 62.7 / 94.1 ms | 4.5 / 35.1 ms / **0.768** | 4.9 / 7.4 ms / **0.952** |
-
-三个可复述的结论：
-
-1. **暴力扫描线性劣化，HNSW 近乎平坦**：数据量 ×10，暴力 P50 从 6ms 涨到 63ms，HNSW 只从 1.6ms 到 4.5ms。
-2. **近似检索的召回损失在规模上真实出现**：1 万条时默认参数 recall 满分，10 万条时掉到 0.768——HNSW 的"近似"不是理论风险而是可测现象。
-3. **ef_search 是召回/延迟的线上旋钮**：调到 120 后 recall 恢复到 0.952，P50 只多 0.4ms（P99 反而更稳）；代价发生在写入侧——10 万条的 HNSW 建索引耗时约 4.6 分钟。
-
-两个诚实边界：合成聚簇数据比真实 embedding 分布更"干净"，recall 数字偏乐观；纯随机（无簇结构）高维向量下 HNSW recall 会塌到 ~0.26，这是维度灾难的已知现象，也说明 ANN 基准必须用带结构的数据。复现：
-
-```bash
-./mvnw test -Dtest=PgVectorBenchmarkTest -Ddevmind.benchmark=true \
-  -Ddevmind.benchmark.vectorCount=100000
-```
-
-## 文档导入
-
-导入接口接受 `.txt`、`.md`、`.markdown` 文件：
-
-```text
-POST /api/v1/documents/import
-Content-Type: multipart/form-data
-```
-
-支持的表单字段：
-
-```text
-file       required
-title      optional, defaults to the file name
-sourceType optional, defaults to imported_note
-tags       optional
-summary    optional
-```
-
-导入后，后端会创建一篇正常的知识文档，并走和手动创建文档相同的 `DocumentChunkService` 路径重建 chunk。这样保证 RAG 链路一致，上传的笔记也能立即被检索到。
-
-## Agent 运行审计（Phase B 基础设施）
-
-V6 migration 新增 `agent_run` 与 `agent_step`，用于持久化实验臂、预算、
-累计用量、有序模型/工具步骤和终态；V7 为工具步骤补充 Provider
-`tool_call_id`，使返回消息和审计步骤可以稳定关联。Phase C 已开放受认证保护的
-repair workflow API，但模型仍没有通用知识库写工具；只有 Java 白名单执行器能在
-人工批准后应用 metadata patch。
-
-步骤预留和完成分别使用短事务；外部模型调用在事务外执行。步数、模型调用
-次数和调用前 deadline 会在请求发出前阻断；总 token 以 Provider 返回的
-usage 记账，达到阈值后禁止下一次调用。工具调用同样占用总步数并受 deadline
-与 token 阈值约束，但不占用模型调用次数。审计仅保存角色、工具名、字段名、
-字符数等有界摘要，不保存完整 Prompt、模型输出、工具参数值或工具结果正文。
-
-Phase B 当前只注册三个租户隔离的只读工具：`searchKnowledge`、
-`getChunkEvidence`、`getAskLogEvidence`。`userId` 与 `runId` 由服务端上下文
-注入，不属于模型参数。普通检索只返回 active 数据；历史证据工具允许按已记录
-ID 读取 archived chunk，但会明确声明它是当前数据库行的解析结果，不是不可变
-历史快照。旧 Prompt Schema 日志会标记为不可用于“证据正确但回答错误”判定。
-Triage 输出使用固定六类根因和一一对应的 route，并拒绝未知字段。
-
-`EvidenceTriageAgent` 提供 Phase B 内部技术切片：首轮固定读取目标 ask log，
-随后按模型请求执行只读工具，完整重建 assistant/tool 消息，最终对 diagnosis
-做服务端证据引用校验。未执行的 tool-call ID、工具结果中不存在的记录 ID、
-重复 call ID、目标 ask log 串线，以及使用旧 Prompt Schema 判定“正确证据但
-回答错误”，都会使 run 明确失败。`evaluation/v2-development-bad-cases-v0.1.json`
-的六条 label-visible case 已通过 scripted 编排测试；这只证明协议和控制流可跑，
-不代表真实模型准确率。Phase C 已加入 bad-case intake、业务状态机和受控提案。
-预注册的 6 次模型调用、12 次工具调用、24,000 token 和 120 秒限制均有独立
-持久计数或终态检查；已完成但造成 token 越界的模型调用保留审计记录，同时 run
-立即进入 `BUDGET_EXHAUSTED`，不能再被标为成功。
-
-Phase C 的知识写入以 `knowledge_document.version_no` 作为乐观锁，并在
-`knowledge_document_version` 保存创建、导入、用户更新、归档和恢复后的不可变
-全文及 metadata 快照。V9 会为已有文档补一条 version 1 baseline。文档当前态、
-版本快照、chunk 替换和 MySQL 向量失效保持同一短事务；embedding 与 pgvector
-同步仍在提交后执行。repair proposal 的来源证据和 proposal ID 将复用同一版本表。
-
-新的 ask log 会额外保存结构化 retrieval snapshot：内容是模型实际可见的
-有界 chunk 文本，并带当时的 document version。`helpful=false` 与问答快照
-在同一短事务内生成去重的 `ai_bad_case`；旧日志缺少该快照时只保留
-空证据并沿用原 prompt schema 标记，不伪装成新 schema 证据。bad case 状态
-迁移受 Java 白名单和 `status_version` 乐观锁双重保护。
-
-`repair_proposal` 把 diff、document base version、正反证据、影响范围和回归计划
-分字段留痕。确定性 `ProposalValidator` 会拒绝跨租户引用、过期 base version、
-越界 diff 和不存在于来源版本的 excerpt。首版只把 `METADATA_PATCH`
-标记为可执行；`DOCUMENT_DRAFT` 必须引用 `USER_SUPPLIED` 可信材料，且只供
-人工复核，不会被自动发布。proposal 创建使用租户级幂等键。
-
-`ChangeReviewerAgent` 是独立的第二角色：它只读结构化 diagnosis、proposal、
-当前 document version 和只读工具结果，首轮必须自主搜索当前用户知识库。
-它不能读 ask log 工具、不能写入、不能审批；输出限定为 `PASS / REVISE /
-REJECT` 严格 schema。`REVISE` 只能消耗一次幂等修订，第二次仍要求修订时
-确定性终止为拒绝，避免 Agent 循环。
-
-Reviewer `PASS` 只会把 proposal 送到 `AWAITING_APPROVAL`，不等于用户同意。
-HITL 内部契约支持 `APPROVE / APPROVE_WITH_EDIT / REJECT`；人工编辑后的 diff
-必须重新通过同一套租户、证据、字段白名单和 base-version 校验。审批请求
-使用租户级幂等键；拒绝必须记录原因。review-only `DOCUMENT_DRAFT` 不能进入
-执行状态。
-
-受控执行把文档 metadata patch、版本快照、chunk 和 MySQL 向量源数据写入保持在
-短事务中；随后才在事务外重建 embedding/pgvector serving index 并执行目标问题
-Hit@3 回归。目标回归或派生索引失败时，执行器按变更前版本补偿 MySQL 源数据，
-再重建 serving index；中断恢复使用幂等执行键继续未完成的执行或补偿。Triage
-诊断、proposal/route 与 AgentRun 成功事实同事务提交，Reviewer 决策与对应
-AgentRun 也同事务提交，但所有远程模型调用始终处于事务外。
-
-前端“受控修复”页与 `/api/v1/ai/repair/**` 提供 case 列表、诊断、proposal diff、
-正反证据、Reviewer findings、人工决定和执行结果。所有查询与动作都从认证主体
-注入 `userId`，请求不能指定其他租户。当前公开动作接口均要求客户端幂等键：
-
-```text
-GET  /api/v1/ai/repair/cases
-GET  /api/v1/ai/repair/cases/{badCaseId}
-POST /api/v1/ai/repair/cases/{badCaseId}/triage
-POST /api/v1/ai/repair/proposals/{proposalId}/review
-POST /api/v1/ai/repair/proposals/{proposalId}/decision
-POST /api/v1/ai/repair/proposals/{proposalId}/execute
-```
-
-冻结的 24 条六类 bad case、24 条 Reviewer challenge 和四臂协议在
-`evaluation/`。真实 DeepSeek v2 评分完成 240 次模型调用且无调用失败；三个模型臂
-的根因分类均为 24/24，`single`、`single+self-review`、`reviewed-multi` 的 challenge
-缺陷捕获分别为 12/12、8/12、10/12。独立 Reviewer 相对 self-review 的增量是 2 个，
-低于预注册的 5 个门槛，所以只证明实现了可复现的双角色生成—核验流水线，不宣称
-Reviewer 带来质量提升。原始结果和边界见
-[`evaluation/results/phase-d-four-arm-provider-run-v2-2026-08-23.md`](evaluation/results/phase-d-four-arm-provider-run-v2-2026-08-23.md)。
+Spring Boot 后端负责认证、文档管理、RAG 问答、反馈评估及经人工审批的元数据修复。设计与事务边界集中在[架构说明](docs/architecture.md)，实验集中在[评估说明](evaluation/README.md)。
 
 ## 本地运行
 
-依赖：
+需要 JDK 17+ 与 Docker Desktop。以下命令从仓库根目录执行：
 
-- JDK 17+
-- Docker Desktop（推荐，用于 MySQL 8 与 Redis 7）
-- IntelliJ IDEA 2024.1.2 或兼容版本
-
-推荐从项目根目录运行 `.\backend\scripts\run-local.ps1`。脚本会使用 Maven Wrapper、启动 Compose 中的 MySQL `3307` 和 Redis `6380`，并以 Mock + 本地稀疏检索 + MySQL JSON 向量存储启动后端。
-
-数据库表由 Flyway 迁移管理：
-
-```text
-src/main/resources/db/migration/
+```powershell
+./backend/scripts/run-local.ps1
 ```
 
-应用启动时，Flyway 会自动检查并执行未执行过的迁移。
+脚本启动 Compose 中的 MySQL `3307`、Redis `6380`，使用 Maven Wrapper 构建后在 `8081` 端口运行后端。它会继承已有环境变量，没有配置时使用 mock、本地稀疏向量和 MySQL JSON 存储。
 
-对于在引入 Flyway 之前手动创建的老数据库，已开启 `baseline-on-migrate`，让 Flyway 能安全接管当前 schema。仓库不再保留第二份可执行 `schema.sql`，避免它与 Flyway 漂移。
+使用 IDEA 时，先在仓库根目录启动依赖：
 
-默认应用端口：
-
-```text
-8081
+```powershell
+docker compose -f backend/docker-compose.yml up -d devmind-mysql devmind-redis
 ```
 
-默认数据库：
+再用 IDEA 打开 `backend` 并选择共享运行配置 `DevMind - Local Mock`，运行 `com.devmind.DevMindApplication`。共享配置显式设置本地 provider；远程模型密钥只放在个人运行配置或进程环境中。
 
-```text
-devmind
-```
+Flyway 自动执行 [数据库迁移](src/main/resources/db/migration)。新环境不需要手动建表；已有旧库的 baseline 配置不能替代迁移兼容性检查。演示 SQL 是可选的数据重置操作，使用前阅读[本地体验指南](../docs/guides/local-demo.md)。
 
-## 环境变量
+## 模型与检索配置
 
-仓库默认连接 Docker Compose 暴露的端口，最小配置为：
+完整变量示例见 [.env.example](.env.example)，实际默认值见 [application.yml](src/main/resources/application.yml)。**应用和启动脚本不会自动加载后端 `.env` 文件**，请将变量注入运行进程或 IDEA 配置。默认数据库为 `devmind`，Compose 本地凭据为 `root/root`；Redis 使用 database `1`。
 
-```text
-DEVMIND_DB_URL=jdbc:mysql://localhost:3307/devmind?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-DEVMIND_DB_USERNAME=root
-DEVMIND_DB_PASSWORD=root
-DEVMIND_JWT_SECRET=replace_with_a_long_random_secret_for_non_local_use
-DEVMIND_AI_PROVIDER=mock
-DEVMIND_REDIS_HOST=localhost
-DEVMIND_REDIS_PORT=6380
-DEVMIND_REDIS_DATABASE=1
-```
+| 能力 | 默认值 | 启用方式 |
+| --- | --- | --- |
+| 问答模型 | `DEVMIND_AI_PROVIDER=mock` | 改为 `deepseek`，并配置下述 DeepSeek 变量。 |
+| 向量表示 | `DEVMIND_AI_EMBEDDING_PROVIDER=local-sparse-vector` | 改为 `remote-dense`，配置远程 embedding。 |
+| 重排 | `DEVMIND_AI_RERANK_PROVIDER=none` | 改为 `remote-rerank`，仅用于离线检索评估。 |
+| 向量查询 | `DEVMIND_VECTOR_STORE_PROVIDER=mysql-json` | 配置 dense embedding 后可选 `pgvector`。 |
 
-只有在明确使用 Windows 本机安装的 MySQL / Redis 时，才覆盖成默认服务端口：
+启用真实服务前，请明确选择 provider；仅填写 Key 不会把普通 mock 问答切换成真实生成。反过来，**Triage / Reviewer 动作直接使用 DeepSeek Agent 客户端**，不受普通问答 mock 开关保护；没有 Key 时不能运行，配置 Key 后点击这些动作会产生真实调用。预置提案的审批与执行无需重新生成诊断。
 
-```text
-DEVMIND_DB_URL=jdbc:mysql://localhost:3306/devmind?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-DEVMIND_REDIS_PORT=6379
-```
+### DeepSeek
 
-IDEA 打开本目录后可选择共享运行配置 `DevMind - Local Mock`。它不包含密钥，并与 `run-local.ps1` 使用同一套 Compose 数据。
+在后端运行环境中设置（以下是变量格式示例，不是 PowerShell 赋值命令）：
 
-真实 Provider 按以下边界注入密钥：
-
-- 本地开发：使用未勾选“存储为项目文件”的 IDEA 个人运行配置，或由当前进程环境注入；
-- CI/CD：使用仓库或流水线 Secret，在任务运行时映射为同名环境变量；
-- 部署环境：使用部署平台 Secret 或专用密钥管理服务，不依赖 IDE 配置。
-
-仓库仅提交 `.env.example` 作为变量契约；`.env` 和 `.env.*` 本地文件均被忽略。不得将真实密钥写入 `.env.example`、`application.yml` 或共享 `.run` 配置。密钥曾出现在截图、日志或提交历史时，应立即在 Provider 端轮换，不以删除本地文件代替轮换。
-
-DeepSeek provider：
-
-```text
+```dotenv
 DEVMIND_AI_PROVIDER=deepseek
-DEVMIND_DEEPSEEK_API_KEY=your_api_key
+DEVMIND_DEEPSEEK_API_KEY=<你的密钥>
 DEVMIND_DEEPSEEK_BASE_URL=https://api.deepseek.com
-DEVMIND_DEEPSEEK_MODEL=deepseek-v4-flash
+DEVMIND_DEEPSEEK_MODEL=<账号可用的模型标识>
 DEVMIND_DEEPSEEK_TEMPERATURE=0.2
 ```
 
-可选 pgvector 向量存储（默认关闭；启用前先 `docker compose up -d devmind-pgvector`）：
+仓库默认模型标识为 `deepseek-v4-flash`，这里仅说明现有配置，不保证供应商当前仍提供该型号。Agent 路径需要模型支持项目使用的 Tool Calling 协议。普通问答调用失败时会记录失败日志并降级为 mock，响应 provider 链用于区分降级回答。
 
-```text
+### 远程 embedding 与 rerank
+
+```dotenv
+DEVMIND_AI_EMBEDDING_PROVIDER=remote-dense
+DEVMIND_AI_EMBEDDING_REMOTE_BASE_URL=<兼容服务的 API 根地址>
+DEVMIND_AI_EMBEDDING_REMOTE_API_KEY=<你的密钥>
+DEVMIND_AI_EMBEDDING_REMOTE_MODEL=<embedding 模型标识>
+DEVMIND_AI_EMBEDDING_REMOTE_DIMENSION=1024
+
+DEVMIND_AI_RERANK_PROVIDER=remote-rerank
+DEVMIND_AI_RERANK_REMOTE_BASE_URL=<rerank 服务的 API 根地址>
+DEVMIND_AI_RERANK_REMOTE_API_KEY=<你的密钥>
+DEVMIND_AI_RERANK_REMOTE_MODEL=<rerank 模型标识>
+```
+
+客户端分别在根地址后拼接 `/embeddings` 与 `/rerank`；需要 `/v1` 的服务应在根地址中包含它。embedding 维度必须由所选模型支持。文档写入、向量回填和检索评估可能调用这些服务；切换 provider 后，已有文档可能需要通过 [API 示例](docs/api/devmind-api.http)中的回填接口建立对应向量。
+
+### 可选 pgvector
+
+从仓库根目录启动向量数据库：
+
+```powershell
+docker compose -f backend/docker-compose.yml up -d devmind-pgvector
+```
+
+然后配置后端：
+
+```dotenv
 DEVMIND_VECTOR_STORE_PROVIDER=pgvector
 DEVMIND_PGVECTOR_URL=jdbc:postgresql://localhost:5433/devmind_vectors
 DEVMIND_PGVECTOR_USERNAME=devmind
 DEVMIND_PGVECTOR_PASSWORD=devmind
-# 必须与 dense embedding 维度一致；HNSW 对 vector 类型上限 2000 维，
-# 所以 dense embedding 用 dimensions 参数请求 1024 维
 DEVMIND_PGVECTOR_DIMENSION=1024
 DEVMIND_AI_EMBEDDING_REMOTE_DIMENSION=1024
 ```
 
-启用后 dense 向量双写：MySQL JSON 行保持源数据与对照组身份，pgvector HNSW 承担相似度查询；评估接口会多出一路 `dense-hybrid-pgvector` 策略，直接对比两种 serving 路径。切换维度后需要调用向量回填接口重建向量；对于 MySQL 中已有的 active dense 向量，backfill 会直接解码 JSON 并重放到 pgvector，不重复请求 embedding，可用于首次迁移或修复此前失败的 best-effort 双写。
+这需要同时启用 `remote-dense`。MySQL JSON 保存向量源数据，pgvector 提供 HNSW 查询索引，两端维度必须一致。回填可重放已有的 active dense JSON，也可能为缺失向量调用 embedding。改变维度涉及重新生成向量和索引，不能把旧向量重放误当作维度转换。
 
-可选行为开关：
+### 常用运行参数
 
-```text
-# true（默认）：Redis 故障时黑名单检查放行，只损失登出撤销能力，本地开发友好。
-# false：黑名单查不到 Redis 时直接拒绝请求，用可用性换“登出后 token 一定不可用”。
-DEVMIND_BLACKLIST_FAIL_OPEN=true
+| 参数 | 默认值与用途 |
+| --- | --- |
+| `DEVMIND_DB_URL` | `localhost:3307/devmind` 的 JDBC URL，完整格式见 `.env.example`。 |
+| `DEVMIND_REDIS_HOST` / `DEVMIND_REDIS_PORT` | `localhost` / `6380`。 |
+| `DEVMIND_JWT_SECRET` | 仓库默认仅供本地开发，共享环境需覆盖。 |
+| `DEVMIND_BLACKLIST_FAIL_OPEN` | `true`；Redis 故障时放行，登出撤销保护会受影响。 |
+| `DEVMIND_AI_ASK_RATE_LIMIT_PER_MINUTE` | `10`；按用户限制 AI 问答次数。 |
+| `DEVMIND_AI_ASK_RATE_LIMIT_FAIL_OPEN` | `true`；关闭后限流服务故障返回 503。 |
+| `DEVMIND_RETRIEVAL_EVALUATION_COOLDOWN_SECONDS` | `300`；完整检索评估冷却时间。 |
+| `DEVMIND_AI_CONNECT_TIMEOUT` / `DEVMIND_AI_READ_TIMEOUT` | `5s` / `30s`；外部 HTTP 调用超时。 |
+| `DEVMIND_RETRIEVAL_TECH_PHRASES_ENABLED` | `true`；关闭可做技术短语表消融。 |
 
-# AI 问答默认按用户每分钟最多 10 次；Redis Lua 原子维护计数和 TTL。
-DEVMIND_AI_ASK_RATE_LIMIT_ENABLED=true
-DEVMIND_AI_ASK_RATE_LIMIT_PER_MINUTE=10
-# true（默认）：Redis 故障时放行；false：限流器不可用时返回 HTTP 503。
-DEVMIND_AI_ASK_RATE_LIMIT_FAIL_OPEN=true
+其余开关见 `application.yml`。部署前的凭据、数据卷和故障策略见[维护说明](../docs/operations/production-readiness.md)。
 
-# 完整五路检索评估默认每个用户 300 秒只能触发一次，避免重复外部调用。
-DEVMIND_RETRIEVAL_EVALUATION_GUARD_ENABLED=true
-DEVMIND_RETRIEVAL_EVALUATION_COOLDOWN_SECONDS=300
-DEVMIND_RETRIEVAL_EVALUATION_GUARD_FAIL_OPEN=true
+## API 与日志
 
-# DeepSeek、远程 embedding 和 rerank 共用的 HTTP 超时。
-DEVMIND_AI_CONNECT_TIMEOUT=5s
-DEVMIND_AI_READ_TIMEOUT=30s
+后端启动后访问 <http://localhost:8081/swagger-ui.html>，或使用 [IDEA HTTP Client 示例](docs/api/devmind-api.http)。接口覆盖认证、文档、检索、问答日志、反馈、评估和修复审批；先注册 / 登录获取 token。
 
-# true（默认）：问题解析使用内置技术短语表辅助抽取检索关键词。
-# false：关闭短语表，用于评估检索质量对这张人工词表的依赖程度（消融实验）。
-DEVMIND_RETRIEVAL_TECH_PHRASES_ENABLED=true
+问答日志保存 provider、召回片段 ID、Prompt 预览、token 用量、耗时与成功 / 失败状态。完整模型输入与最多 2,000 字符的日志预览分离；新日志保存模型可见的有界证据快照及文档版本。反馈覆盖率、检索指标与生成质量是不同指标，定义见[评估说明](evaluation/README.md)。
+
+## 测试与 CI
+
+在 `backend` 目录执行：
+
+```powershell
+./mvnw.cmd test
 ```
 
-绝不要提交真实 API key。
+测试包含单元测试和 Testcontainers 集成测试；Docker 不可用时相关集成测试可能跳过。真实 DeepSeek smoke、四臂模型评估和规模基准均为显式开启的 opt-in 项，启用条件见[评估说明](evaluation/README.md)。普通测试通过不等于这些外部实验已运行。
 
-`application.yml` 里的默认 JWT secret 只用于本地开发。在任何共享、部署或类生产环境，请用 `DEVMIND_JWT_SECRET` 覆盖它。
+[GitHub Actions](../.github/workflows/ci.yml)负责后端测试与前端构建；实际结果以对应提交的运行记录为准。

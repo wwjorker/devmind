@@ -1,4 +1,6 @@
-# Phase D controlled repair before/after run
+# controlled repair before/after run
+
+> Historical experiment record from 2026-08-23; not rerun during documentation maintenance.
 
 This is the real-MySQL end-to-end evidence that is intentionally separate from
 the prompt-only four-arm provider comparison. The raw report is
@@ -42,6 +44,10 @@ titles. The frozen full-suite regression delta is therefore Hit@3 `0.0` and MRR
 retroactively modifying the separately scored four-arm provider report.
 
 ## Reproduction
+
+Run from `backend/` at the recorded historical snapshot to reproduce this report.
+When testing another revision, record its actual SHA instead of reusing the
+historical `DEVMIND_EVAL_KNOWLEDGE_SNAPSHOT` value below.
 
 ```powershell
 $env:JAVA_HOME='C:\path\to\jdk-17'

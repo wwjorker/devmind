@@ -1,74 +1,30 @@
-# DevMind Frontend
+# DevMind 前端
 
-这是 DevMind 的前端项目，使用 `Vue 3 + Vite + TypeScript` 实现，用于展示知识文档、AI 问答、问答日志和 RAG 评估结果。
+使用 Vue 3、Vite 和 TypeScript，提供文档管理、知识库问答、引用与日志、反馈评估，以及修复提案的人工审批界面。
 
-## 功能
+## 本地运行
 
-- 登录 / 注册
-- 知识文档列表、编辑和归档
-- 手动创建知识文档
-- 导入 `.txt / .md / .markdown` 笔记文件
-- AI 问答
-- 召回来源（检索上下文）展示
-- token 用量展示
-- 无上下文兜底状态展示
-- 问答日志分页列表
-- 页面刷新后从后端 ask logs 恢复最近一次回答
-- 问答日志详情：回答、提示词预览、token、召回片段、反馈
-- 有帮助 / bad case 反馈提交
-- RAG 评估集覆盖率、Hit@3 和 MRR 展示
-
-## 本地启动
-
-推荐在项目根目录执行：
+需要 Node.js 20.19+（20.x）或 22.12+。先按[后端说明](../backend/README.md#本地运行)启动服务，再从仓库根目录执行：
 
 ```powershell
-.\start-local.ps1
+cd frontend
+npm ci
+npm run dev
 ```
 
-它会分别打开后端和前端日志终端。只启动前端时执行：
+访问 <http://127.0.0.1:5173>。也可以在仓库根目录执行 `./start-local.ps1` 同时启动前后端；仅启动前端的脚本路径为 `./frontend/scripts/run-local.ps1`。
+
+Vite 将 `/api` 和 `/v3` 请求代理到 `http://localhost:8081`。需要覆盖时，在启动前设置 `VITE_API_TARGET`，或写入本地忽略的 `.env.local`。页面通过 `/api/v1/health` 显示后端状态。
+
+模型密钥只配置在后端，不写入前端环境变量。数据准备、mock 与离线提案的区别见[本地体验指南](../docs/guides/local-demo.md)。
+
+## 构建与预览
+
+在 `frontend` 目录执行：
 
 ```powershell
-.\scripts\run-local.ps1
-```
-
-打开：
-
-```text
-http://127.0.0.1:5173
-```
-
-Vite dev server 会把 `/api` 请求代理到 `VITE_API_TARGET`，默认是 `http://localhost:8081`。页面左下角会通过 `/api/v1/health` 显示真实后端在线状态。
-
-## 演示流程
-
-1. 登录或注册本地账号。
-2. 需要重置演示数据时，在 MySQL 中执行 `backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql`，为 `testuser` 重建一套演示数据。
-3. 如果要演示文件导入，可以导入 `backend/docs/samples/redis-cache-penetration.md`，或你自己的任意 `.txt` / `.md` 笔记。
-4. 在 AI 问答区提问：`Redis 缓存穿透是什么，怎么解决？`
-5. 查看回答、召回来源、召回片段、提示词预览和 token 用量。
-6. 继续提问 JWT、Flyway、LlmClient 等工程设计问题。
-7. 提交“有帮助”或 bad case 反馈。
-8. 打开评估看板，查看 bad case、RAG 评估集覆盖率、Hit@3 和 MRR。
-
-## 无上下文兜底验证
-
-可以提问：
-
-```text
-Kafka consumer rebalance 为什么会变慢？
-```
-
-如果知识库没有相关召回片段，后端会返回兜底回答，并跳过模型调用。
-
-注意：部分库外问题（如“Kubernetes Pod 驱逐策略”）会被本地稀疏向量以弱相似度召回而不触发兜底，这是 bigram 稀疏表示的已知限制，详见根 README 的评估说明。
-
-## 构建
-
-```bash
 npm run build
+npm run preview
 ```
 
-## 安全说明
-
-前端不保存模型 API Key。DeepSeek 等模型密钥只应该配置在后端运行环境中。
+构建执行 TypeScript 检查并输出到 `dist`；预览地址为 <http://127.0.0.1:4173>。预览主要用于检查静态产物，独立部署时仍需配置后端 API 转发，见[部署说明](../docs/operations/production-readiness.md)。

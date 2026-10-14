@@ -1,10 +1,19 @@
-# Phase D four-arm provider run — invalid protocol run
+# four-arm provider run — invalid protocol run
+
+> Historical experiment record from 2026-08-23; not rerun during documentation maintenance.
 
 This report is preserved as failure evidence and must not be used as a model-
-quality or resume claim. It was the first complete provider run and exposed a
+quality claim. It was the first complete provider run and exposed a
 degenerate `reviewed-multi` prompt. The raw report is
-`phase-d-four-arm-provider-run-2026-08-23-invalid.json` (SHA-256
+`phase-d-four-arm-provider-run-2026-08-23-invalid.json` (historically recorded SHA-256
 `336ac916ceacbc2c50397c86f567b4b29610e0628323b9d6528329a6d10b7d42`).
+
+Integrity note: the preserved Git blob at `213dad9` has SHA-256
+`b59ebd49bbd7200cd7d8881da61ff9640998009e86d4cbf5bb3d1a9bdb3f3b28`.
+Neither its LF form nor the current CRLF checkout matches the historical hash
+above. That original digest remains unverified; the JSON and protocol amendment
+have not been rewritten to hide the mismatch. This run remains invalid evidence
+for quality comparison regardless of the digest discrepancy.
 
 ## Frozen inputs and provider
 

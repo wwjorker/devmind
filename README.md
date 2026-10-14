@@ -1,307 +1,66 @@
-# DevMind：面向开发学习的 AI 知识库系统
+# DevMind · AI 知识库
 
 [![CI](https://github.com/wwjorker/devmind/actions/workflows/ci.yml/badge.svg)](https://github.com/wwjorker/devmind/actions/workflows/ci.yml)
 
-DevMind 是一个面向个人开发学习、项目复盘和知识沉淀的 AI 知识库系统。项目重点不是简单包装大模型 API，而是把 RAG 问答接入完整的 Java 后端工程链路。
+DevMind 用来整理开发笔记和项目资料：导入文档后，可以围绕知识库提问、查看回答引用的原文，并通过反馈追踪回答问题。对于部分检索问题，系统支持提出修复建议，经人工审批后更新文档元数据、重建索引并复测。
 
-## 30 秒速览
+项目采用 **Java 17 / Spring Boot 3、Vue 3 / TypeScript、MySQL 和 Redis**。默认使用本地 mock 回答与稀疏向量检索，无需模型 API Key；真实问答模型、dense embedding、rerank 和 pgvector 均需另行配置。
 
-- **Java / Spring Boot 后端**：认证、文档版本、MySQL / Redis、Flyway、短事务与失败补偿组成可运行的 RAG 工程链路。
-- **可解释 RAG**：关键词、FULLTEXT、稀疏/稠密向量、RRF、可选 pgvector 与 rerank 对照；回答展示真实召回引用，模型完整输入与有限日志 preview 分离。
-- **受控 Agent 修复**：Evidence Triage 只读调查，独立 Reviewer 审核证据、反证和回归计划；Tool Calling 受 schema 与预算约束，写入必须经过 `APPROVE / APPROVE_WITH_EDIT / REJECT`。
-- **可恢复执行**：文档乐观锁、不可变版本、审批幂等、事务外 embedding / 索引重建，以及索引或回归失败后的补偿回滚。
-- **可复现实验**：14 篇演示文档、40 条 gold-label 检索用例，sparse-hybrid Hit@3=`1.000`；Docker-enabled Maven 共 193 项（190 passed、3 个 opt-in skipped、0 failures/errors）。
-- **诚实负结论**：冻结集完成 240 次真实 DeepSeek 调用且无 Provider 失败；Reviewer 比 self-review 多捕获 2 个缺陷，但未达到预注册 `+5` 门槛，因此不宣称 Multi-Agent 显著提升质量。
+## 实际截图
 
-**最短体验路径**：默认 mock 模式不需要 API Key。克隆后运行 `.\start-local.ps1`，打开 `http://127.0.0.1:5173`；完整演示数据、讲解顺序与降级路径见 [5 分钟演示指南](docs/guides/multi-agent-v2-5-minute-demo.md)。
+以下为已有的本地运行截图，使用演示数据。问答使用 mock，修复提案使用预置离线样例；它们展示实际界面与执行流程，不代表实时模型生成效果。
 
-## 界面预览
+### 问答与引用
 
-### RAG 回答与可见引用
+![RAG 回答、召回片段与来源引用](docs/assets/portfolio/rag-answer-citations.png)
 
-![DevMind RAG 回答、召回片段与引用](docs/assets/portfolio/rag-answer-citations.png)
+回答旁展示来源文档、chunk ID 和召回分数，便于回到原文核对。
 
-真实本地 mock 问答复用完整检索编排；页面同时展示回答依据、chunk ID、来源文档和召回分数。
+### 修复提案与证据
 
-### Triage 提案与版本化证据
+![元数据修复提案、版本化证据与回归计划](docs/assets/portfolio/triage-reviewer-proposal.png)
 
-![DevMind Triage 元数据提案、来源证据与回归计划](docs/assets/portfolio/triage-reviewer-proposal.png)
+提案列出修改内容、来源版本、证据与回归问题；Reviewer 通过后仍需人工审批。
 
-离线演示 fixture 处于 `AWAITING_APPROVAL`：提案只允许白名单 metadata patch，并绑定文档版本、来源证据、反证与目标回归计划；它不冒充实时模型输出。
+### 执行与复测
 
-### HITL 应用与目标回归
+![人工批准后的执行结果与目标回归](docs/assets/portfolio/hitl-applied-result.png)
 
-![DevMind HITL 应用结果与目标回归](docs/assets/portfolio/hitl-applied-result.png)
+图中为预置提案实际执行后的结果：文档更新到 version 2，目标问题检索到该文档且排名为 1。操作步骤见[本地体验指南](docs/guides/local-demo.md)。
 
-人工批准后由 Java 服务执行版本化发布和派生索引重建；截图中的真实结果为 `RESOLVED`、applied version 2、目标文档 rank 1。`APPROVE_WITH_EDIT / REJECT` 与补偿回滚由同一受控状态机覆盖，演示步骤见上方指南。
+## 核心功能与关键设计
 
-## 当前状态
+| 功能 | 实现与取舍 |
+| --- | --- |
+| 文档管理 | 支持创建、编辑、归档及 TXT / Markdown 导入；自动分块，保留不可变文档版本。 |
+| 知识库问答 | 关键词 / FULLTEXT 与向量召回通过 RRF 融合；回答保留引用，检索为空时跳过模型并返回兜底。 |
+| 问题追踪 | 记录 provider、耗时、token 用量和反馈；模型完整输入与日志中的有限 Prompt 预览分开。 |
+| 受控修复 | Triage 调查、Reviewer 核验证据，Java 服务校验并执行人工批准的元数据修改；正文草稿只供审阅。 |
+| 版本与恢复 | 使用乐观锁和幂等键；外部调用在数据库事务外，索引重建或目标回归失败时执行补偿回滚。 |
+| 检索评估 | 用人工标注数据比较检索策略；MySQL 保存向量源数据，可选 pgvector 作为可重建的查询索引。 |
 
-这是一个前后端分离的完整 monorepo 项目：
+项目面向本地使用；功能边界见[当前限制](backend/docs/architecture.md#当前限制)，历史实验及结论见[评估说明](backend/evaluation/README.md)。
 
-- `backend`：Spring Boot 后端，已实现认证、知识文档、检索、AI 问答、日志、反馈、评估和受控 bad-case 修复接口。
-- `frontend`：Vue 3 前端，已实现中文工作台、文档管理、AI 问答、日志与评估看板，以及提案 diff、Reviewer 意见和人工审批界面。
-- `CI`：GitHub Actions 已配置后端测试和前端构建。
+## 本地运行
 
-已验证（当前本地快照）：
-
-```text
-backend: Docker-enabled Maven 测试共 193 项，190 passed、3 skipped、0 failures/errors
-frontend: npm run build 生产构建通过
-GitHub Actions: push / PR 自动执行后端测试与前端构建，实时状态见顶部 CI 徽章
-```
-
-当前版本已实现真实 dense embedding 接入（OpenAI 兼容 API，可插拔 provider）、rerank 精排（离线评估）、多策略检索评估，以及可选的 pgvector 向量存储：dense 向量双写 MySQL JSON（源数据，兼对照组）与 Postgres + pgvector HNSW（serving 索引，`docker compose` 一键启动，默认关闭）。仍不宣称实现 rerank 线上问答链路、PDF/OCR 或生产级部署。默认配置全本地运行、零外部调用，不配置 API key 不产生任何费用。
-
-## Multi-Agent 受控修复闭环
-
-Phase C 把 bad case 从一条反馈记录推进为可审计的受控修复流程：Evidence
-Triage 只读历史问答与知识证据并归因，Change Reviewer 独立检查提案的证据、
-反证、影响范围和回归计划，Java 服务负责 schema 校验、状态迁移、幂等、版本冲突
-与最终执行。Reviewer 通过不等于执行；任何写入都必须经过当前用户的
-`APPROVE / APPROVE_WITH_EDIT / REJECT` 决策。
-
-```text
-bad case -> triage -> metadata proposal -> independent review
-         -> human approval -> short MySQL write transaction
-         -> rebuild derived vectors -> target regression
-         -> applied or compensating rollback
-```
-
-首版有意只执行白名单内的 metadata patch；需要改正文的 `DOCUMENT_DRAFT`
-只能作为人工审阅材料，不能自动发布。MySQL 中的文档、不可变版本、chunk 和向量
-源数据是可恢复事实，pgvector 只是可重建 serving index。embedding、模型调用和
-pgvector 同步都不在数据库事务中。执行失败会保留明确失败阶段；源数据已变更但
-索引或目标回归失败时，系统按执行前版本补偿回滚，并允许幂等恢复中断的补偿。
-
-这套闭环验证的是个人知识库中可复现的团队知识维护模式，不宣称已经成为生产级
-企业自治 Agent 平台。真实 DeepSeek 四臂实验在修正版 v2 冻结集上完成 240 次模型
-调用且无调用失败：`single`、`single+self-review`、`reviewed-multi` 的根因分类均为
-24/24；Reviewer challenge 缺陷捕获分别为 12/12、8/12、10/12。独立 Reviewer
-只比 self-review 多抓 2 个，未达到预注册的至少 5 个门槛，因此项目保留双角色流水线，
-但不宣称 Multi-Agent 带来质量提升。完整原始报告、无效首跑和协议修正记录见
-[backend/evaluation](backend/evaluation/README.md)。
-
-## 项目亮点
-
-```text
-知识文档
--> TXT / Markdown 文件导入
--> 文档自动分块 chunks
--> 中英文关键词检索
--> chunk 向量持久化（本地稀疏向量 / 真实 dense embedding，按 provider 区分）
--> FULLTEXT + 关键词 + 向量 + RRF 融合检索
--> rerank 精排（可插拔，离线评估）
--> 无上下文兜底，减少幻觉
--> 构建带上下文的 Prompt
--> LLM Provider 路由
--> 返回带召回来源的回答
--> 记录成功 / 失败问答日志、token 用量和耗时
--> bad case 反馈
--> 五方检索策略 Hit@3 / MRR 对比评估
-```
-
-AI 问答不是独立模块，而是接入了认证、数据库设计、事务、Redis、日志、评估和 CI 的完整后端链路。
-
-## 检索评估结果
-
-在 14 篇文档、40 个人工标注 gold-label 用例（35 个正例含词法失配、同义改写、跨主题 hard-negative，5 个库外负例）上，对五种检索策略计算 Hit@3 / MRR（K=3，ngram FULLTEXT + 字面证据过滤生效后测得；dense 向量为 1024 维，以适配 pgvector HNSW 的 2000 维上限）：
-
-| 策略 | Hit@3 | MRR | 特点 |
-|---|---|---|---|
-| keyword baseline | 0.857 | 0.843 | 字面证据优先，精确但漏改写问题 |
-| sparse-hybrid | **1.000** | 0.924 | 向量通道补齐改写召回 |
-| dense-hybrid | 0.971 | 0.920 | dense 向量 + JVM 暴力余弦（对照组） |
-| dense-hybrid-pgvector | 0.971 | **0.934** | 同批向量改由 pgvector HNSW serving |
-| dense-hybrid-rerank | **1.000** | 0.852 | 最坏情况召回满分，但平均排序变平 |
-
-核心结论：没有单一最优策略。dense embedding 的价值在精确排序，rerank 的价值在最坏情况召回（Hit@3 满分），但 rerank 会把部分本来排第 1 的结果挤到第 2，拉低平均 MRR。**在本次 35 个正例评估中，pgvector HNSW 与同批向量的 JVM 暴力余弦 Hit@3 均为 0.971**；MRR 的微小差异来自排序精度——JVM 路径把相似度圆整为整数分会产生并列，pg 按原始距离排序。注意 rerank 是在混合检索 top-5 候选池上做"5 选 3"重排，其 Hit@3 满分受候选池限制；Hit@3 相邻两档相差约 0.029，以上数字为方向性而非统计显著。
-
-**词表消融**：问题解析里有一张人工技术短语表，为验证评估不依赖这张表，用 `DEVMIND_RETRIEVAL_TECH_PHRASES_ENABLED=false` 关掉后重跑：
-
-| 策略 | 词表开 | 词表关 |
-|---|---|---|
-| keyword baseline | 0.857 / 0.843 | 0.714 / 0.686 |
-| sparse-hybrid | 1.000 / 0.924 | 1.000 / 0.886 |
-
-关键词基线确实吃词表红利（约 0.14）；关闭短语表后，本评估集中的 sparse-hybrid Hit@3 仍为 1.000，但 MRR 从 0.924 降至 0.886。
-
-**向量 serving 规模基准**：另有一组暴力余弦 vs pgvector HNSW 的单机基准（1 万/10 万条、含 ef_search 召回-延迟权衡与近似检索的实测召回损失），见 [backend/README.md](backend/README.md) 的"向量 serving 规模基准"一节。
-
-**负例与已知限制**：5 个库外问题中 1 个正确触发空召回兜底，其余 4 个仍被本地稀疏向量通道以 0.16–0.23 的弱相似度召回。校准数据显示，改写正例的 gold 相似度（约 0.14）低于 hard-negative 的噪声相似度（约 0.16），在 bigram 稀疏表示下两者发生倒挂，不存在能分开它们的阈值。这是稀疏表示的固有限制，也是引入 dense embedding、并计划基于 dense 相似度阈值改进无上下文判定的直接原因。
-
-## 项目结构
-
-```text
-devmind
-+-- backend    Spring Boot 后端
-+-- frontend   Vue 3 + Vite 前端
-+-- .github    GitHub Actions CI
-```
-
-## 技术栈
-
-后端：
-
-```text
-Java 17
-Spring Boot 3.3.x
-Spring Security
-MyBatis-Plus
-MySQL
-Redis
-Flyway
-PostgreSQL + pgvector（可选向量索引）
-JJWT
-Springdoc OpenAPI
-DeepSeek API
-```
-
-前端：
-
-```text
-Vue 3
-Vite
-TypeScript
-```
-
-## 本地启动
-
-默认本地模式只使用 Docker 中的 MySQL、Redis，以及本机运行的 Spring Boot、Vite。它不会调用 DeepSeek、远程 embedding、rerank 或 pgvector。
-
-准备条件：
-
-- Docker Desktop 已启动。
-- `JAVA_HOME` 指向 JDK 17+（可以使用 IntelliJ IDEA 自带的 JBR 17）。
-- Node.js 20+ 和 npm 可用。
-
-Windows 一键启动（会打开前后端两个日志终端）：
+准备 JDK 17+、Docker Desktop，以及 Node.js 20.19+（20.x）或 22.12+。以下命令用于 Windows PowerShell：
 
 ```powershell
 git clone https://github.com/wwjorker/devmind.git
 cd devmind
-.\start-local.ps1
+./start-local.ps1
 ```
 
-也可以手动分开启动：
+脚本会启动 MySQL、Redis，并分别打开后端和前端终端。前端首次启动会安装 npm 依赖；后端使用 Maven Wrapper 构建。启动后访问 <http://127.0.0.1:5173>，先注册本地账号，再创建或导入文档。
 
-```powershell
-# 终端 1：自动启动 Docker MySQL 3307、Redis 6380 和 Spring Boot 8081
-cd devmind
-.\backend\scripts\run-local.ps1
+默认端口为前端 `5173`、后端 `8081`、MySQL `3307`、Redis `6380`。没有覆盖环境变量时，问答使用 `mock`、embedding 使用 `local-sparse-vector`、rerank 为 `none`、向量存储为 `mysql-json`，不调用外部模型。脚本会继承已有环境变量；若曾配置真实 provider，请先核对[后端配置](backend/README.md#模型与检索配置)。
 
-# 终端 2：启动 Vite 5173
-cd devmind
-.\frontend\scripts\run-local.ps1
-```
+日常开发也可以用 IDEA 打开 `backend`，启动 Compose 依赖后选择共享配置 `DevMind - Local Mock`；前端在 `frontend` 中执行 `npm ci`、`npm run dev`。分步操作见[后端说明](backend/README.md#本地运行)和[前端说明](frontend/README.md)。
 
-打开 `http://127.0.0.1:5173`。前后端分别占用终端，是因为 Spring Boot 和 Vite 是两个持续运行、各自输出日志的进程；一键脚本只是帮你统一发起它们。
+## 必要文档入口
 
-Compose 固定映射 MySQL `3307 -> 3306`、Redis `6380 -> 6379`。如果提示端口已占用，先停止占用该端口的其他项目容器，不要在未确认目标时删除数据卷。
-
-IDEA 打开 `backend` 后，可以直接选择仓库共享的 `DevMind - Local Mock` 运行配置。它与脚本使用同一套 `3307/6380` 数据环境，且不会调用外部模型。`.idea/workspace.xml` 属于个人本地状态，不进入 Git；不要再把其中旧的 `3306/6379` 配置当作项目默认值。
-
-若要启用真实 DeepSeek 或完整 dense/rerank/pgvector 链路，请显式配置对应环境变量和依赖；不要把带密钥的 IDEA 运行配置提交到 Git。
-
-## 本地演示路径
-
-需要演示数据时，先在 MySQL 中执行：
-
-```text
-backend/docs/sql/reset-and-seed-demo-data-for-testuser.sql
-```
-
-脚本只重置 `testuser` 的演示数据。
-
-推荐体验顺序：
-
-1. 登录 `testuser`。
-2. 查看知识文档和自动生成的 chunks。
-3. 提问：`Redis 缓存穿透是什么，怎么解决？`
-4. 查看回答、召回来源、召回片段、Prompt Preview 和 token 用量。
-5. 提问：`Kafka consumer rebalance 为什么会变慢？`，展示无上下文兜底。
-6. 打开评估看板，查看标准问题覆盖率、Hit@3、MRR 和问答日志。
-7. 打开“受控修复”，先查看 `CONFLICT_PENDING` 的只读来源冲突，再批准并执行预置的低风险 metadata patch。
-
-完整的计时话术、fixture 边界和失败降级路径见
-[5 分钟 Multi-Agent v2 演示脚本](docs/guides/multi-agent-v2-5-minute-demo.md)。
-
-## 核心功能
-
-- JWT 登录认证与用户数据隔离
-- BCrypt 密码加密
-- Redis JWT logout 黑名单
-- Redis Lua 固定窗口限流：AI 问答按用户默认每分钟 10 次，超限返回 HTTP 429，Redis 故障时支持 fail-open / fail-closed 配置
-- Flyway 数据库迁移管理
-- 知识文档 CRUD 与软删除
-- TXT / Markdown 笔记导入
-- 文档创建、更新、导入后自动生成 chunks
-- 中英文关键词检索与 MySQL FULLTEXT，保留各通道得分用于调试
-- chunk 向量持久化（本地稀疏向量与真实 dense embedding 按 provider 共存）、余弦相似度与 RRF 融合排序
-- 可插拔 EmbeddingClient / RerankClient：默认本地零成本，配置 key 后可切换外部 embedding 与 rerank API
-- 可选 pgvector 向量存储：dense 向量双写 MySQL JSON 与 Postgres HNSW 索引，评估接口可直接对比两种 serving 路径的 Hit@3 / MRR
-- 无上下文兜底，避免知识库没有资料时强行调用模型
-- Prompt Preview 保存，方便排查 RAG 问题
-- `LlmClient` 抽象，支持 Mock 与 DeepSeek Provider
-- AI Ask 日志记录 provider、耗时、chunk ids、token usage、成功 / 失败状态
-- bad case 反馈与评估汇总
-- RAG evaluation dataset 覆盖率，用标准问题检查检索链路
-- Retrieval evaluation 五方检索评估（keyword / sparse-hybrid / dense-hybrid / dense-hybrid-pgvector / dense-hybrid-rerank），用人工标注 gold label 计算 Hit@3、MRR、首个相关片段排名与策略间 delta
-- 前端展示问答、召回来源、召回片段、Prompt、文档管理、日志分页详情和评估看板
-- 后端单元测试与 GitHub Actions CI
-
-## 核心设计要点
-
-DevMind 的核心设计围绕 RAG 链路和后端工程化展开：
-
-1. 文档先持久化并切分为 chunks，避免长文本直接进入 Prompt 导致上下文过长和召回不稳定。
-2. 检索层支持中英文多关键词、标题、标签和类型召回，并保留各通道原始得分便于排查召回结果；RRF 融合后的分数只用于排序，不具备业务含义。
-3. chunk 重建时同步生成本地稀疏向量并持久化到向量表，提问时只计算 query 向量，再与已持久化的 chunk 向量做余弦相似度比较。
-4. 混合检索使用 RRF 融合关键词 / FULLTEXT 排名和本地稀疏向量排名，避免直接相加不同量纲的分数。
-5. 当检索不到有效上下文时，系统返回无上下文兜底，避免模型在知识库缺资料时编造答案。
-6. 完整 Prompt 与 Prompt Preview 分离：模型接收全部召回上下文，日志和 API 只保留最多 2,000 字符的预览；Ask Log 用 schema version 区分历史截断输入与修复后的可信输入，方便定位 RAG 问题。
-7. `LlmClient` 抽象隔离业务流程和模型供应商，支持 Mock、本地测试、DeepSeek 接入和后续 Provider 扩展。
-8. JWT logout 使用 Redis 黑名单保存未过期 token 的剩余 TTL，解决无状态 token 退出后仍可能可用的问题。
-9. AI 问答入口使用 Redis Lua 原子执行 `INCR + EXPIRE`，按用户限制固定窗口内的请求次数；默认每分钟 10 次，超限返回 HTTP 429，Redis 故障策略可配置。
-10. Flyway 管理数据库结构版本，避免不同环境手动执行 SQL 造成表结构漂移。
-11. bad case feedback 和 RAG evaluation dataset 用于记录问题样例、期望答案和覆盖情况，形成持续优化闭环。
-12. retrieval evaluation 会批量执行标准问题检索，用人工标注的相关文档作为 gold label 计算 Hit@3、MRR 和首个相关片段排名；命中关键词只作为诊断信息展示，不作为相关性裁判。
-13. retrieval evaluation 在同一 gold-label 用例集上对比 keyword / sparse-hybrid / dense-hybrid / dense-hybrid-pgvector / dense-hybrid-rerank 五种策略的 Hit@3、MRR 和 delta；外部依赖未配置时对应策略标记为 unavailable 并优雅降级，评估不失败、不联网。
-14. 评估集包含词法失配、同义改写和跨主题 hard-negative 用例；实测显示 dense embedding 能把改写问题的相关文档从第 5 位提升到第 1 位，rerank 能保证相关文档必进前 3，但会牺牲部分排序精度（详见上方评估结果表）。
-15. embedding 输入文本由 `EmbeddingTextBuilder` 统一从标题、来源类型、标签和 chunk 内容构造，避免索引、重排和后续向量化使用不同字段。
-16. 第一版优先支持 TXT / Markdown 导入，保证核心链路稳定；PDF、Word、OCR 与 SSE 保留为产品化演进项，不纳入当前作品集版本。
-
-## 项目定位
-
-DevMind 是一个面向开发学习场景的 AI 知识库系统，重点展示 Java 后端工程链路中的 RAG 应用实践与可量化的检索质量评估。
-
-## 后续规划
-
-后续迭代按优先级分为三类：
-
-1. 检索增强：rerank 从离线评估接入线上问答链路；无上下文判定从"召回为空"升级为基于 dense 相似度阈值；HNSW 参数（m / ef_search）按规模调优。
-2. 评估增强：扩大标注评估集规模使结论具备统计显著性，补充 bad case 分类统计和模型回答质量评测。
-3. 工程增强：限流已覆盖高成本 AI 问答入口；后续可扩展接口幂等、失败重试和部署监控。SSE、PDF/Word 导入保留为可选产品化能力。
-
-## 文档
-
-- 后端说明：[backend/README.md](backend/README.md)
-- 前端说明：[frontend/README.md](frontend/README.md)
-- 架构说明：[backend/docs/architecture.md](backend/docs/architecture.md)
-- API 调试：[backend/docs/api/devmind-api.http](backend/docs/api/devmind-api.http)
-- 部署与运维边界：[docs/operations/production-readiness.md](docs/operations/production-readiness.md)
-- 5 分钟演示：[docs/guides/multi-agent-v2-5-minute-demo.md](docs/guides/multi-agent-v2-5-minute-demo.md)
-- Multi-Agent v2 面试手册：[docs/interview/multi-agent-v2-handbook.md](docs/interview/multi-agent-v2-handbook.md)
-
-## CI
-
-GitHub Actions 会在 push 和 pull request 时执行：
-
-```text
-backend: ./mvnw test
-frontend: npm ci && npm run build
-```
-
-## 说明
-
-本项目用于学习和作品集展示，不在仓库中提交真实 API Key、数据库密码或个人隐私笔记。
+- [本地体验指南](docs/guides/local-demo.md)：导入示例、准备演示数据、查看提案和执行结果。
+- [后端运行与配置](backend/README.md) · [前端运行与构建](frontend/README.md)
+- [架构与设计取舍](backend/docs/architecture.md) · [API 请求示例](backend/docs/api/devmind-api.http)
+- [实验方法与结果](backend/evaluation/README.md)：检索对比、受控修复与独立 Reviewer 的验证边界。
+- [部署与维护说明](docs/operations/production-readiness.md)

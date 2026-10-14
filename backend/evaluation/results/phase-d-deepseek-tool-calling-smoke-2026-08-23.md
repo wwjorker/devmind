@@ -1,4 +1,6 @@
-# Phase D DeepSeek tool-calling smoke
+# DeepSeek tool-calling smoke
+
+> Historical experiment record from 2026-08-23; not rerun during documentation maintenance.
 
 ## Run identity
 
@@ -34,6 +36,6 @@ configuration.
 
 This is a protocol and integration smoke check only. It does not establish
 retrieval accuracy, diagnosis quality, production availability, cost, or an
-advantage for any of the preregistered four evaluation arms. The full scored
-provider report remains unrun until the frozen manifest, knowledge snapshot,
-pricing inputs, and explicit cost authorization are supplied.
+advantage for any of the preregistered four evaluation arms. This smoke record predates the separate scored run. See the
+[four-arm result](phase-d-four-arm-provider-run-v2-2026-08-23.md) for that
+experiment and its negative Reviewer-uplift conclusion.

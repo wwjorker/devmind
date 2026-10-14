@@ -1,4 +1,6 @@
-# Phase D four-arm provider run — amended v2 dataset
+# four-arm provider run — amended v2 dataset
+
+> Historical experiment record from 2026-08-23; not rerun during documentation maintenance.
 
 This is the first scored provider run after the independent-review protocol
 amendment. The raw report is
@@ -6,6 +8,10 @@ amendment. The raw report is
 `290db07d1326562c78a85d39158c36e0aba0f5c66f3604a32037ebffde47a51d`).
 The earlier v1 run remains preserved separately as invalid protocol evidence
 and was not overwritten.
+
+The hash above matches the CRLF checkout. The Git blob at `213dad9` uses LF and
+has SHA-256 `50ae58244b153d54344d24f1d76e60c26bb829039ca5f73bc9c229e5da4a8417`.
+Line endings affect byte hashes; this is not a new experimental run.
 
 ## Frozen inputs and provider
 
@@ -24,7 +30,7 @@ and was not overwritten.
 The runner classified the run as `scored-provider-run`. Its validity guard
 passed because every model arm discriminated between valid and defective
 challenge proposals. This only establishes that the protocol produced a
-scoreable run; it does not establish a product-quality or resume claim.
+scoreable run; it does not establish a product-quality claim.
 
 ## Observed results
 
